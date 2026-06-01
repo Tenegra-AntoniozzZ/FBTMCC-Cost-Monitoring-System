@@ -2,9 +2,9 @@ FBTMCC Cost Monitoring & Disbursement System
 
 A modern, Local Area Network (LAN)-based web application designed to replace the company's manual and error-prone Excel workflow. This system unifies the encoding of financial receipts (Disbursements) and provides real-time budget tracking for active construction projects (Cost Monitoring).
 
-Key Features
+✨ Key Features
 
-Role-Based Access Control (RBAC):
+🔐 Role-Based Access Control (RBAC):
 
 Encoder: Has full access to create, edit, and post Disbursement Vouchers.
 
@@ -12,7 +12,7 @@ Project Engineer: Read-only access focused on Project Progress Costing and remai
 
 CEO / Admin: Read-only access for overall financial health and ledger viewing.
 
-Smart Voucher Entry System:
+⚡ Smart Voucher Entry System:
 
 Automatic computation of 2% EWT (Expanded Withholding Tax) for Labor/Subcontractor categories.
 
@@ -20,21 +20,21 @@ Target CIB variance checker to prevent unbalanced entries.
 
 Real-time CV# duplication detection.
 
-Excel-Like Ledger View:
+📊 Excel-Like Ledger View:
 
 Familiar spreadsheet layout featuring over 30 expense categories.
 
 Multi-select month filtering and dynamic CV# search capabilities.
 
-Real-Time Cost Monitoring Dashboard:
+📈 Real-Time Cost Monitoring Dashboard:
 
 Instant calculation of Contract Cost, Budget Limit (Net of VAT), Total Expenses, and Remaining Pondo.
 
-Secure Local Deployment:
+🔒 Secure Local Deployment:
 
 100% offline capability. Hosted entirely on the company's local server (LAN) for maximum financial data security.
 
-Technology Stack
+🛠️ Technology Stack
 
 Frontend: React.js (via Vite)
 
@@ -44,7 +44,7 @@ Backend API: Node.js with Express.js
 
 Database: SQLite3 (Local file-based database)
 
-Prerequisites
+📋 Prerequisites
 
 Before setting up the project, ensure the host computer (Server PC) has the following installed:
 
@@ -52,7 +52,7 @@ Node.js (LTS Version) - Download from nodejs.org
 
 Git - Download from git-scm.com
 
-Installation & Setup Guide
+🚀 Installation & Setup Guide
 
 This system requires two separate terminal windows running simultaneously on the Server PC: one for the Backend (Database) and one for the Frontend (UI).
 
@@ -107,7 +107,7 @@ Start the frontend development server and expose it to the local network:
 npm run dev -- --host
 
 
-Network Access for Users (Encoders/Managers)
+🌐 Network Access for Users (Encoders/Managers)
 
 Users do not need to install anything on their computers. To access the system:
 
@@ -119,7 +119,7 @@ Type the Server's IP address followed by the frontend port (default is usually 5
 
 Example: http://192.168.1.50:5173
 
-Folder Structure Overview
+📁 Folder Structure Overview
 
 FBTMCC COST MON/
 ├── costmon-backend/                 # Node.js Express API
@@ -138,7 +138,7 @@ FBTMCC COST MON/
     └── package.json
 
 
-Database Management & Backups
+🗄️ Database Management & Backups
 
 Because the system uses SQLite, the entire database is contained within a single file: costmon_local.db located inside the costmon-backend folder.
 
