@@ -9,16 +9,24 @@ import {
   Save,
   X,
   FileCode,
-  Layers
+  Layers,
+  CheckCircle2,
+  BarChart3
 } from 'lucide-react';
 import { API_URL } from '../utils/constants';
 
-export default function ProjectsSetupScreen({ projects, categories, refreshData }) {
+export default function ProjectsSetupScreen({ projects, categories, refreshData, onNavigateToCostMonitoring }) {
   const [newProject, setNewProject] = useState({ project_code: '', project_name: '', contract_cost: '', profit_percentage: '20' });
   const [newCategory, setNewCategory] = useState('');
   const [editingProject, setEditingProject] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
+  const [projectCodeError, setProjectCodeError] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showCategorySuccessModal, setShowCategorySuccessModal] = useState(false);
+  const [recentlyAddedProject, setRecentlyAddedProject] = useState(null);
+  const [projectToDelete, setProjectToDelete] = useState(null);
+  const [categoryToDelete, setCategoryToDelete] = useState(null);
 
   const showMessage = (text, type = 'success') => {
     setMessage({ text, type });
@@ -28,7 +36,15 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData 
   const handleAddProject = async (e) => {
     e.preventDefault();
     if (!newProject.project_code || !newProject.project_name) return;
+
+    // Project Code Uniqueness Validation
+    const isExisting = projects.some(p => p.project_code.toLowerCase() === newProject.project_code.toLowerCase());
+    if (isExisting) {
+      setProjectCodeError(`Code "${newProject.project_code}" already exists!`);
+      return;
+    }
     
+    setProjectCodeError('');
     setIsSaving(true);
     try {
       const response = await fetch(`${API_URL}/projects`, {
@@ -41,7 +57,9 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData 
       });
       
       if (response.ok) {
-        showMessage('Project added successfully!');
+        const data = await response.json();
+        setRecentlyAddedProject({ id: data.id, code: newProject.project_code });
+        setShowSuccessModal(true);
         setNewProject({ project_code: '', project_name: '', contract_cost: '', profit_percentage: '20' });
         refreshData();
       }
@@ -77,17 +95,20 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData 
     }
   };
 
-  const handleDeleteProject = async (id) => {
-    if (!window.confirm('Sigurado ka bang gusto mong burahin ang project na ito?')) return;
-    
+  const confirmDeleteProject = async () => {
+    if (!projectToDelete) return;
+    setIsSaving(true);
     try {
-      const response = await fetch(`${API_URL}/projects/${id}`, { method: 'DELETE' });
+      const response = await fetch(`${API_URL}/projects/${projectToDelete.id}`, { method: 'DELETE' });
       if (response.ok) {
         showMessage('Project deleted.');
+        setProjectToDelete(null);
         refreshData();
       }
     } catch (error) {
       showMessage('Failed to delete project.', 'error');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -104,7 +125,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData 
       });
       
       if (response.ok) {
-        showMessage('Category added!');
+        setShowCategorySuccessModal(true);
         setNewCategory('');
         refreshData();
       } else {
@@ -117,19 +138,29 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData 
     }
   };
 
-  const handleDeleteCategory = async (id) => {
-    if (!window.confirm('Burahin ang kategoryang ito?')) return;
+  const handleDeleteCategory = (cat) => {
+    setCategoryToDelete(cat);
+  };
+
+  const confirmDeleteCategory = async () => {
+    if (!categoryToDelete) return;
     
+    setIsSaving(true);
     try {
-      const response = await fetch(`${API_URL}/categories/${id}`, { method: 'DELETE' });
+      const response = await fetch(`${API_URL}/categories/${categoryToDelete.id}`, { method: 'DELETE' });
       if (response.ok) {
         showMessage('Category removed.');
+        setCategoryToDelete(null);
         refreshData();
       }
     } catch (error) {
       showMessage('Failed to remove category.', 'error');
+    } finally {
+      setIsSaving(false);
     }
   };
+
+  const sortedCategories = [...categories].sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div className="flex flex-col h-full bg-[#f8fafc] overflow-hidden">
@@ -165,7 +196,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData 
                 <FileCode className="text-indigo-600" size={24} />
                 Project Codes
               </h2>
-              <span className="px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-black text-slate-500 uppercase tracking-widest">
+              <span className="px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-black text-slate-500 tracking-widest">
                 {projects.length} Registered
               </span>
             </div>
@@ -173,18 +204,40 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData 
             {/* ADD / EDIT FORM */}
             <div className="p-8 border-b border-slate-100 bg-indigo-50/30">
               <form onSubmit={editingProject ? handleUpdateProject : handleAddProject} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                <div className="md:col-span-1 space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Code</label>
+                <div className="md:col-span-1 space-y-1.5 relative">
+                  <label className="text-[10px] font-black text-slate-400 tracking-widest ml-1">Code</label>
                   <input 
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase"
+                    className={`w-full px-4 py-3 rounded-xl border font-bold focus:outline-none focus:ring-2 transition-all ${
+                      projectCodeError 
+                        ? 'border-rose-500 bg-rose-50/50 focus:ring-rose-500 text-rose-700' 
+                        : 'border-slate-200 focus:ring-indigo-500'
+                    }`}
                     placeholder="RF-000"
                     value={editingProject ? editingProject.project_code : newProject.project_code}
-                    onChange={(e) => editingProject ? setEditingProject({...editingProject, project_code: e.target.value}) : setNewProject({...newProject, project_code: e.target.value})}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (editingProject) {
+                        setEditingProject({...editingProject, project_code: val});
+                      } else {
+                        setNewProject({...newProject, project_code: val});
+                        // Clear error while typing if the code is now unique
+                        if (projects.some(p => p.project_code.toLowerCase() === val.toLowerCase())) {
+                           setProjectCodeError(`Code "${val}" na-gamit na!`);
+                        } else {
+                           setProjectCodeError('');
+                        }
+                      }
+                    }}
                     required
                   />
+                  {projectCodeError && !editingProject && (
+                    <p className="absolute -bottom-5 left-1 text-[10px] text-rose-500 font-bold whitespace-nowrap animate-in slide-in-from-top-1">
+                      {projectCodeError}
+                    </p>
+                  )}
                 </div>
                 <div className="md:col-span-2 space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Project Name</label>
+                  <label className="text-[10px] font-black text-slate-400 tracking-widest ml-1">Project Name</label>
                   <input 
                     className="w-full px-4 py-3 rounded-xl border border-slate-200 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     placeholder="Enter site name..."
@@ -196,8 +249,12 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData 
                 <div className="flex gap-2">
                   <button 
                     type="submit" 
-                    disabled={isSaving}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-3 rounded-xl shadow-lg shadow-indigo-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    disabled={isSaving || (!!projectCodeError && !editingProject)}
+                    className={`flex-1 text-white font-black py-3 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                      (!!projectCodeError && !editingProject)
+                        ? 'bg-slate-400 shadow-slate-100' 
+                        : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'
+                    }`}
                   >
                     {editingProject ? <Save size={18} /> : <Plus size={18} />}
                     {editingProject ? 'Update' : 'Add'}
@@ -219,10 +276,10 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData 
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50/50">
-                    <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Code</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Project Name</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-right">Contract Cost</th>
-                    <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-center">Actions</th>
+                    <th className="px-8 py-4 text-[10px] font-black text-slate-400 tracking-widest border-b border-slate-100">Code</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 tracking-widest border-b border-slate-100">Project Name</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 tracking-widest border-b border-slate-100 text-right">Contract Cost</th>
+                    <th className="px-8 py-4 text-[10px] font-black text-slate-400 tracking-widest border-b border-slate-100 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -249,7 +306,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData 
                             <Settings2 size={18} />
                           </button>
                           <button 
-                            onClick={() => handleDeleteProject(p.id)}
+                            onClick={() => setProjectToDelete(p)}
                             className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
                           >
                             <Trash2 size={18} />
@@ -272,7 +329,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData 
                 <Tags className="text-amber-500" size={24} />
                 Categories
               </h2>
-              <span className="px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-black text-slate-500 uppercase tracking-widest">
+              <span className="px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-black text-slate-500 tracking-widest">
                 {categories.length}
               </span>
             </div>
@@ -297,11 +354,11 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData 
 
             <div className="flex-1 overflow-y-auto max-h-[600px] p-6">
               <div className="space-y-2">
-                {categories.map((cat) => (
+                {sortedCategories.map((cat) => (
                   <div key={cat.id} className="group flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-amber-200 hover:bg-amber-50/30 transition-all">
                     <span className="text-sm font-bold text-slate-600">{cat.name}</span>
                     <button 
-                      onClick={() => handleDeleteCategory(cat.id)}
+                      onClick={() => handleDeleteCategory(cat)}
                       className="p-1.5 text-slate-300 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-all"
                     >
                       <Trash2 size={16} />
@@ -313,6 +370,137 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData 
           </div>
         </section>
       </main>
+
+      {/* DELETE MODAL */}
+      {projectToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-2">
+                <Trash2 size={32} />
+              </div>
+              <h3 className="text-2xl font-black text-slate-800">Delete Project?</h3>
+              <p className="text-slate-500 font-medium">
+                Are you sure you want to delete project <strong className="text-rose-600">{projectToDelete.project_code}</strong>? This action cannot be undone.
+              </p>
+              
+              <div className="flex flex-col w-full gap-3 mt-6">
+                <button 
+                  onClick={confirmDeleteProject}
+                  disabled={isSaving}
+                  className="w-full py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl shadow-lg shadow-rose-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isSaving ? 'Deleting...' : 'Yes, Delete Project'}
+                </button>
+                <button 
+                  onClick={() => setProjectToDelete(null)}
+                  disabled={isSaving}
+                  className="w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUCCESS MODAL */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-[2.5rem] p-10 max-w-xl w-full shadow-2xl animate-in zoom-in-95">
+            <div className="flex flex-col items-center text-center space-y-6">
+              <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-2 shadow-inner">
+                <CheckCircle2 size={40} />
+              </div>
+              <div>
+                <h3 className="text-3xl font-black text-slate-800">Project Added Successfully!</h3>
+                <p className="text-slate-500 font-medium mt-2 text-lg">
+                  Successfully created project code <strong className="text-indigo-600">{recentlyAddedProject?.code}</strong>.
+                </p>
+              </div>
+              
+              <div className="flex flex-row w-full gap-5 mt-4">
+                <button 
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    onNavigateToCostMonitoring(recentlyAddedProject?.id);
+                  }}
+                  className="flex-[1.2] py-5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl shadow-xl shadow-indigo-200 transition-all flex items-center justify-center gap-3 text-lg"
+                >
+                  <BarChart3 size={24} strokeWidth={2.5} />
+                  Go to Monitoring
+                </button>
+                <button 
+                  onClick={() => setShowSuccessModal(false)}
+                  className="flex-1 py-5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition-all text-lg"
+                >
+                  Stay Here
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CATEGORY SUCCESS MODAL */}
+      {showCategorySuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-[2rem] p-10 max-w-md w-full shadow-2xl animate-in zoom-in-95">
+            <div className="flex flex-col items-center text-center space-y-6">
+              <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-2 shadow-inner">
+                <Plus size={40} />
+              </div>
+              <div>
+                <h3 className="text-2xl font-black text-slate-800">Category Added!</h3>
+                <p className="text-slate-500 font-medium mt-2">
+                  Bagong kategorya ay matagumpay na naidagdag sa system.
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowCategorySuccessModal(false)}
+                className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-xl shadow-lg shadow-amber-100 transition-all text-lg"
+              >
+                Understood
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CATEGORY DELETE MODAL */}
+      {categoryToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-[2rem] p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-2">
+                <Trash2 size={32} />
+              </div>
+              <h3 className="text-2xl font-black text-slate-800">Delete Category?</h3>
+              <p className="text-slate-500 font-medium">
+                Are you sure you want to delete <strong className="text-rose-600">{categoryToDelete.name}</strong>? This may affect existing disbursements.
+              </p>
+              
+              <div className="flex flex-col w-full gap-3 mt-6">
+                <button 
+                  onClick={confirmDeleteCategory}
+                  disabled={isSaving}
+                  className="w-full py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl shadow-lg shadow-rose-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isSaving ? 'Deleting...' : 'Yes, Delete Category'}
+                </button>
+                <button 
+                  onClick={() => setCategoryToDelete(null)}
+                  disabled={isSaving}
+                  className="w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

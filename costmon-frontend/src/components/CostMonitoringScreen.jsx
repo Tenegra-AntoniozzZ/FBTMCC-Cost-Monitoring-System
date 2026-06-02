@@ -11,11 +11,17 @@ import {
   Receipt
 } from 'lucide-react';
 
-export default function CostMonitoringScreen({ projects, disbursements, onUpdateProject }) {
-  const [selectedProjectId, setSelectedProjectId] = useState(projects[0]?.id || '');
+export default function CostMonitoringScreen({ projects, disbursements, onUpdateProject, initialProjectId }) {
+  const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId || projects[0]?.id || '');
   
   // Local state for editable fields to ensure snappy UI
   const [editingValues, setEditingValues] = useState({});
+
+  useEffect(() => {
+    if (initialProjectId) {
+      setSelectedProjectId(initialProjectId);
+    }
+  }, [initialProjectId]);
 
   const project = useMemo(() => 
     projects.find(p => p.id === selectedProjectId), 
@@ -227,7 +233,7 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
                   {financials.projectExpenses.length} Entries
                 </span>
               </h3>
-              <p className="text-slate-500 text-xs font-medium mt-1 uppercase tracking-widest">Linked disbursements for {project?.project_code}</p>
+              <p className="text-slate-500 text-xs font-medium mt-1 tracking-widest">Linked disbursements for {project?.project_code}</p>
             </div>
             <button className="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors shadow-sm">
               Export to Excel

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, Plus, Trash2, FileText, ChevronDown, Filter, X, Lock, Save } from 'lucide-react';
+import { Search, Plus, Trash2, FileText, ChevronDown, Filter, X, Lock, Save, Wallet as WalletIcon, LayoutDashboard, Receipt, BarChart3 } from 'lucide-react';
 import SearchableDropdown from './SearchableDropdown';
+import HealthCard from './HealthCard';
 import { API_URL } from '../utils/constants';
 
 export default function DisbursementScreen({ disbursements, refreshData, isLoading, userRole, categories }) {
@@ -280,8 +281,215 @@ export default function DisbursementScreen({ disbursements, refreshData, isLoadi
   };
 
   return (
-    <div className="p-8 max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-300">
-      
+    <div className="flex flex-col h-full bg-[#f8fafc] overflow-hidden">
+      {/* HEADER */}
+      <header className="bg-white border-b border-slate-200 px-8 py-6 flex items-center justify-between shrink-0 shadow-sm">
+        <div>
+          <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+            <div className="bg-blue-600 p-2 rounded-xl text-white shadow-lg shadow-blue-200">
+              <Receipt size={28} />
+            </div>
+            DISBURSEMENT LEDGER
+          </h1>
+          <p className="text-slate-500 mt-1 font-medium italic">{activeMonthDisplay}</p>
+        </div>
+
+        <div className="flex items-center gap-4">
+          {!canEdit && (
+            <div className="bg-amber-50 border border-amber-100 text-amber-700 px-4 py-2 rounded-xl flex items-center gap-2 text-xs font-bold">
+              <Lock size={16} />
+              READ-ONLY MODE
+            </div>
+          )}
+          {isLoading && (
+            <div className="bg-blue-50 text-blue-600 px-4 py-2 rounded-xl text-xs font-black animate-pulse border border-blue-100">
+              UPDATING...
+            </div>
+          )}
+        </div>
+      </header>
+
+      <main className="flex-1 overflow-y-auto p-8 space-y-8">
+        
+        {/* STATS CARDS */}
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <HealthCard 
+            title="Total of Debit (Gross)" 
+            amount={ledgerTotals.dr} 
+            colorClass="bg-blue-600" 
+            textClass="text-blue-600" 
+          />
+          <HealthCard 
+            title="Total of Credit (Net+Tax)" 
+            amount={ledgerTotals.cr} 
+            colorClass="bg-emerald-600" 
+            textClass="text-emerald-600" 
+          />
+          <HealthCard 
+            title="Current Variance" 
+            amount={ledgerTotals.diff} 
+            colorClass={ledgerTotals.diff === 0 ? "bg-emerald-500" : "bg-rose-500"} 
+            textClass={ledgerTotals.diff === 0 ? "text-emerald-600" : "text-rose-600"} 
+          />
+        </section>
+
+        {/* LEDGER TABLE SECTION */}
+        <section className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[600px]">
+          
+          {/* ACTION BAR */}
+          <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4 flex-1">
+              <div className="relative max-w-sm w-full">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input
+                  type="text"
+                  placeholder="Search CV No..."
+                  className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              <div className="relative" ref={filterRef}>
+                <button 
+                  onClick={() => {
+                    setTempSelectedMonths(selectedMonths);
+                    setIsFilterOpen(!isFilterOpen);
+                  }}
+                  className="flex items-center gap-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-5 py-3 rounded-xl font-bold transition-all shadow-sm"
+                >
+                  <Filter size={18} className={selectedMonths.includes('All') ? 'text-slate-400' : 'text-blue-600'} />
+                  <span>{selectedMonths.includes('All') ? 'All Months' : `${selectedMonths.length} Months`}</span>
+                </button>
+
+                {isFilterOpen && (
+                  <div className="absolute left-0 mt-3 w-72 bg-white border border-slate-200 rounded-2xl shadow-2xl z-20 overflow-hidden animate-in fade-in zoom-in-95">
+                    <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                      <span className="font-black text-slate-700 text-sm tracking-tight uppercase">Select Months</span>
+                      <button onClick={() => setIsFilterOpen(false)} className="text-slate-400 hover:text-rose-500 transition-colors"><X size={18} /></button>
+                    </div>
+                    <div className="p-3 max-h-64 overflow-y-auto space-y-1 custom-scrollbar">
+                      <label className="flex items-center gap-3 p-3 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors group">
+                        <input 
+                          type="checkbox" 
+                          checked={tempSelectedMonths.includes('All')}
+                          onChange={() => handleToggleMonth('All')}
+                          className="rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500 w-5 h-5 cursor-pointer"
+                        />
+                        <span className={`text-sm ${tempSelectedMonths.includes('All') ? 'font-black text-slate-800' : 'text-slate-500 font-bold'}`}>Show All Data</span>
+                      </label>
+                      {availableMonths.map(month => (
+                        <label key={month} className="flex items-center gap-3 p-3 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors group">
+                          <input 
+                            type="checkbox" 
+                            checked={tempSelectedMonths.includes(month)}
+                            onChange={() => handleToggleMonth(month)}
+                            className="rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500 w-5 h-5 cursor-pointer"
+                          />
+                          <span className={`text-sm ${tempSelectedMonths.includes(month) ? 'font-black text-slate-800' : 'text-slate-500 font-bold'}`}>{formatMonth(month)}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="p-4 border-t border-slate-100 bg-slate-50">
+                      <button 
+                        onClick={applyFilter}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-black transition-all shadow-lg shadow-blue-100"
+                      >
+                        Apply Filters
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {canEdit && (
+              <button 
+                onClick={() => {
+                  resetForm();
+                  setIsModalOpen(true);
+                }}
+                className="flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-black transition-all shadow-lg shadow-blue-200"
+              >
+                <Plus size={20} />
+                New Disbursement
+              </button>
+            )}
+          </div>
+
+          {/* TABLE */}
+          <div className="overflow-x-auto custom-scrollbar flex-1">
+            <table className="w-full text-left border-collapse min-w-[1500px]">
+              <thead>
+                <tr className="bg-slate-50/50">
+                  <th className="px-6 py-5 text-xs font-black text-slate-700 uppercase tracking-wider border-b border-slate-200 sticky left-0 z-10 bg-slate-50 shadow-[1px_0_0_0_#e2e8f0]">Date</th>
+                  <th className="px-6 py-5 text-xs font-black text-slate-700 uppercase tracking-wider border-b border-slate-200">Payee</th>
+                  <th className="px-6 py-5 text-xs font-black text-slate-700 uppercase tracking-wider border-b border-slate-200 text-center">CV No.</th>
+                  <th className="px-6 py-5 text-xs font-black text-slate-700 uppercase tracking-wider border-b border-slate-200 text-center">Project</th>
+                  <th className="px-6 py-5 text-xs font-black text-slate-700 uppercase tracking-wider border-b border-slate-200 text-right">Debit (Gross)</th>
+                  <th className="px-6 py-5 text-xs font-black text-slate-700 uppercase tracking-wider border-b border-slate-200 text-right text-emerald-700 bg-emerald-50/30">Credit (CIB)</th>
+                  <th className="px-6 py-5 text-xs font-black text-slate-700 uppercase tracking-wider border-b border-slate-200 text-right text-rose-700">EWT</th>
+                  {categories.map(cat => (
+                    <th key={cat} className="px-4 py-5 text-xs font-black text-slate-600 uppercase tracking-wider border-b border-slate-200 text-right min-w-[120px]" title={cat}>
+                      {cat}
+                    </th>
+                  ))}
+                  <th className="px-6 py-5 text-xs font-black text-slate-700 uppercase tracking-wider border-b border-slate-200 text-center">Particulars</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {filteredDisbursements.length === 0 ? (
+                  <tr>
+                    <td colSpan={8 + categories.length} className="px-8 py-20 text-center">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="bg-slate-100 p-6 rounded-full text-slate-300">
+                          <Receipt size={48} />
+                        </div>
+                        <p className="text-slate-400 font-bold text-lg italic">No disbursements found for the selected criteria.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredDisbursements.map(d => (
+                  <tr 
+                    key={d.id} 
+                    className={`hover:bg-slate-50/50 transition-colors group ${canEdit ? 'cursor-pointer' : ''}`}
+                    onDoubleClick={() => handleEditRow(d)}
+                  >
+                    <td className="px-6 py-4 font-bold text-slate-500 sticky left-0 z-10 bg-white group-hover:bg-slate-50/50 shadow-[1px_0_0_0_#f1f5f9]">{d.date}</td>
+                    <td className="px-6 py-4 font-black text-slate-700">{d.payee}</td>
+                    <td className="px-6 py-4 font-black text-blue-600 text-center">#{d.cv_no}</td>
+                    <td className="px-6 py-4 font-black text-slate-400 text-center">{d.project_code}</td>
+                    <td className="px-6 py-4 text-right font-mono font-bold text-slate-800">₱{(d.gross_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td className="px-6 py-4 text-right font-mono font-bold text-emerald-600 bg-emerald-50/20">₱{(d.net_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td className="px-6 py-4 text-right font-mono font-bold text-rose-500">₱{(d.ewt_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    {categories.map(cat => {
+                      const amt = getCategoryAmount(d, cat);
+                      return (
+                        <td key={cat} className={`px-4 py-4 text-right font-mono text-sm ${amt ? 'font-bold text-slate-700' : 'text-slate-300'}`}>
+                          {amt ? `₱${amt.toLocaleString()}` : '—'}
+                        </td>
+                      );
+                    })}
+                    <td className="px-6 py-4 text-slate-400 text-xs italic max-w-[200px] truncate" title={d.particulars}>{d.particulars}</td>
+                  </tr>
+                ))}
+              </tbody>
+              {filteredDisbursements.length > 0 && (
+                <tfoot className="bg-slate-50 font-black text-slate-700 border-t-2 border-slate-200">
+                  <tr>
+                    <td colSpan="4" className="px-6 py-5 text-right text-[10px] tracking-widest text-slate-400 sticky left-0 z-10 bg-slate-50 shadow-[1px_0_0_0_#e2e8f0]">TOTAL SUMMARY:</td>
+                    <td className="px-6 py-5 text-right font-mono text-blue-600">₱{ledgerTotals.dr.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td className="px-6 py-5 text-right font-mono text-emerald-600">₱{ledgerTotals.cib.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td className="px-6 py-5 text-right font-mono text-rose-600">₱{ledgerTotals.ewt.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td colSpan={categories.length + 1} className="px-6 py-5"></td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </section>
+      </main>
+
       {isModalOpen && canEdit && (
         <div className="fixed inset-0 z-50 flex justify-center items-start pt-10 pb-10 overflow-y-auto bg-slate-900/60 backdrop-blur-sm px-4">
           <div className="bg-slate-50 w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
@@ -326,7 +534,7 @@ export default function DisbursementScreen({ disbursements, refreshData, isLoadi
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-slate-500">Project Code (#) <span className="text-red-500">*</span></label>
-                      <input type="text" name="project_code" placeholder="Hal. RF-105" className="w-full p-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-700 uppercase"
+                      <input type="text" name="project_code" placeholder="Hal. RF-105" className="w-full p-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium text-slate-700"
                         value={headerData.project_code} onChange={handleHeaderChange} required />
                     </div>
                     <div className="space-y-1">
@@ -437,7 +645,7 @@ export default function DisbursementScreen({ disbursements, refreshData, isLoadi
                                 value={line.category}
                                 onChange={(val) => handleLineChange(line.id, 'category', val)}
                                 placeholder="-- Hanapin ang kategorya --"
-                                hasError={lineErrors.includes(line.id)} // <-- ITO ANG BAGONG IDINAGDAG
+                                hasError={lineErrors.includes(line.id)}
                                 />
                             </div>
                           <div className="w-40 relative">
@@ -521,225 +729,6 @@ export default function DisbursementScreen({ disbursements, refreshData, isLoadi
           </div>
         </div>
       )}
-
-      {/* ========================================================= */}
-      {/* LEDGER TABLE VIEW */}
-      {/* ========================================================= */}
-      
-      {!canEdit && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl flex items-center gap-3 mb-6">
-          <Lock className="text-amber-500" size={20} />
-          <p className="text-sm">Restricted Access. Ikaw ay nasa <strong>Read-Only Mode</strong>.</p>
-        </div>
-      )}
-
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col flex-1 min-h-[85vh]">
-        
-        <div className="p-4 bg-slate-50 flex justify-between items-center rounded-t-xl">
-          <div className="flex items-center gap-3">
-            <h3 className="font-bold text-slate-800 text-lg">Disbursement Ledger View (Full Excel View)</h3>
-            {isLoading && <span className="text-xs text-blue-600 animate-pulse bg-blue-50 px-2 py-1 rounded">Updating data...</span>}
-          </div>
-          
-          <div className="flex items-center gap-4">
-            
-            <div className="relative flex flex-col items-end">
-              <div className="relative">
-                <Search className="absolute left-3 top-2 text-slate-400" size={16} />
-                <input
-                  type="text"
-                  placeholder="Hanapin ang CV#..."
-                  className="pl-9 pr-3 py-1.5 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none w-48 shadow-sm transition-all focus:w-64"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              {searchQuery.trim() !== '' && (
-                <span className="absolute -bottom-5 right-1 text-[10px] text-blue-600 font-medium whitespace-nowrap">
-                  {filteredDisbursements.length} record(s) found
-                </span>
-              )}
-            </div>
-
-            <div className="relative" ref={filterRef}>
-              <button 
-                onClick={() => {
-                  setTempSelectedMonths(selectedMonths);
-                  setIsFilterOpen(!isFilterOpen);
-                }}
-                className="flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-md text-sm font-medium transition-colors shadow-sm"
-              >
-                <Filter size={16} className={selectedMonths.includes('All') ? 'text-slate-400' : 'text-blue-600'} />
-                <span>{selectedMonths.includes('All') ? 'Filter ng Buwan' : `${selectedMonths.length} Buwan Napili`}</span>
-              </button>
-
-              {isFilterOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-lg shadow-xl z-20 overflow-hidden flex flex-col">
-                  <div className="p-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                    <span className="font-bold text-slate-700 text-sm">Pumili ng Buwan</span>
-                    <button onClick={() => setIsFilterOpen(false)} className="text-slate-400 hover:text-red-500 transition-colors"><X size={16} /></button>
-                  </div>
-                  <div className="p-2 max-h-48 overflow-y-auto space-y-1">
-                    <label className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer transition-colors">
-                      <input 
-                        type="checkbox" 
-                        checked={tempSelectedMonths.includes('All')}
-                        onChange={() => handleToggleMonth('All')}
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
-                      />
-                      <span className={`text-sm ${tempSelectedMonths.includes('All') ? 'font-bold text-slate-800' : 'text-slate-600'}`}>Lahat (All)</span>
-                    </label>
-                    {availableMonths.map(month => (
-                      <label key={month} className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer transition-colors">
-                        <input 
-                          type="checkbox" 
-                          checked={tempSelectedMonths.includes(month)}
-                          onChange={() => handleToggleMonth(month)}
-                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
-                        />
-                        <span className={`text-sm ${tempSelectedMonths.includes(month) ? 'font-bold text-slate-800' : 'text-slate-600'}`}>{formatMonth(month)}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <div className="p-3 border-t border-slate-100 bg-slate-50">
-                    <button 
-                      onClick={applyFilter}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md text-sm font-bold transition-colors"
-                    >
-                      I-apply ang Filter
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {canEdit && (
-              <button 
-                onClick={() => {
-                  resetForm();
-                  setIsModalOpen(true);
-                }}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-md text-sm font-bold transition-all shadow-sm ml-2"
-              >
-                <Plus size={18} />
-                Bagong Disbursement
-              </button>
-            )}
-
-          </div>
-        </div>
-
-        <div className="bg-slate-800 text-white p-4 grid grid-cols-1 md:grid-cols-3 gap-4 border-y border-slate-700">
-          <div>
-            <div className="text-xs text-slate-400 uppercase tracking-widest font-bold mb-1">Summary of Disbursement</div>
-            <div className="text-sm font-medium">{activeMonthDisplay}</div>
-          </div>
-          <div className="flex gap-6 md:col-span-2 justify-end items-end">
-            <div className="text-right">
-              <div className="text-xs text-slate-400 uppercase tracking-wider mb-1">Total Dr</div>
-              <div className="font-mono text-xl font-bold">₱{ledgerTotals.dr.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-            </div>
-            <div className="text-right border-l border-slate-600 pl-6">
-              <div className="text-xs text-slate-400 uppercase tracking-wider mb-1">Total Cr</div>
-              <div className="font-mono text-xl font-bold">₱{ledgerTotals.cr.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-            </div>
-            <div className="text-right border-l border-slate-600 pl-6">
-              <div className="text-xs text-slate-400 uppercase tracking-wider mb-1">Variance</div>
-              <div className={`font-mono text-xl font-bold ${ledgerTotals.diff < 0 ? 'text-red-500' : ledgerTotals.diff > 0 ? 'text-blue-400' : 'text-emerald-400'}`}>
-                {ledgerTotals.diff < 0 ? '' : ledgerTotals.diff > 0 ? '+' : ''}
-                {ledgerTotals.diff.toLocaleString(undefined, {minimumFractionDigits: 2})}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto custom-scrollbar bg-white rounded-b-xl flex-1">
-          <table className="w-max text-left whitespace-nowrap border-collapse min-w-full">
-            <thead>
-              <tr className="bg-slate-100 text-slate-600 text-xs uppercase tracking-wider border-b border-slate-200">
-                <th className="p-3 font-semibold border-r border-slate-200 sticky left-0 z-10 bg-slate-100 shadow-[1px_0_0_0_#e2e8f0]">Date</th>
-                <th className="p-3 font-semibold border-r border-slate-200">Payee</th>
-                <th className="p-3 font-semibold border-r border-slate-200">Particulars</th>
-                <th className="p-3 font-semibold border-r border-slate-200">TIN</th>
-                <th className="p-3 font-semibold border-r border-slate-200 text-center">CODE #</th>
-                <th className="p-3 font-semibold border-r border-slate-200 text-center">CV#</th>
-                <th className="p-3 font-semibold border-r border-slate-200 text-center">Check No.</th>
-                <th className="p-3 font-semibold border-r border-slate-200 text-center">OR/Inv. #</th>
-                
-                <th className="p-3 font-bold border-r border-slate-200 text-blue-700 bg-blue-50/50 text-right">CIB/COH</th>
-                <th className="p-3 font-semibold border-r border-slate-200 text-right text-slate-500">Accts Pay</th>
-                <th className="p-3 font-semibold border-r border-slate-200 text-right text-red-500">EWT Payable</th>
-                
-                {categories.map(cat => (
-                  <th key={cat} className="p-3 font-semibold border-r border-slate-200 text-right" title={cat}>
-                    {cat.length > 20 ? cat.substring(0, 18) + '...' : cat}
-                  </th>
-                ))}
-
-                <th className="p-3 font-semibold border-r border-slate-200 text-right text-slate-500">Input Tax</th>
-                <th className="p-3 font-semibold border-r border-slate-200 text-right text-slate-500">Output Tax</th>
-                <th className="p-3 font-bold border-l-2 border-slate-300 bg-slate-50 text-right text-slate-800">Total of Debit</th>
-              </tr>
-            </thead>
-            <tbody className="text-sm divide-y divide-slate-100">
-              {filteredDisbursements.length === 0 ? (
-                <tr><td colSpan={15 + categories.length} className="p-12 text-center text-slate-400 text-lg">Walang laman ang ledger. I-click ang "+ Bagong Disbursement" para mag-encode.</td></tr>
-              ) : filteredDisbursements.map(d => {
-                const acctsPay = parseFloat(d.accts_pay) || 0;
-                const inputTax = parseFloat(d.input_tax) || 0;
-                const outputTax = parseFloat(d.output_tax) || 0;
-
-                return (
-                  <tr 
-                    key={d.id} 
-                    className={`hover:bg-slate-50 transition-colors group ${canEdit ? 'cursor-pointer' : ''}`}
-                    onDoubleClick={() => handleEditRow(d)}
-                    title={canEdit ? "Double-click para i-edit" : ""}
-                  >
-                    <td className="p-3 text-slate-600 font-medium border-r border-slate-100 sticky left-0 z-10 bg-white group-hover:bg-slate-50 shadow-[1px_0_0_0_#f1f5f9]">{d.date}</td>
-                    <td className="p-3 font-semibold text-slate-800 border-r border-slate-100 max-w-[200px] truncate" title={d.payee}>{d.payee}</td>
-                    <td className="p-3 text-slate-500 border-r border-slate-100 max-w-[250px] truncate" title={d.particulars}>{d.particulars}</td>
-                    <td className="p-3 text-slate-500 border-r border-slate-100 font-mono text-xs">{d.tin || '-'}</td>
-                    <td className="p-3 font-bold text-slate-700 uppercase border-r border-slate-100 text-center">{d.project_code}</td>
-                    <td className="p-3 font-bold text-slate-800 border-r border-slate-100 text-center">{d.cv_no || '-'}</td>
-                    <td className="p-3 text-slate-500 border-r border-slate-100 text-center">{d.check_no || '-'}</td>
-                    <td className="p-3 text-slate-500 border-r border-slate-100 text-center">{d.or_inv_no || '-'}</td>
-                    
-                    <td className="p-3 text-right text-blue-600 font-bold bg-blue-50/20 border-r border-slate-100">{d.net_amount ? d.net_amount.toLocaleString(undefined, {minimumFractionDigits: 2}) : '-'}</td>
-                    <td className="p-3 text-right border-r border-slate-100 text-slate-500">{acctsPay ? acctsPay.toLocaleString(undefined, {minimumFractionDigits: 2}) : '-'}</td>
-                    <td className="p-3 text-right text-red-500 border-r border-slate-100">{d.ewt_amount ? d.ewt_amount.toLocaleString(undefined, {minimumFractionDigits: 2}) : '-'}</td>
-
-                    {categories.map(cat => {
-                      const amt = getCategoryAmount(d, cat);
-                      return (
-                        <td key={cat} className="p-3 text-right border-r border-slate-100 font-mono">
-                          {amt ? amt.toLocaleString(undefined, {minimumFractionDigits: 2}) : '-'}
-                        </td>
-                      );
-                    })}
-
-                    <td className="p-3 text-right border-r border-slate-100 text-slate-500">{inputTax ? inputTax.toLocaleString(undefined, {minimumFractionDigits: 2}) : '-'}</td>
-                    <td className="p-3 text-right border-r border-slate-100 text-slate-500">{outputTax ? outputTax.toLocaleString(undefined, {minimumFractionDigits: 2}) : '-'}</td>
-                    <td className="p-3 text-right font-bold bg-slate-50/50 border-l-2 border-slate-200">{d.gross_amount ? parseFloat(d.gross_amount).toLocaleString(undefined, {minimumFractionDigits: 2}) : '-'}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-            {filteredDisbursements.length > 0 && (
-              <tfoot className="bg-slate-100 border-t-2 border-slate-300 font-bold text-slate-700 sticky bottom-0">
-                <tr>
-                  <td colSpan="8" className="p-3 text-right text-xs uppercase tracking-wider text-slate-500 sticky left-0 z-10 bg-slate-100 shadow-[1px_0_0_0_#cbd5e1]">Total Sum for Selection:</td>
-                  <td className="p-3 text-right text-blue-700">₱{ledgerTotals.cib.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                  <td className="p-3 text-right text-slate-500">-</td>
-                  <td className="p-3 text-right text-red-600">₱{ledgerTotals.ewt.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                  <td colSpan={categories.length + 2} className="p-3"></td>
-                  <td className="p-3 text-right text-slate-800">₱{ledgerTotals.dr.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
-      </div>
     </div>
   );
 }

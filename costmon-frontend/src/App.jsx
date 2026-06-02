@@ -14,6 +14,7 @@ import { API_URL } from './utils/constants';
 export default function App() {
   const [userRole, setUserRole] = useState(null);
   const [activeTab, setActiveTab] = useState('disbursements');
+  const [initialCostMonitoringProjectId, setInitialCostMonitoringProjectId] = useState(null);
   const [projects, setProjects] = useState([]);
   const [categories, setCategories] = useState([]);
   
@@ -65,6 +66,11 @@ export default function App() {
   const handleLogin = (role) => {
     setUserRole(role);
     setActiveTab(role === 'encoder' ? 'disbursements' : 'cost-monitoring');
+  };
+
+  const navigateToCostMonitoring = (projectId) => {
+    setInitialCostMonitoringProjectId(projectId);
+    setActiveTab('cost-monitoring');
   };
 
   if (!userRole) return <LoginScreen onLogin={handleLogin} />;
@@ -131,6 +137,7 @@ export default function App() {
             projects={projects} 
             disbursements={disbursements} 
             onUpdateProject={handleUpdateProject} 
+            initialProjectId={initialCostMonitoringProjectId}
           />
         )}
         {activeTab === 'projects' && (
@@ -138,6 +145,7 @@ export default function App() {
             projects={projects} 
             categories={categories} 
             refreshData={fetchAllData} 
+            onNavigateToCostMonitoring={navigateToCostMonitoring}
           />
         )}
       </main>
