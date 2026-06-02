@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, Plus, Trash2, FileText, ChevronDown, Filter, X, Lock, Save } from 'lucide-react';
 import SearchableDropdown from './SearchableDropdown';
-import { EXPENSE_CATEGORIES, API_URL } from '../utils/constants';
+import { API_URL } from '../utils/constants';
 
-export default function DisbursementScreen({ disbursements, refreshData, isLoading, userRole }) {
+export default function DisbursementScreen({ disbursements, refreshData, isLoading, userRole, categories }) {
   const canEdit = userRole === 'encoder';
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -433,7 +433,7 @@ export default function DisbursementScreen({ disbursements, refreshData, isLoadi
                           </div>
                           <div className="flex-1">
                                 <SearchableDropdown 
-                                options={EXPENSE_CATEGORIES}
+                                options={categories}
                                 value={line.category}
                                 onChange={(val) => handleLineChange(line.id, 'category', val)}
                                 placeholder="-- Hanapin ang kategorya --"
@@ -670,7 +670,7 @@ export default function DisbursementScreen({ disbursements, refreshData, isLoadi
                 <th className="p-3 font-semibold border-r border-slate-200 text-right text-slate-500">Accts Pay</th>
                 <th className="p-3 font-semibold border-r border-slate-200 text-right text-red-500">EWT Payable</th>
                 
-                {EXPENSE_CATEGORIES.map(cat => (
+                {categories.map(cat => (
                   <th key={cat} className="p-3 font-semibold border-r border-slate-200 text-right" title={cat}>
                     {cat.length > 20 ? cat.substring(0, 18) + '...' : cat}
                   </th>
@@ -683,7 +683,7 @@ export default function DisbursementScreen({ disbursements, refreshData, isLoadi
             </thead>
             <tbody className="text-sm divide-y divide-slate-100">
               {filteredDisbursements.length === 0 ? (
-                <tr><td colSpan={15 + EXPENSE_CATEGORIES.length} className="p-12 text-center text-slate-400 text-lg">Walang laman ang ledger. I-click ang "+ Bagong Disbursement" para mag-encode.</td></tr>
+                <tr><td colSpan={15 + categories.length} className="p-12 text-center text-slate-400 text-lg">Walang laman ang ledger. I-click ang "+ Bagong Disbursement" para mag-encode.</td></tr>
               ) : filteredDisbursements.map(d => {
                 const acctsPay = parseFloat(d.accts_pay) || 0;
                 const inputTax = parseFloat(d.input_tax) || 0;
@@ -709,7 +709,7 @@ export default function DisbursementScreen({ disbursements, refreshData, isLoadi
                     <td className="p-3 text-right border-r border-slate-100 text-slate-500">{acctsPay ? acctsPay.toLocaleString(undefined, {minimumFractionDigits: 2}) : '-'}</td>
                     <td className="p-3 text-right text-red-500 border-r border-slate-100">{d.ewt_amount ? d.ewt_amount.toLocaleString(undefined, {minimumFractionDigits: 2}) : '-'}</td>
 
-                    {EXPENSE_CATEGORIES.map(cat => {
+                    {categories.map(cat => {
                       const amt = getCategoryAmount(d, cat);
                       return (
                         <td key={cat} className="p-3 text-right border-r border-slate-100 font-mono">
@@ -732,7 +732,7 @@ export default function DisbursementScreen({ disbursements, refreshData, isLoadi
                   <td className="p-3 text-right text-blue-700">₱{ledgerTotals.cib.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                   <td className="p-3 text-right text-slate-500">-</td>
                   <td className="p-3 text-right text-red-600">₱{ledgerTotals.ewt.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                  <td colSpan={EXPENSE_CATEGORIES.length + 2} className="p-3"></td>
+                  <td colSpan={categories.length + 2} className="p-3"></td>
                   <td className="p-3 text-right text-slate-800">₱{ledgerTotals.dr.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                 </tr>
               </tfoot>

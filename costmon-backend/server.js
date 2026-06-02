@@ -40,10 +40,146 @@ db.serialize(() => {
     expenses_json TEXT,
     created_at TEXT
   )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS projects (
+    id TEXT PRIMARY KEY,
+    project_code TEXT UNIQUE,
+    project_name TEXT,
+    contract_cost REAL DEFAULT 0,
+    profit_percentage REAL DEFAULT 0.20
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS expense_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE
+  )`);
+
+  // Insert Initial Data if tables are empty
+  db.get("SELECT count(*) as count FROM projects", (err, row) => {
+    if (row && row.count === 0) {
+      const initialProjects = [
+        ['1', 'RF-105', 'Unitop Dasma', 800000, 0.15],
+        ['2', 'W-308', 'Amazing Place QC', 1600000, 0.20],
+        ['3', 'RF-126', 'WM Tanauan', 990000, 0.15],
+        ['4', 'ADMIN', 'Shop/Admin 2026', 0, 0]
+      ];
+      const stmt = db.prepare("INSERT INTO projects (id, project_code, project_name, contract_cost, profit_percentage) VALUES (?, ?, ?, ?, ?)");
+      initialProjects.forEach(p => stmt.run(p));
+      stmt.finalize();
+    }
+  });
+
+  db.get("SELECT count(*) as count FROM expense_categories", (err, row) => {
+    if (row && row.count === 0) {
+      const initialCats = [
+        'Materials/Purchases', 'Labor /SUBCONTRACTOR', 'Gas & Oil', 'Office Supplies', 
+        'Tools & Equipment', 'Office Furniture', 'Shop Supplies', 'Food/Meals', 
+        'Transpo/Travel', 'Repair & Maint.', 'Parking', 'Toll Fee', 'Handling Fee', 
+        'Communication', 'Miscellaneous / Sending Fee / Schematic', 'Light & Power', 
+        'Water', 'Rental/Hotel Accom.', 'Representation', 'Salaries & Wages', 
+        'Cash Advance/Payroll', 'Cash Advance/Project', 'Permit/Licenses', 
+        'Insurance Expense/CONST', 'Insurance Expenses/CAR', 'SOP/Retainer Fee', 
+        'Incentives Fee', 'Service Fee', 'Entrance'
+      ];
+      const stmt = db.prepare("INSERT INTO expense_categories (name) VALUES (?)");
+      initialCats.forEach(c => stmt.run(c));
+      stmt.finalize();
+    }
+  });
 });
 
 // ==========================================
-// API ENDPOINTS
+// API ENDPOINTS - PROJECTS
+// ==========================================
+
+app.get('/api/projects', (req, res) => {
+  db.all("SELECT * FROM projects ORDER BY project_code ASC", [], (err, rows) => {
+    if (err) {
+      console.error("Database error (GET projects):", err.message);
+      return res.status(500).json({ error: err.message });
+    }
+    console.log(`Fetched ${rows.length} projects`);
+    res.json(rows);
+  });
+});
+
+app.post('/api/projects', (req, res) => {
+  const { id, project_code, project_name, contract_cost, profit_percentage } = req.body;
+  const newId = id || Math.random().toString(36).substr(2, 9);
+  db.run(
+    "INSERT INTO projects (id, project_code, project_name, contract_cost, profit_percentage) VALUES (?, ?, ?, ?, ?)",
+    [newId, project_code, project_name, contract_cost || 0, profit_percentage || 0.20],
+    function(err) {
+      if (err) {
+        console.error("Database error (POST project):", err.message);
+        return res.status(500).json({ error: err.message });
+      }
+      res.json({ success: true, id: newId });
+    }
+  );
+});
+
+app.put('/api/projects/:id', (req, res) => {
+  const { project_code, project_name, contract_cost, profit_percentage } = req.body;
+  
+  // We allow partial updates for the Cost Monitoring screen
+  let query = "UPDATE projects SET ";
+  let params = [];
+  const fields = [];
+  
+  if (project_code !== undefined) { fields.push("project_code=?"); params.push(project_code); }
+  if (project_name !== undefined) { fields.push("project_name=?"); params.push(project_name); }
+  if (contract_cost !== undefined) { fields.push("contract_cost=?"); params.push(contract_cost); }
+  if (profit_percentage !== undefined) { fields.push("profit_percentage=?"); params.push(profit_percentage); }
+  
+  if (fields.length === 0) return res.json({ success: true, message: "No changes" });
+  
+  query += fields.join(", ") + " WHERE id=?";
+  params.push(req.params.id);
+
+  db.run(query, params, function(err) {
+    if (err) {
+      console.error("Database error (PUT project):", err.message);
+      return res.status(500).json({ error: err.message });
+    }
+    res.json({ success: true });
+  });
+});
+
+app.delete('/api/projects/:id', (req, res) => {
+  db.run("DELETE FROM projects WHERE id=?", req.params.id, function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// ==========================================
+// API ENDPOINTS - CATEGORIES
+// ==========================================
+
+app.get('/api/categories', (req, res) => {
+  db.all("SELECT * FROM expense_categories ORDER BY name ASC", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+app.post('/api/categories', (req, res) => {
+  db.run("INSERT INTO expense_categories (name) VALUES (?)", [req.body.name], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true, id: this.lastID });
+  });
+});
+
+app.delete('/api/categories/:id', (req, res) => {
+  db.run("DELETE FROM expense_categories WHERE id=?", req.params.id, function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// ==========================================
+// API ENDPOINTS - DISBURSEMENTS
 // ==========================================
 
 // 1. GET - Kunin lahat ng records

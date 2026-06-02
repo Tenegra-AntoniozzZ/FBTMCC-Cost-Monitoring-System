@@ -6,27 +6,35 @@ import LoginScreen from './components/LoginScreen';
 import NavItem from './components/NavItem';
 import DisbursementScreen from './components/DisbursementScreen';
 import CostMonitoringScreen from './components/CostMonitoringScreen';
+import ProjectsSetupScreen from './components/ProjectsSetupScreen';
 
 // Pag-import ng data mula sa utils
-import { INITIAL_PROJECTS, API_URL } from './utils/constants';
+import { API_URL } from './utils/constants';
 
 export default function App() {
   const [userRole, setUserRole] = useState(null);
   const [activeTab, setActiveTab] = useState('disbursements');
-  const [projects] = useState(INITIAL_PROJECTS);
+  const [projects, setProjects] = useState([]);
+  const [categories, setCategories] = useState([]);
   
   const [disbursements, setDisbursements] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  const fetchDisbursements = async () => {
+  const fetchAllData = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/disbursements`);
-      if (response.ok) {
-        const data = await response.json();
-        setDisbursements(data);
-      }
+      // Parallel fetching for efficiency
+      const [disbRes, projRes, catRes] = await Promise.all([
+        fetch(`${API_URL}/disbursements`),
+        fetch(`${API_URL}/projects`),
+        fetch(`${API_URL}/categories`)
+      ]);
+
+      if (disbRes.ok) setDisbursements(await disbRes.json());
+      if (projRes.ok) setProjects(await projRes.json());
+      if (catRes.ok) setCategories(await catRes.json());
+
     } catch (error) {
       console.error("Hindi makakonekta sa Local Server.", error);
     } finally {
@@ -36,11 +44,23 @@ export default function App() {
 
   useEffect(() => {
     if (userRole) {
-      queueMicrotask(() => {
-        fetchDisbursements();
-      });
+      fetchAllData();
     }
   }, [userRole]);
+
+  const handleUpdateProject = (projectId, updatedValues) => {
+    // Optimistic UI update
+    setProjects(prev => prev.map(p => 
+      p.id === projectId ? { ...p, ...updatedValues } : p
+    ));
+    
+    // Sync with backend
+    fetch(`${API_URL}/projects/${projectId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedValues)
+    });
+  };
 
   const handleLogin = (role) => {
     setUserRole(role);
@@ -96,8 +116,30 @@ export default function App() {
       </aside>
 
       <main className="flex-1 overflow-y-auto relative w-full">
-        {activeTab === 'disbursements' && <DisbursementScreen projects={projects} disbursements={disbursements} refreshData={fetchDisbursements} isLoading={isLoading} userRole={userRole} />}
-        {activeTab === 'cost-monitoring' && <CostMonitoringScreen projects={projects} disbursements={disbursements} />}
+        {activeTab === 'disbursements' && (
+          <DisbursementScreen 
+            projects={projects} 
+            categories={categories.map(c => c.name)} 
+            disbursements={disbursements} 
+            refreshData={fetchAllData} 
+            isLoading={isLoading} 
+            userRole={userRole} 
+          />
+        )}
+        {activeTab === 'cost-monitoring' && (
+          <CostMonitoringScreen 
+            projects={projects} 
+            disbursements={disbursements} 
+            onUpdateProject={handleUpdateProject} 
+          />
+        )}
+        {activeTab === 'projects' && (
+          <ProjectsSetupScreen 
+            projects={projects} 
+            categories={categories} 
+            refreshData={fetchAllData} 
+          />
+        )}
       </main>
     </div>
   );
