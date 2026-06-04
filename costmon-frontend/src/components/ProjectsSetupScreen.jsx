@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   BarChart3
 } from 'lucide-react';
+import PasswordConfirmModal from './PasswordConfirmModal';
 import { API_URL } from '../utils/constants';
 
 export default function ProjectsSetupScreen({ projects, categories, refreshData, onNavigateToCostMonitoring }) {
@@ -23,8 +24,8 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showCategorySuccessModal, setShowCategorySuccessModal] = useState(false);
   const [recentlyAddedProject, setRecentlyAddedProject] = useState(null);
-  const [projectToDelete, setProjectToDelete] = useState(null);
-  const [categoryToDelete, setCategoryToDelete] = useState(null);
+  
+  const [passwordModal, setPasswordModal] = useState({ isOpen: false, action: null, payload: null });
 
   const showMessage = (text, type = 'success') => {
     setMessage({ text, type });
@@ -32,7 +33,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
   };
 
   const handleAddProject = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!newProject.project_code || !newProject.project_name) return;
 
     // Project Code Uniqueness Validation
@@ -68,8 +69,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
     }
   };
 
-  const handleUpdateProject = async (e) => {
-    e.preventDefault();
+  const executeUpdateProject = async () => {
     setIsSaving(true);
     try {
       const response = await fetch(`${API_URL}/projects/${editingProject.id}`, {
@@ -93,14 +93,12 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
     }
   };
 
-  const confirmDeleteProject = async () => {
-    if (!projectToDelete) return;
+  const executeDeleteProject = async (project) => {
     setIsSaving(true);
     try {
-      const response = await fetch(`${API_URL}/projects/${projectToDelete.id}`, { method: 'DELETE' });
+      const response = await fetch(`${API_URL}/projects/${project.id}`, { method: 'DELETE' });
       if (response.ok) {
         showMessage('Project deleted.');
-        setProjectToDelete(null);
         refreshData();
       }
     } catch {
@@ -111,7 +109,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
   };
 
   const handleAddCategory = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!newCategory.trim()) return;
     
     setIsSaving(true);
@@ -136,19 +134,12 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
     }
   };
 
-  const handleDeleteCategory = (cat) => {
-    setCategoryToDelete(cat);
-  };
-
-  const confirmDeleteCategory = async () => {
-    if (!categoryToDelete) return;
-    
+  const executeDeleteCategory = async (category) => {
     setIsSaving(true);
     try {
-      const response = await fetch(`${API_URL}/categories/${categoryToDelete.id}`, { method: 'DELETE' });
+      const response = await fetch(`${API_URL}/categories/${category.id}`, { method: 'DELETE' });
       if (response.ok) {
         showMessage('Category removed.');
-        setCategoryToDelete(null);
         refreshData();
       }
     } catch {
@@ -156,6 +147,17 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handlePasswordConfirm = () => {
+    if (passwordModal.action === 'update_project') {
+      executeUpdateProject();
+    } else if (passwordModal.action === 'delete_project') {
+      executeDeleteProject(passwordModal.payload);
+    } else if (passwordModal.action === 'delete_category') {
+      executeDeleteCategory(passwordModal.payload);
+    }
+    setPasswordModal({ isOpen: false, action: null, payload: null });
   };
 
   const sortedCategories = [...categories].sort((a, b) => a.name.localeCompare(b.name));
@@ -201,7 +203,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
 
             {/* ADD / EDIT FORM */}
             <div className="p-8 border-b border-slate-100 bg-indigo-50/30">
-              <form onSubmit={editingProject ? handleUpdateProject : handleAddProject} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+              <form onSubmit={(e) => { e.preventDefault(); if (editingProject) { setPasswordModal({ isOpen: true, action: 'update_project', payload: null }); } else { handleAddProject(e); } }} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                 <div className="md:col-span-1 space-y-1.5 relative">
                   <label className="text-[10px] font-black text-slate-400 tracking-widest ml-1">Code</label>
                   <input 
@@ -304,7 +306,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                             <Settings2 size={18} />
                           </button>
                           <button 
-                            onClick={() => setProjectToDelete(p)}
+                            onClick={() => setPasswordModal({ isOpen: true, action: 'delete_project', payload: p })}
                             className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
                           >
                             <Trash2 size={18} />
@@ -356,7 +358,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                   <div key={cat.id} className="group flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-amber-200 hover:bg-amber-50/30 transition-all">
                     <span className="text-sm font-bold text-slate-600">{cat.name}</span>
                     <button 
-                      onClick={() => handleDeleteCategory(cat)}
+                      onClick={() => setPasswordModal({ isOpen: true, action: 'delete_category', payload: cat })}
                       className="p-1.5 text-slate-300 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-all"
                     >
                       <Trash2 size={16} />
@@ -368,40 +370,6 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
           </div>
         </section>
       </main>
-
-      {/* DELETE MODAL */}
-      {projectToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95">
-            <div className="flex flex-col items-center text-center space-y-4">
-              <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-2">
-                <Trash2 size={32} />
-              </div>
-              <h3 className="text-2xl font-black text-slate-800">Delete Project?</h3>
-              <p className="text-slate-500 font-medium">
-                Are you sure you want to delete project <strong className="text-rose-600">{projectToDelete.project_code}</strong>? This action cannot be undone.
-              </p>
-              
-              <div className="flex flex-col w-full gap-3 mt-6">
-                <button 
-                  onClick={confirmDeleteProject}
-                  disabled={isSaving}
-                  className="w-full py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl shadow-lg shadow-rose-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {isSaving ? 'Deleting...' : 'Yes, Delete Project'}
-                </button>
-                <button 
-                  onClick={() => setProjectToDelete(null)}
-                  disabled={isSaving}
-                  className="w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* SUCCESS MODAL */}
       {showSuccessModal && (
@@ -466,39 +434,12 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
         </div>
       )}
 
-      {/* CATEGORY DELETE MODAL */}
-      {categoryToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-[2rem] p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95">
-            <div className="flex flex-col items-center text-center space-y-4">
-              <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mb-2">
-                <Trash2 size={32} />
-              </div>
-              <h3 className="text-2xl font-black text-slate-800">Delete Category?</h3>
-              <p className="text-slate-500 font-medium">
-                Are you sure you want to delete <strong className="text-rose-600">{categoryToDelete.name}</strong>? This may affect existing disbursements.
-              </p>
-              
-              <div className="flex flex-col w-full gap-3 mt-6">
-                <button 
-                  onClick={confirmDeleteCategory}
-                  disabled={isSaving}
-                  className="w-full py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl shadow-lg shadow-rose-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {isSaving ? 'Deleting...' : 'Yes, Delete Category'}
-                </button>
-                <button 
-                  onClick={() => setCategoryToDelete(null)}
-                  disabled={isSaving}
-                  className="w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <PasswordConfirmModal
+        isOpen={passwordModal.isOpen}
+        actionType={passwordModal.action === 'update_project' ? 'update' : 'delete'}
+        onClose={() => setPasswordModal({ isOpen: false, action: null, payload: null })}
+        onConfirm={handlePasswordConfirm}
+      />
     </div>
   );
 }

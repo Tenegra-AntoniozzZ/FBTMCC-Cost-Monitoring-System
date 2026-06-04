@@ -121,6 +121,20 @@ app.post('/api/forgot-password/reset', async (req, res) => {
   });
 });
 
+// 4. VERIFY PASSWORD API (Para sa Security Check Modals)
+app.post('/api/verify-password', (req, res) => {
+  const { username, password } = req.body;
+  db.get("SELECT password FROM users WHERE username = ?", [username], async (err, user) => {
+    if (err) return res.status(500).json({ error: "Database error." });
+    if (!user) return res.status(401).json({ error: "User not found." });
+
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) return res.status(401).json({ error: "Mali ang password." });
+
+    res.json({ success: true });
+  });
+});
+
 // ==========================================
 // UMIIRAL NA API ENDPOINTS (Projects, Categories, Disbursements)
 // ==========================================
@@ -134,6 +148,7 @@ app.delete('/api/categories/:id', (req, res) => { db.run("DELETE FROM expense_ca
 app.get('/api/disbursements', (req, res) => { db.all("SELECT * FROM disbursements ORDER BY created_at DESC", [], (err, rows) => { if (err) return res.status(500).json({ error: err.message }); const formattedRows = rows.map(row => ({ ...row, expenses: row.expenses_json ? JSON.parse(row.expenses_json) : [] })); res.json(formattedRows); }); });
 app.post('/api/disbursements', (req, res) => { const data = req.body; const stmt = db.prepare(`INSERT INTO disbursements (id, project_code, date, payee, particulars, tin, cv_no, check_no, or_inv_no, accts_pay, input_tax, output_tax, target_cib, gross_amount, ewt_amount, net_amount, expenses_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`); stmt.run(data.id, data.project_code, data.date, data.payee, data.particulars, data.tin, data.cv_no, data.check_no, data.or_inv_no, data.accts_pay || 0, data.input_tax || 0, data.output_tax || 0, data.target_cib || 0, data.gross_amount || 0, data.ewt_amount || 0, data.net_amount || 0, JSON.stringify(data.expenses), data.created_at, function(err) { if (err) return res.status(500).json({ error: err.message }); res.json({ success: true, message: 'Record saved successfully.' }); }); stmt.finalize(); });
 app.put('/api/disbursements/:id', (req, res) => { const data = req.body; const id = req.params.id; const stmt = db.prepare(`UPDATE disbursements SET project_code=?, date=?, payee=?, particulars=?, tin=?, cv_no=?, check_no=?, or_inv_no=?, accts_pay=?, input_tax=?, output_tax=?, target_cib=?, gross_amount=?, ewt_amount=?, net_amount=?, expenses_json=? WHERE id=?`); stmt.run(data.project_code, data.date, data.payee, data.particulars, data.tin, data.cv_no, data.check_no, data.or_inv_no, data.accts_pay || 0, data.input_tax || 0, data.output_tax || 0, data.target_cib || 0, data.gross_amount || 0, data.ewt_amount || 0, data.net_amount || 0, JSON.stringify(data.expenses), id, function(err) { if (err) return res.status(500).json({ error: err.message }); res.json({ success: true, message: 'Record updated successfully.' }); }); stmt.finalize(); });
+app.delete('/api/disbursements/:id', (req, res) => { db.run("DELETE FROM disbursements WHERE id=?", req.params.id, function(err) { if (err) return res.status(500).json({ error: err.message }); res.json({ success: true }); }); });
 
 const PORT = 3001;
 app.listen(PORT, '0.0.0.0', () => { 

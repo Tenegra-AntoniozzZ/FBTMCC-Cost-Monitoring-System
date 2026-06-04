@@ -33,6 +33,7 @@ export default function App() {
   const [disbursements, setDisbursements] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const fetchAllData = useCallback(async () => {
     setIsLoading(true);
@@ -153,7 +154,7 @@ export default function App() {
             <UserCircle2 size={24} className="text-blue-500 shrink-0" title={`User: ${activeUsername} (${userRole})`} />
           )}
 
-          <button onClick={handleLogout} className={`flex items-center text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors bg-slate-800/50 rounded-md justify-center ${isSidebarOpen ? 'gap-2 p-2' : 'p-3'}`}>
+          <button onClick={() => setShowLogoutModal(true)} className={`flex items-center text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors bg-slate-800/50 rounded-md justify-center ${isSidebarOpen ? 'gap-2 p-2' : 'p-3'}`}>
             <LogOut size={isSidebarOpen ? 14 : 18} />
             {isSidebarOpen && <span className="text-xs font-bold">Log out</span>}
           </button>
@@ -165,12 +166,46 @@ export default function App() {
           <DisbursementScreen projects={projects} categories={categories.map(c => c.name)} disbursements={disbursements} refreshData={fetchAllData} isLoading={isLoading} userRole={userRole} />
         )}
         {activeTab === 'cost-monitoring' && (
-          <CostMonitoringScreen projects={projects} disbursements={disbursements} onUpdateProject={handleUpdateProject} initialProjectId={initialCostMonitoringProjectId} />
+          <CostMonitoringScreen projects={projects} disbursements={disbursements} onUpdateProject={handleUpdateProject} initialProjectId={initialCostMonitoringProjectId} userRole={userRole} refreshData={fetchAllData} />
         )}
         {activeTab === 'projects' && (
           <ProjectsSetupScreen projects={projects} categories={categories} refreshData={fetchAllData} onNavigateToCostMonitoring={navigateToCostMonitoring} />
         )}
       </main>
+
+      {/* LOGOUT CONFIRMATION MODAL */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="flex flex-col items-center text-center">
+              <div className="bg-red-100 p-3 rounded-full text-red-600 mb-4">
+                <LogOut size={28} strokeWidth={2.5} />
+              </div>
+              <h3 className="text-xl font-black text-slate-800 mb-2">Confirm Logout</h3>
+              <p className="text-sm text-slate-500 font-medium mb-6">
+                Are you sure you want to log out of your current session? You will need to sign in again to access the system.
+              </p>
+              <div className="flex w-full gap-3">
+                <button 
+                  onClick={() => setShowLogoutModal(false)}
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowLogoutModal(false);
+                    handleLogout();
+                  }}
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-red-200"
+                >
+                  Yes, Log out
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

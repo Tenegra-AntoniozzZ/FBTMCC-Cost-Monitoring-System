@@ -6,11 +6,18 @@ import {
   CheckCircle2, 
   Wallet,
   Calendar,
-  Receipt
+  Receipt,
+  Save,
+  Trash2
 } from 'lucide-react';
 import SearchableDropdown from './SearchableDropdown';
+import PasswordConfirmModal from './PasswordConfirmModal';
+import { API_URL } from '../utils/Constants';
 
-export default function CostMonitoringScreen({ projects, disbursements, onUpdateProject, initialProjectId }) {
+export default function CostMonitoringScreen({ projects, disbursements, onUpdateProject, initialProjectId, userRole, refreshData }) {
+  const canEdit = userRole === 'encoder';
+  const [passwordModal, setPasswordModal] = useState({ isOpen: false, action: null, payload: null });
+  const [isSaving, setIsSaving] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId || projects[0]?.id || '');
   const [prevInitialProjectId, setPrevInitialProjectId] = useState(initialProjectId);
 
@@ -57,13 +64,48 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
   }
 
   const handleInputChange = (field, value) => {
-    const updatedValues = { ...editingValues, [field]: value };
-    setEditingValues(updatedValues);
-    
-    // Optional: Notify parent of changes (if onUpdateProject is provided)
+    setEditingValues(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveClick = () => {
+    if (!canEdit) return;
+    setPasswordModal({ isOpen: true, action: 'update_project', payload: editingValues });
+  };
+
+  const executeSaveProject = async (values) => {
+    setIsSaving(true);
     if (onUpdateProject && project) {
-      onUpdateProject(project.id, updatedValues);
+      await onUpdateProject(project.id, values);
     }
+    setIsSaving(false);
+  };
+
+  const handleDeleteClick = (id) => {
+    if (!canEdit) return;
+    setPasswordModal({ isOpen: true, action: 'delete_disbursement', payload: id });
+  };
+
+  const executeDeleteDisbursement = async (id) => {
+    try {
+      const response = await fetch(`${API_URL}/disbursements/${id}`, { method: 'DELETE' });
+      if (response.ok) {
+        if (refreshData) await refreshData();
+      } else {
+        alert("Failed to delete disbursement.");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Network Error");
+    }
+  };
+
+  const handlePasswordConfirm = () => {
+    if (passwordModal.action === 'update_project') {
+      executeSaveProject(passwordModal.payload);
+    } else if (passwordModal.action === 'delete_disbursement') {
+      executeDeleteDisbursement(passwordModal.payload);
+    }
+    setPasswordModal({ isOpen: false, action: null, payload: null });
   };
 
   const financials = useMemo(() => {
@@ -90,6 +132,11 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
       projectExpenses 
     };
   }, [project, editingValues, disbursements]);
+
+  const budgetPercentage = financials.budgetCostLimit > 0 ? (financials.totalExpenses / financials.budgetCostLimit) * 100 : 0;
+  let progressColor = 'bg-emerald-500';
+  if (budgetPercentage > 75) progressColor = 'bg-amber-500';
+  if (budgetPercentage > 90) progressColor = 'bg-rose-500';
 
   if (!projects.length) {
     return (
@@ -180,6 +227,18 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
           </div>
         </section>
 
+        {canEdit && (
+          <div className="flex justify-end -mt-4 animate-in fade-in">
+            <button 
+              onClick={handleSaveClick}
+              disabled={isSaving}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-blue-200 transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              <Save size={18} /> {isSaving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        )}
+
         {/* FINANCIAL SUMMARY CARDS */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* BUDGET LIMIT */}
@@ -231,6 +290,22 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
               </div>
               <p className="text-slate-500 text-sm font-medium">Available project funds</p>
             </div>
+          </div>
+        </section>
+
+        {/* BUDGET PROGRESS BAR */}
+        <section className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Budget Utilization</span>
+            <span className={`text-sm font-black ${progressColor.replace('bg-', 'text-')}`}>
+              {budgetPercentage.toFixed(1)}%
+            </span>
+          </div>
+          <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden shadow-inner">
+            <div 
+              className={`h-full rounded-full transition-all duration-1000 ${progressColor}`} 
+              style={{ width: `${Math.min(budgetPercentage, 100)}%` }}
+            ></div>
           </div>
         </section>
 
@@ -297,6 +372,17 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
                           ₱{parseFloat(d.gross_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </div>
                       </td>
+                      {canEdit && (
+                        <td className="px-6 py-5 text-center">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleDeleteClick(d.id); }} 
+                            className="p-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors" 
+                            title="Delete"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}
@@ -305,6 +391,13 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
           </div>
         </section>
       </main>
+
+      <PasswordConfirmModal
+        isOpen={passwordModal.isOpen}
+        actionType={passwordModal.action === 'update_project' ? 'update' : 'delete'}
+        onClose={() => setPasswordModal({ isOpen: false, action: null, payload: null })}
+        onConfirm={handlePasswordConfirm}
+      />
     </div>
   );
 }

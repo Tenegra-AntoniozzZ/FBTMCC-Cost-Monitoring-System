@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, Plus, Trash2, FileText, ChevronDown, Filter, X, Lock, Save, Receipt } from 'lucide-react';
+import { Search, Plus, Trash2, FileText, ChevronDown, Filter, X, Lock, Save, Receipt, Edit2 } from 'lucide-react';
 import SearchableDropdown from './SearchableDropdown';
 import HealthCard from './HealthCard';
-import { API_URL } from '../utils/constants';
+import PasswordConfirmModal from './PasswordConfirmModal';
+import { API_URL } from '../utils/Constants';
 
 export default function DisbursementScreen({ projects, disbursements, refreshData, isLoading, userRole, categories }) {
   const canEdit = userRole === 'encoder';
@@ -12,6 +13,9 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
   const [errorMessage, setErrorMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [lineErrors, setLineErrors] = useState([]);
+  
+  // PASSWORD VERIFICATION STATE
+  const [passwordModal, setPasswordModal] = useState({ isOpen: false, action: null, payload: null });
 
   // --- SEARCH BAR STATE ---
   const [searchQuery, setSearchQuery] = useState('');
@@ -231,16 +235,14 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
     // ==========================================
     const emptyCategoryLines = expenseLines.filter(line => !line.category || line.category.trim() === '');
     if (emptyCategoryLines.length > 0) {
-      // Kunin ang mga IDs ng mga linyang walang laman
       const errorIds = emptyCategoryLines.map(line => line.id);
-      setLineErrors(errorIds); // Ito ang magpapasimula ng pamumula
+      setLineErrors(errorIds); 
       return; 
     }
-    // ==========================================
 
-    setIsSaving(true);
     const newDisbursement = {
-      id: editingId || Math.random().toString(36).substr(2, 9), 
+      // eslint-disable-next-line react-hooks/purity
+      id: editingId || Date.now().toString(36) + Math.floor(Math.random()*1000).toString(), 
       ...headerData,
       expenses: expenseLines,
       gross_amount: totals.totalDebit,
@@ -249,6 +251,17 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
       created_at: editingId ? disbursements.find(d => d.id === editingId).created_at : new Date().toISOString()
     };
 
+    if (editingId) {
+      // If it's an update, prompt for password
+      setPasswordModal({ isOpen: true, action: 'update', payload: newDisbursement });
+    } else {
+      // If it's a new entry, just save directly (user requested password for update/delete)
+      executeSave(newDisbursement);
+    }
+  };
+
+  const executeSave = async (disbursementData) => {
+    setIsSaving(true);
     try {
       const url = editingId ? `${API_URL}/disbursements/${editingId}` : `${API_URL}/disbursements`;
       const method = editingId ? 'PUT' : 'POST';
@@ -256,7 +269,7 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
       const response = await fetch(url, {
         method: method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newDisbursement)
+        body: JSON.stringify(disbursementData)
       });
 
       if (response.ok) {
@@ -272,6 +285,34 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleDeleteClick = (id) => {
+    if (!canEdit) return;
+    setPasswordModal({ isOpen: true, action: 'delete', payload: id });
+  };
+
+  const executeDelete = async (id) => {
+    try {
+      const response = await fetch(`${API_URL}/disbursements/${id}`, { method: 'DELETE' });
+      if (response.ok) {
+        await refreshData();
+      } else {
+        alert("Failed to delete disbursement.");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Network Error");
+    }
+  };
+
+  const handlePasswordConfirm = () => {
+    if (passwordModal.action === 'update') {
+      executeSave(passwordModal.payload);
+    } else if (passwordModal.action === 'delete') {
+      executeDelete(passwordModal.payload);
+    }
+    setPasswordModal({ isOpen: false, action: null, payload: null });
   };
 
   const getCategoryAmount = (disbursement, catName) => {
@@ -435,6 +476,7 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
                     </th>
                   ))}
                   <th className="px-6 py-5 text-xs font-black text-slate-700 uppercase tracking-wider border-b border-slate-200 text-center">Particulars</th>
+                  {canEdit && <th className="px-6 py-5 text-xs font-black text-slate-700 uppercase tracking-wider border-b border-slate-200 text-center sticky right-0 z-10 bg-slate-50 shadow-[-1px_0_0_0_#e2e8f0]">Action</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -452,10 +494,10 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
                 ) : filteredDisbursements.map(d => (
                   <tr 
                     key={d.id} 
-                    className={`hover:bg-slate-50/50 transition-colors group ${canEdit ? 'cursor-pointer' : ''}`}
+                    className={`even:bg-slate-50/50 hover:bg-blue-50/50 transition-colors group ${canEdit ? 'cursor-pointer' : ''}`}
                     onDoubleClick={() => handleEditRow(d)}
                   >
-                    <td className="px-6 py-4 font-bold text-slate-500 sticky left-0 z-10 bg-white group-hover:bg-slate-50/50 shadow-[1px_0_0_0_#f1f5f9]">{d.date}</td>
+                    <td className="px-6 py-4 font-bold text-slate-500 sticky left-0 z-10 bg-white group-even:bg-slate-50/50 group-hover:bg-blue-50/50 shadow-[1px_0_0_0_#f1f5f9]">{d.date}</td>
                     <td className="px-6 py-4 font-black text-slate-700">{d.payee}</td>
                     <td className="px-6 py-4 font-black text-blue-600 text-center">#{d.cv_no}</td>
                     <td className="px-6 py-4 font-black text-slate-400 text-center">{d.project_code}</td>
@@ -471,6 +513,18 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
                       );
                     })}
                     <td className="px-6 py-4 text-slate-400 text-xs italic max-w-[200px] truncate" title={d.particulars}>{d.particulars}</td>
+                    {canEdit && (
+                      <td className="px-6 py-4 text-center sticky right-0 z-10 bg-white group-even:bg-slate-50/50 group-hover:bg-blue-50/50 shadow-[-1px_0_0_0_#f1f5f9]">
+                        <div className="flex items-center justify-center gap-2">
+                          <button onClick={(e) => { e.stopPropagation(); handleEditRow(d); }} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors" title="Edit">
+                            <Edit2 size={16} />
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteClick(d.id); }} className="p-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors" title="Delete">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -481,7 +535,7 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
                     <td className="px-6 py-5 text-right font-mono text-blue-600">₱{ledgerTotals.dr.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                     <td className="px-6 py-5 text-right font-mono text-emerald-600">₱{ledgerTotals.cib.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                     <td className="px-6 py-5 text-right font-mono text-rose-600">₱{ledgerTotals.ewt.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td colSpan={categories.length + 1} className="px-6 py-5"></td>
+                    <td colSpan={categories.length + (canEdit ? 2 : 1)} className="px-6 py-5"></td>
                   </tr>
                 </tfoot>
               )}
@@ -734,6 +788,13 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
           </div>
         </div>
       )}
+
+      <PasswordConfirmModal
+        isOpen={passwordModal.isOpen}
+        actionType={passwordModal.action}
+        onClose={() => setPasswordModal({ isOpen: false, action: null, payload: null })}
+        onConfirm={handlePasswordConfirm}
+      />
     </div>
   );
 }
