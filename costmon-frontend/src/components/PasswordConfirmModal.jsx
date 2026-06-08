@@ -16,11 +16,15 @@ export default function PasswordConfirmModal({ isOpen, onClose, onConfirm, actio
     setIsVerifying(true);
 
     const username = localStorage.getItem('fbtmcc_username');
+    const token = localStorage.getItem('fbtmcc_token'); // 1. Kunin ang token mula sa localStorage
 
     try {
       const res = await fetch(`${API_URL}/verify-password`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // 2. IDINAGDAG ANG AUTHORIZATION HEADER DITO
+        },
         body: JSON.stringify({ username, password })
       });
       const data = await res.json();
@@ -32,8 +36,8 @@ export default function PasswordConfirmModal({ isOpen, onClose, onConfirm, actio
       } else {
         setError(data.error || 'Mali ang password.');
       }
-    } catch (err) {
-      console.error('Password Verification Error:', err);
+    } catch {
+      // Inalis ang (err) dito para masunod ang Option 1 at mawala ang red line warning sa line 42
       setError('Server connection error. Please check if the backend is running.');
     } finally {
       setIsVerifying(false);

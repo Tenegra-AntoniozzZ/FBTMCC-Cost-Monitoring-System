@@ -169,9 +169,10 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
     setExpenseLines([{ id: Date.now(), category: '', amount: '' }]);
     setShowTaxFields(false);
     setErrorMessage('');
-    setLineErrors([]); // <-- Idagdag ito para malinis ang mga error lines
+    setLineErrors([]); 
     setEditingId(null);
   };
+
   const closeAndResetModal = () => {
     setIsModalOpen(false);
     resetForm();
@@ -230,9 +231,6 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
     if (isDuplicateCV) { setErrorMessage("May kaparehas na CV#! Paki-palitan bago i-save."); return; }
     if (!isVarianceZero) { setErrorMessage("Hindi pwedeng i-save! Paki-check ang Variance. Kailangang pantay ang Target CIB sa Computed CIB."); return; }
 
-    // ==========================================
-    // BAGONG VALIDATION: Hanapin ang mga walang category at papulahin
-    // ==========================================
     const emptyCategoryLines = expenseLines.filter(line => !line.category || line.category.trim() === '');
     if (emptyCategoryLines.length > 0) {
       const errorIds = emptyCategoryLines.map(line => line.id);
@@ -252,14 +250,13 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
     };
 
     if (editingId) {
-      // If it's an update, prompt for password
       setPasswordModal({ isOpen: true, action: 'update', payload: newDisbursement });
     } else {
-      // If it's a new entry, just save directly (user requested password for update/delete)
       executeSave(newDisbursement);
     }
   };
 
+  // --- DITO NAIDAGDAG ANG TOKEN (executeSave) ---
   const executeSave = async (disbursementData) => {
     setIsSaving(true);
     try {
@@ -295,6 +292,7 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
     setPasswordModal({ isOpen: true, action: 'delete', payload: id });
   };
 
+  // --- DITO NAIDAGDAG ANG TOKEN (executeDelete) ---
   const executeDelete = async (id) => {
     try {
       const response = await fetch(`${API_URL}/disbursements/${id}`, { 
@@ -306,13 +304,6 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
       if (response.ok) {
         await refreshData();
       } else {
-        alert("Failed to delete disbursement.");
-      }
-    } catch (error) {
-      console.error(error);
-      alert("Network Error");
-    }
-  };
         alert("Failed to delete disbursement.");
       }
     } catch (error) {
@@ -642,8 +633,7 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
                       <input type="text" name="particulars" placeholder="Details..." className="w-full p-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                         value={headerData.particulars} onChange={handleHeaderChange} required />
                     </div>
-                    <div className="space-y-
-                    1">
+                    <div className="space-y-1">
                       <label className="text-xs font-semibold text-slate-500">TIN</label>
                       <input type="text" name="tin" placeholder="000-000-000-000" className="w-full p-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                         value={headerData.tin} onChange={handleHeaderChange} />
