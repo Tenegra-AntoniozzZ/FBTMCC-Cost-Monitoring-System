@@ -16,7 +16,8 @@ app.use(cors({
   origin: [
     'http://localhost:5173', 
     'http://127.0.0.1:5173',
-   'http://192.168.2.124:5173'
+   'http://192.168.2.124:5173',
+   'http://192.168.2.117:5173'
     // 'http://192.168.1.15:5173' // Pwede mong tanggalin ang comment (//) at ilagay ang exact IP ng PC mo rito
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],

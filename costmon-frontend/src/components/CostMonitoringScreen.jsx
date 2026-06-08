@@ -87,7 +87,12 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
 
   const executeDeleteDisbursement = async (id) => {
     try {
-      const response = await fetch(`${API_URL}/disbursements/${id}`, { method: 'DELETE' });
+      const response = await fetch(`${API_URL}/disbursements/${id}`, { 
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
+        }
+      });
       if (response.ok) {
         if (refreshData) await refreshData();
       } else {
@@ -326,18 +331,18 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
             </button>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto border border-slate-300 rounded-xl shadow-md">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-white">
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Date</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">CV Number</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Payee</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Description</th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-right">Amount</th>
+                <tr className="bg-slate-100">
+                  <th className="px-8 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r border-slate-200 last:border-r-0">Date</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r border-slate-200 last:border-r-0">CV Number</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r border-slate-200 last:border-r-0">Payee</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r border-slate-200 last:border-r-0">Description</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r border-slate-200 last:border-r-0 text-right">Amount</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y divide-slate-200">
                 {financials.projectExpenses.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="px-8 py-20 text-center">
@@ -350,33 +355,33 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
                   </tr>
                 ) : (
                   financials.projectExpenses.map((d) => (
-                    <tr key={d.id} className="hover:bg-slate-50/80 transition-colors group">
-                      <td className="px-8 py-5">
+                    <tr key={d.id} className="hover:bg-blue-100/50 transition-colors group">
+                      <td className="px-8 py-5 border-r border-slate-200 last:border-r-0 bg-white group-hover:bg-blue-50/50">
                         <div className="text-sm font-bold text-slate-700">{d.date}</div>
                       </td>
-                      <td className="px-6 py-5">
-                        <span className="px-2 py-1 rounded bg-slate-100 text-slate-500 font-mono text-xs font-bold">
+                      <td className="px-6 py-5 border-r border-slate-200 last:border-r-0 bg-white group-hover:bg-blue-50/50">
+                        <span className="px-2 py-1 rounded bg-slate-100 text-slate-600 font-mono text-xs font-bold border border-slate-200">
                           {d.cv_no || 'N/A'}
                         </span>
                       </td>
-                      <td className="px-6 py-5">
+                      <td className="px-6 py-5 border-r border-slate-200 last:border-r-0 bg-white group-hover:bg-blue-50/50">
                         <div className="text-sm font-bold text-slate-800">{d.payee}</div>
                       </td>
-                      <td className="px-6 py-5">
-                        <div className="text-sm text-slate-500 font-medium max-w-xs truncate" title={d.particulars}>
+                      <td className="px-6 py-5 border-r border-slate-200 last:border-r-0 bg-white group-hover:bg-blue-50/50">
+                        <div className="text-sm text-slate-600 font-medium max-w-xs truncate" title={d.particulars}>
                           {d.particulars}
                         </div>
                       </td>
-                      <td className="px-8 py-5 text-right">
-                        <div className="text-base font-black text-slate-800">
+                      <td className="px-8 py-5 text-right border-r border-slate-200 last:border-r-0 bg-white group-hover:bg-blue-50/50">
+                        <div className="text-base font-black text-slate-900">
                           ₱{parseFloat(d.gross_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </div>
                       </td>
                       {canEdit && (
-                        <td className="px-6 py-5 text-center">
+                        <td className="px-6 py-5 text-center bg-white group-hover:bg-blue-50/50">
                           <button 
                             onClick={(e) => { e.stopPropagation(); handleDeleteClick(d.id); }} 
-                            className="p-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors" 
+                            className="p-2 bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 rounded-lg transition-colors" 
                             title="Delete"
                           >
                             <Trash2 size={16} />

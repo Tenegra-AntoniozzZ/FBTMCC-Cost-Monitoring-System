@@ -48,7 +48,10 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
     try {
       const response = await fetch(`${API_URL}/projects`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
+        },
         body: JSON.stringify({
           ...newProject,
           profit_percentage: parseFloat(newProject.profit_percentage || 20) / 100
@@ -74,7 +77,10 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
     try {
       const response = await fetch(`${API_URL}/projects/${editingProject.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
+        },
         body: JSON.stringify({
           ...editingProject,
           profit_percentage: parseFloat(editingProject.profit_percentage) / 100
@@ -96,7 +102,12 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
   const executeDeleteProject = async (project) => {
     setIsSaving(true);
     try {
-      const response = await fetch(`${API_URL}/projects/${project.id}`, { method: 'DELETE' });
+      const response = await fetch(`${API_URL}/projects/${project.id}`, { 
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
+        }
+      });
       if (response.ok) {
         showMessage('Project deleted.');
         refreshData();
@@ -116,7 +127,10 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
     try {
       const response = await fetch(`${API_URL}/categories`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
+        },
         body: JSON.stringify({ name: newCategory.trim() })
       });
       
@@ -137,7 +151,12 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
   const executeDeleteCategory = async (category) => {
     setIsSaving(true);
     try {
-      const response = await fetch(`${API_URL}/categories/${category.id}`, { method: 'DELETE' });
+      const response = await fetch(`${API_URL}/categories/${category.id}`, { 
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
+        }
+      });
       if (response.ok) {
         showMessage('Category removed.');
         refreshData();
@@ -272,42 +291,42 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
               </form>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto border border-slate-300 rounded-xl shadow-md bg-white">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50/50">
-                    <th className="px-8 py-4 text-[10px] font-black text-slate-400 tracking-widest border-b border-slate-100">Code</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 tracking-widest border-b border-slate-100">Project Name</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 tracking-widest border-b border-slate-100 text-right">Contract Cost</th>
-                    <th className="px-8 py-4 text-[10px] font-black text-slate-400 tracking-widest border-b border-slate-100 text-center">Actions</th>
+                  <tr className="bg-slate-100">
+                    <th className="px-8 py-4 text-[10px] font-black text-slate-600 tracking-widest border-b-2 border-r border-slate-200 last:border-r-0 uppercase">Code</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-600 tracking-widest border-b-2 border-r border-slate-200 last:border-r-0 uppercase">Project Name</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-600 tracking-widest border-b-2 border-r border-slate-200 last:border-r-0 uppercase text-right">Contract Cost</th>
+                    <th className="px-8 py-4 text-[10px] font-black text-slate-600 tracking-widest border-b-2 border-r border-slate-200 last:border-r-0 uppercase text-center">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-slate-200">
                   {projects.map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-50/50 transition-colors group">
-                      <td className="px-8 py-4">
-                        <span className="font-black text-indigo-600">{p.project_code}</span>
+                    <tr key={p.id} className="hover:bg-indigo-50/50 transition-colors group">
+                      <td className="px-8 py-4 border-r border-slate-200 last:border-r-0 bg-white group-hover:bg-indigo-50/30">
+                        <span className="font-black text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100 shadow-sm">{p.project_code}</span>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="font-bold text-slate-700">{p.project_name}</div>
+                      <td className="px-6 py-4 border-r border-slate-200 last:border-r-0 bg-white group-hover:bg-indigo-50/30">
+                        <div className="font-bold text-slate-800">{p.project_name}</div>
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="font-mono font-bold text-slate-500 text-sm">₱{(p.contract_cost || 0).toLocaleString()}</div>
+                      <td className="px-6 py-4 text-right border-r border-slate-200 last:border-r-0 bg-white group-hover:bg-indigo-50/30">
+                        <div className="font-mono font-black text-slate-700 text-sm">₱{(p.contract_cost || 0).toLocaleString()}</div>
                       </td>
-                      <td className="px-8 py-4">
-                        <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <td className="px-8 py-4 border-r border-slate-200 last:border-r-0 bg-white group-hover:bg-indigo-50/30">
+                        <div className="flex items-center justify-center gap-2">
                           <button 
                             onClick={() => setEditingProject({
                               ...p, 
                               profit_percentage: (p.profit_percentage * 100).toFixed(0)
                             })}
-                            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"
+                            className="p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-100 border border-indigo-50 rounded-lg transition-colors shadow-sm"
                           >
                             <Settings2 size={18} />
                           </button>
                           <button 
                             onClick={() => setPasswordModal({ isOpen: true, action: 'delete_project', payload: p })}
-                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
+                            className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-100 border border-rose-50 rounded-lg transition-colors shadow-sm"
                           >
                             <Trash2 size={18} />
                           </button>
