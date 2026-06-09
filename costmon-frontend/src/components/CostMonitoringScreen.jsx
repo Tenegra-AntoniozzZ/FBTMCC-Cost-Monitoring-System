@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   FileSpreadsheet, 
   TrendingUp, 
@@ -12,21 +12,27 @@ import {
 } from 'lucide-react';
 import SearchableDropdown from './SearchableDropdown';
 import PasswordConfirmModal from './PasswordConfirmModal';
+import LoadingOverlay from './LoadingOverlay';
 import { API_URL } from '../utils/Constants';
 
 export default function CostMonitoringScreen({ projects, disbursements, onUpdateProject, initialProjectId, userRole, refreshData }) {
   const canEdit = userRole === 'encoder';
   const [passwordModal, setPasswordModal] = useState({ isOpen: false, action: null, payload: null });
   const [isSaving, setIsSaving] = useState(false);
+  const [isSwitching, setIsSwitching] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId || projects[0]?.id || '');
   const [prevInitialProjectId, setPrevInitialProjectId] = useState(initialProjectId);
 
-  if (initialProjectId !== prevInitialProjectId) {
-    setPrevInitialProjectId(initialProjectId);
-    if (initialProjectId) {
-      setSelectedProjectId(initialProjectId);
+  useEffect(() => {
+    if (initialProjectId !== prevInitialProjectId) {
+      setPrevInitialProjectId(initialProjectId);
+      if (initialProjectId) {
+        setIsSwitching(true);
+        setSelectedProjectId(initialProjectId);
+        setTimeout(() => setIsSwitching(false), 1000);
+      }
     }
-  }
+  }, [initialProjectId, prevInitialProjectId]);
 
   const project = useMemo(() => 
     projects.find(p => p.id === selectedProjectId), 
@@ -48,10 +54,7 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
     return {};
   });
 
-  const [prevSelectedProjectId, setPrevSelectedProjectId] = useState(selectedProjectId);
-
-  if (selectedProjectId !== prevSelectedProjectId) {
-    setPrevSelectedProjectId(selectedProjectId);
+  useEffect(() => {
     if (project) {
       setEditingValues({
         contract_cost: project.contract_cost || 0,
@@ -61,7 +64,7 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
         days_end: project.days_end || ''
       });
     }
-  }
+  }, [project]);
 
   const handleInputChange = (field, value) => {
     setEditingValues(prev => ({ ...prev, [field]: value }));
@@ -86,6 +89,7 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
   };
 
   const executeDeleteDisbursement = async (id) => {
+    setIsSaving(true);
     try {
       const response = await fetch(`${API_URL}/disbursements/${id}`, { 
         method: 'DELETE',
@@ -101,6 +105,8 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
     } catch (error) {
       console.error(error);
       alert("Network Error");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -331,18 +337,18 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
             </button>
           </div>
 
-          <div className="overflow-x-auto border border-slate-300 rounded-xl shadow-md">
+          <div className="overflow-x-auto border border-slate-400 rounded-xl shadow-md">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-100">
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r border-slate-200 last:border-r-0">Date</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r border-slate-200 last:border-r-0">CV Number</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r border-slate-200 last:border-r-0">Payee</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r border-slate-200 last:border-r-0">Description</th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r border-slate-200 last:border-r-0 text-right">Amount</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r border-slate-400 last:border-r-0">Date</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r border-slate-400 last:border-r-0">CV Number</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r border-slate-400 last:border-r-0">Payee</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r border-slate-400 last:border-r-0">Description</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r border-slate-400 last:border-r-0 text-right">Amount</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
+              <tbody className="divide-y divide-slate-400">
                 {financials.projectExpenses.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="px-8 py-20 text-center">
@@ -356,29 +362,29 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
                 ) : (
                   financials.projectExpenses.map((d) => (
                     <tr key={d.id} className="hover:bg-blue-100/50 transition-colors group">
-                      <td className="px-8 py-5 border-r border-slate-200 last:border-r-0 bg-white group-hover:bg-blue-50/50">
+                      <td className="px-8 py-5 border-r border-slate-400 last:border-r-0 bg-white group-hover:bg-blue-50/50">
                         <div className="text-sm font-bold text-slate-700">{d.date}</div>
                       </td>
-                      <td className="px-6 py-5 border-r border-slate-200 last:border-r-0 bg-white group-hover:bg-blue-50/50">
-                        <span className="px-2 py-1 rounded bg-slate-100 text-slate-600 font-mono text-xs font-bold border border-slate-200">
+                      <td className="px-6 py-5 border-r border-slate-400 last:border-r-0 bg-white group-hover:bg-blue-50/50">
+                        <span className="px-2 py-1 rounded bg-slate-100 text-slate-600 font-mono text-xs font-bold border border-slate-400">
                           {d.cv_no || 'N/A'}
                         </span>
                       </td>
-                      <td className="px-6 py-5 border-r border-slate-200 last:border-r-0 bg-white group-hover:bg-blue-50/50">
+                      <td className="px-6 py-5 border-r border-slate-400 last:border-r-0 bg-white group-hover:bg-blue-50/50">
                         <div className="text-sm font-bold text-slate-800">{d.payee}</div>
                       </td>
-                      <td className="px-6 py-5 border-r border-slate-200 last:border-r-0 bg-white group-hover:bg-blue-50/50">
+                      <td className="px-6 py-5 border-r border-slate-400 last:border-r-0 bg-white group-hover:bg-blue-50/50">
                         <div className="text-sm text-slate-600 font-medium max-w-xs truncate" title={d.particulars}>
                           {d.particulars}
                         </div>
                       </td>
-                      <td className="px-8 py-5 text-right border-r border-slate-200 last:border-r-0 bg-white group-hover:bg-blue-50/50">
+                      <td className="px-8 py-5 text-right border-r border-slate-400 last:border-r-0 bg-white group-hover:bg-blue-50/50">
                         <div className="text-base font-black text-slate-900">
                           ₱{parseFloat(d.gross_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </div>
                       </td>
                       {canEdit && (
-                        <td className="px-6 py-5 text-center bg-white group-hover:bg-blue-50/50">
+                        <td className="px-6 py-5 text-center bg-white group-hover:bg-blue-50/50 border-l border-slate-400">
                           <button 
                             onClick={(e) => { e.stopPropagation(); handleDeleteClick(d.id); }} 
                             className="p-2 bg-red-50 text-red-600 hover:bg-red-100 border border-red-100 rounded-lg transition-colors" 
@@ -403,6 +409,13 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
         onClose={() => setPasswordModal({ isOpen: false, action: null, payload: null })}
         onConfirm={handlePasswordConfirm}
       />
+
+      {(isSaving || isSwitching) && (
+        <LoadingOverlay 
+          message={isSwitching ? "Switching Project" : "Saving Changes"} 
+          subtext={isSwitching ? "Inihahanda ang data..." : "Paki-antay lamang..."} 
+        />
+      )}
     </div>
   );
 }

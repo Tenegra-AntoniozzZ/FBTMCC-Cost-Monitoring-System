@@ -3,6 +3,7 @@ import { Search, Plus, Trash2, FileText, ChevronDown, Filter, X, Lock, Save, Rec
 import SearchableDropdown from './SearchableDropdown';
 import HealthCard from './HealthCard';
 import PasswordConfirmModal from './PasswordConfirmModal';
+import LoadingOverlay from './LoadingOverlay';
 import { API_URL } from '../utils/Constants';
 
 export default function DisbursementScreen({ projects, disbursements, refreshData, isLoading, userRole, categories }) {
@@ -465,27 +466,27 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
           </div>
 
           {/* TABLE */}
-          <div className="overflow-x-auto custom-scrollbar flex-1 border border-slate-300 rounded-2xl shadow-xl bg-white">
+          <div className="overflow-x-auto custom-scrollbar flex-1 border border-slate-400 rounded-2xl shadow-xl bg-white">
             <table className="w-full text-left border-collapse min-w-[1500px]">
               <thead>
                 <tr className="bg-slate-100">
-                  <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-r border-slate-300 sticky left-0 z-10 bg-slate-100 shadow-[3px_0_0_0_#cbd5e1]">Date</th>
-                  <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-r border-slate-300">Payee</th>
-                  <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-r border-slate-300 text-center">CV No.</th>
-                  <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-r border-slate-300 text-center">Project</th>
-                  <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-r border-slate-300 text-right">Debit (Gross)</th>
-                  <th className="px-6 py-5 text-xs font-black text-emerald-800 uppercase tracking-wider border-b-2 border-r border-slate-300 text-right bg-emerald-100/50">Credit (CIB)</th>
-                  <th className="px-6 py-5 text-xs font-black text-rose-800 uppercase tracking-wider border-b-2 border-r border-slate-300 text-right bg-rose-50/50">EWT</th>
+                  <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-r border-slate-400 sticky left-0 z-10 bg-slate-100 shadow-[3px_0_0_0_#94a3b8]">Date</th>
+                  <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-r border-slate-400">Payee</th>
+                  <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-r border-slate-400 text-center">CV No.</th>
+                  <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-r border-slate-400 text-center">Project</th>
+                  <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-r border-slate-400 text-right">Debit (Gross)</th>
+                  <th className="px-6 py-5 text-xs font-black text-emerald-800 uppercase tracking-wider border-b-2 border-r border-slate-400 text-right bg-emerald-100/50">Credit (CIB)</th>
+                  <th className="px-6 py-5 text-xs font-black text-rose-800 uppercase tracking-wider border-b-2 border-r border-slate-400 text-right bg-rose-50/50">EWT</th>
                   {categories.map(cat => (
-                    <th key={cat} className="px-4 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r border-slate-200 text-right min-w-[120px] bg-slate-50" title={cat}>
+                    <th key={cat} className="px-4 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r border-slate-400 text-right min-w-[120px] bg-slate-50" title={cat}>
                       {cat}
                     </th>
                   ))}
-                  <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-r border-slate-300 text-center">Particulars</th>
-                  {canEdit && <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-slate-300 text-center sticky right-0 z-10 bg-slate-100 shadow-[-3px_0_0_0_#cbd5e1]">Action</th>}
+                  <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-r border-slate-400 text-center">Particulars</th>
+                  {canEdit && <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-slate-400 text-center sticky right-0 z-10 bg-slate-100 shadow-[-3px_0_0_0_#94a3b8]">Action</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
+              <tbody className="divide-y divide-slate-400">
                 {filteredDisbursements.length === 0 ? (
                   <tr>
                     <td colSpan={8 + categories.length} className="px-8 py-20 text-center">
@@ -503,24 +504,24 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
                     className={`even:bg-slate-50/80 hover:bg-blue-100/50 transition-colors group ${canEdit ? 'cursor-pointer' : ''}`}
                     onDoubleClick={() => handleEditRow(d)}
                   >
-                    <td className="px-6 py-4 font-black text-slate-600 sticky left-0 z-10 bg-white group-even:bg-slate-50 group-hover:bg-blue-100/50 border-r border-slate-200 shadow-[3px_0_0_0_#e2e8f0]">{d.date}</td>
-                    <td className="px-6 py-4 font-black text-slate-800 border-r border-slate-200 group-even:bg-slate-50/30 group-hover:bg-blue-50/50">{d.payee}</td>
-                    <td className="px-6 py-4 font-black text-blue-700 text-center border-r border-slate-200 group-even:bg-slate-50/30 group-hover:bg-blue-50/50">#{d.cv_no}</td>
-                    <td className="px-6 py-4 font-black text-slate-500 text-center border-r border-slate-200 group-even:bg-slate-50/30 group-hover:bg-blue-50/50">{d.project_code}</td>
-                    <td className="px-6 py-4 text-right font-mono font-black text-slate-900 border-r border-slate-200 group-even:bg-slate-50/30 group-hover:bg-blue-50/50">₱{(d.gross_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td className="px-6 py-4 text-right font-mono font-black text-emerald-700 bg-emerald-50/30 border-r border-slate-200 group-hover:bg-emerald-100/30">₱{(d.net_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td className="px-6 py-4 text-right font-mono font-black text-rose-600 bg-rose-50/20 border-r border-slate-200 group-hover:bg-rose-100/20">₱{(d.ewt_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td className="px-6 py-4 font-black text-slate-600 sticky left-0 z-10 bg-white group-even:bg-slate-50 group-hover:bg-blue-100/50 border-r border-slate-400 shadow-[3px_0_0_0_#94a3b8]">{d.date}</td>
+                    <td className="px-6 py-4 font-black text-slate-800 border-r border-slate-400 group-even:bg-slate-50/30 group-hover:bg-blue-50/50">{d.payee}</td>
+                    <td className="px-6 py-4 font-black text-blue-700 text-center border-r border-slate-400 group-even:bg-slate-50/30 group-hover:bg-blue-50/50">#{d.cv_no}</td>
+                    <td className="px-6 py-4 font-black text-slate-500 text-center border-r border-slate-400 group-even:bg-slate-50/30 group-hover:bg-blue-50/50">{d.project_code}</td>
+                    <td className="px-6 py-4 text-right font-mono font-black text-slate-900 border-r border-slate-400 group-even:bg-slate-50/30 group-hover:bg-blue-50/50">₱{(d.gross_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td className="px-6 py-4 text-right font-mono font-black text-emerald-700 bg-emerald-50/30 border-r border-slate-400 group-hover:bg-emerald-100/30">₱{(d.net_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td className="px-6 py-4 text-right font-mono font-black text-rose-600 bg-rose-50/20 border-r border-slate-400 group-hover:bg-rose-100/20">₱{(d.ewt_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                     {categories.map(cat => {
                       const amt = getCategoryAmount(d, cat);
                       return (
-                        <td key={cat} className={`px-4 py-4 text-right font-mono text-sm border-r border-slate-100 group-even:bg-slate-50/30 group-hover:bg-blue-50/30 ${amt ? 'font-black text-slate-800 bg-slate-100/40' : 'text-slate-300'}`}>
+                        <td key={cat} className={`px-4 py-4 text-right font-mono text-sm border-r border-slate-400 group-even:bg-slate-50/30 group-hover:bg-blue-50/30 ${amt ? 'font-black text-slate-800 bg-slate-100/40' : 'text-slate-300'}`}>
                           {amt ? `₱${amt.toLocaleString()}` : '—'}
                         </td>
                       );
                     })}
-                    <td className="px-6 py-4 text-slate-500 text-xs italic max-w-[200px] truncate border-r border-slate-200 group-even:bg-slate-50/30 group-hover:bg-blue-50/50" title={d.particulars}>{d.particulars}</td>
+                    <td className="px-6 py-4 text-slate-500 text-xs italic max-w-[200px] truncate border-r border-slate-400 group-even:bg-slate-50/30 group-hover:bg-blue-50/50" title={d.particulars}>{d.particulars}</td>
                     {canEdit && (
-                      <td className="px-6 py-4 text-center sticky right-0 z-10 bg-white group-even:bg-slate-50 group-hover:bg-blue-100/50 shadow-[-3px_0_0_0_#e2e8f0]">
+                      <td className="px-6 py-4 text-center sticky right-0 z-10 bg-white group-even:bg-slate-50 group-hover:bg-blue-100/50 shadow-[-3px_0_0_0_#94a3b8]">
                         <div className="flex items-center justify-center gap-2">
                           <button onClick={(e) => { e.stopPropagation(); handleEditRow(d); }} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-200 border border-blue-100 rounded-lg transition-colors" title="Edit">
                             <Edit2 size={16} />
@@ -535,12 +536,12 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
                 ))}
               </tbody>
               {filteredDisbursements.length > 0 && (
-                <tfoot className="bg-slate-100 font-black text-slate-800 border-t-4 border-slate-300">
+                <tfoot className="bg-slate-100 font-black text-slate-800 border-t-4 border-slate-400">
                   <tr>
-                    <td colSpan="4" className="px-6 py-6 text-right text-xs tracking-widest text-slate-500 sticky left-0 z-10 bg-slate-100 border-r border-slate-300 shadow-[3px_0_0_0_#cbd5e1]">TOTAL SUMMARY:</td>
-                    <td className="px-6 py-6 text-right font-mono text-blue-800 border-r border-slate-200 text-lg">₱{ledgerTotals.dr.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td className="px-6 py-6 text-right font-mono text-emerald-800 border-r border-slate-200 text-lg">₱{ledgerTotals.cib.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td className="px-6 py-6 text-right font-mono text-rose-800 border-r border-slate-200 text-lg">₱{ledgerTotals.ewt.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td colSpan="4" className="px-6 py-6 text-right text-xs tracking-widest text-slate-500 sticky left-0 z-10 bg-slate-100 border-r border-slate-400 shadow-[3px_0_0_0_#94a3b8]">TOTAL SUMMARY:</td>
+                    <td className="px-6 py-6 text-right font-mono text-blue-800 border-r border-slate-400 text-lg">₱{ledgerTotals.dr.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td className="px-6 py-6 text-right font-mono text-emerald-800 border-r border-slate-400 text-lg">₱{ledgerTotals.cib.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td className="px-6 py-6 text-right font-mono text-rose-800 border-r border-slate-400 text-lg">₱{ledgerTotals.ewt.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                     <td colSpan={categories.length + (canEdit ? 2 : 1)} className="px-6 py-6"></td>
                   </tr>
                 </tfoot>
@@ -800,6 +801,13 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
         onClose={() => setPasswordModal({ isOpen: false, action: null, payload: null })}
         onConfirm={handlePasswordConfirm}
       />
+
+      {(isSaving || isLoading) && (
+        <LoadingOverlay 
+          message={isSaving ? "Saving Entry" : "Refreshing Data"} 
+          subtext={isSaving ? "Paki-antay lamang..." : "Sina-sync ang inyong ledger..."} 
+        />
+      )}
     </div>
   );
 }
