@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { KeyRound, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
 import { API_URL } from '../utils/Constants';
 
@@ -7,6 +7,18 @@ export default function PasswordConfirmModal({ isOpen, onClose, onConfirm, actio
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen && !isVerifying) {
+        setPassword('');
+        setError('');
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isVerifying, onClose]);
 
   if (!isOpen) return null;
 

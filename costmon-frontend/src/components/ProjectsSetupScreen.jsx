@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Tags, 
   Trash2, 
@@ -27,6 +27,17 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
   const [recentlyAddedProject, setRecentlyAddedProject] = useState(null);
   
   const [passwordModal, setPasswordModal] = useState({ isOpen: false, action: null, payload: null });
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (showSuccessModal) setShowSuccessModal(false);
+        if (showCategorySuccessModal) setShowCategorySuccessModal(false);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showSuccessModal, showCategorySuccessModal]);
 
   const showMessage = (text, type = 'success') => {
     setMessage({ text, type });

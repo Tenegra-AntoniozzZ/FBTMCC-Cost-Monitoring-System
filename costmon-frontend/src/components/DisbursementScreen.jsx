@@ -37,6 +37,17 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        if (isModalOpen) closeAndResetModal();
+        if (isFilterOpen) setIsFilterOpen(false);
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isModalOpen, isFilterOpen]);
+
   const availableMonths = useMemo(() => {
     const months = disbursements.map(d => d.date && d.date.substring(0, 7)).filter(Boolean); 
     return [...new Set(months)].sort((a, b) => b.localeCompare(a)); 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LayoutDashboard, Receipt, BarChart3, Lock, User, KeyRound, AlertCircle, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { API_URL } from '../utils/Constants';
 
@@ -20,6 +20,21 @@ export default function LoginScreen({ onLogin }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  const closeForm = () => {
+    setView('role-select');
+    setSelectedRole(null);
+  }
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && view !== 'role-select' && !isLoading) {
+        closeForm();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [view, isLoading]);
+
   const handleRoleClick = (role) => {
     setSelectedRole(role);
     setView('login');
@@ -27,11 +42,6 @@ export default function LoginScreen({ onLogin }) {
     setUsername('');
     setPassword('');
   };
-
-  const closeForm = () => {
-    setView('role-select');
-    setSelectedRole(null);
-  }
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();

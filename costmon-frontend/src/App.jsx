@@ -51,6 +51,16 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [userRole, fetchAllData]);
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && showLogoutModal) {
+        setShowLogoutModal(false);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showLogoutModal]);
+
   const handleUpdateProject = (projectId, updatedValues) => {
     setProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updatedValues } : p));
     fetch(`${API_URL}/projects/${projectId}`, {
