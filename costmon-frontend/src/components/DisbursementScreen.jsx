@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, Plus, Trash2, FileText, ChevronDown, Filter, X, Lock, Save, Receipt, Edit2 } from 'lucide-react';
+import { Search, Plus, Trash2, FileText, ChevronDown, Filter, X, Lock, Save, Receipt, Edit2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import SearchableDropdown from './SearchableDropdown';
 import HealthCard from './HealthCard';
 import PasswordConfirmModal from './PasswordConfirmModal';
@@ -32,6 +32,33 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
   const [selectedMonths, setSelectedMonths] = useState(['All']);
   const [tempSelectedMonths, setTempSelectedMonths] = useState(['All']);
   const filterRef = useRef(null);
+
+  // --- ZOOM LOGIC ---
+  const [zoomLevel, setZoomLevel] = useState(() => {
+    const saved = localStorage.getItem('disbursement_zoom');
+    return saved ? parseFloat(saved) : 1;
+  });
+
+  const handleZoomIn = () => {
+    setZoomLevel(prev => {
+      const next = Math.min(prev + 0.1, 1.5);
+      localStorage.setItem('disbursement_zoom', next.toString());
+      return next;
+    });
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel(prev => {
+      const next = Math.max(prev - 0.1, 0.5);
+      localStorage.setItem('disbursement_zoom', next.toString());
+      return next;
+    });
+  };
+
+  const resetZoom = () => {
+    setZoomLevel(1);
+    localStorage.setItem('disbursement_zoom', '1');
+  };
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -460,10 +487,10 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-8 space-y-8">
+      <main className="flex-1 overflow-hidden flex flex-col p-8 space-y-8">
         
         {/* STATS CARDS */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
           <HealthCard 
             title="Total of Debit (Gross)" 
             amount={ledgerTotals.dr} 
@@ -485,10 +512,10 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
         </section>
 
         {/* LEDGER TABLE SECTION */}
-        <section className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[600px]">
+        <section className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
           
           {/* ACTION BAR */}
-          <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
+          <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4 shrink-0">
             <div className="flex items-center gap-4 flex-1">
               <div className="relative max-w-sm w-full">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -552,6 +579,37 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
                   </div>
                 )}
               </div>
+
+              {/* ZOOM CONTROLS */}
+              <div className="flex items-center bg-white border border-slate-200 rounded-xl px-2 py-1 shadow-sm gap-1 ml-2">
+                <button 
+                  onClick={handleZoomOut} 
+                  className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors disabled:opacity-30" 
+                  title="Zoom Out"
+                  disabled={zoomLevel <= 0.6}
+                >
+                  <ZoomOut size={16} />
+                </button>
+                <div className="text-[10px] font-black text-slate-400 w-12 text-center select-none uppercase tracking-tighter">
+                  {Math.round(zoomLevel * 100)}%
+                </div>
+                <button 
+                  onClick={handleZoomIn} 
+                  className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors disabled:opacity-30" 
+                  title="Zoom In"
+                  disabled={zoomLevel >= 1.5}
+                >
+                  <ZoomIn size={16} />
+                </button>
+                <div className="w-px h-4 bg-slate-200 mx-1"></div>
+                <button 
+                  onClick={resetZoom} 
+                  className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-blue-600 transition-colors" 
+                  title="Reset Zoom"
+                >
+                  <RotateCcw size={14} />
+                </button>
+              </div>
             </div>
 
             {canEdit && (
@@ -566,8 +624,8 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
           </div>
 
           {/* TABLE */}
-          <div className="overflow-x-auto custom-scrollbar flex-1 border border-slate-400 rounded-2xl shadow-xl bg-white">
-            <table className="w-full text-left border-collapse min-w-[1500px]">
+          <div className="overflow-auto custom-scrollbar flex-1 border border-slate-400 rounded-2xl shadow-xl bg-white">
+            <table className="w-full text-left border-collapse min-w-[1500px]" style={{ zoom: zoomLevel }}>
               <thead>
                 <tr className="bg-slate-100">
                   <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-r border-slate-400 sticky left-0 z-10 bg-slate-100 shadow-[3px_0_0_0_#94a3b8]">Date</th>

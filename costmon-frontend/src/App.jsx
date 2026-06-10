@@ -145,7 +145,7 @@ export default function App() {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto relative w-full bg-[#f8fafc]">
+      <main className="flex-1 overflow-hidden relative w-full bg-[#f8fafc] flex flex-col">
         <Routes>
           <Route path="/" element={<Navigate to="/disbursements" />} />
           <Route path="/disbursements" element={<DisbursementScreen projects={projects} categories={categories.map(c => c.name)} disbursements={disbursements} refreshData={fetchAllData} isLoading={isLoading} userRole={userRole} />} />
