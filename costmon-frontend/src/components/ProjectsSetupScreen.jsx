@@ -303,29 +303,29 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
               </form>
             </div>
 
-            <div className="overflow-x-auto border border-slate-400 rounded-xl shadow-md bg-white">
-              <table className="w-full text-left border-collapse">
+            <div className="overflow-auto border border-slate-400 rounded-xl shadow-md bg-white custom-scrollbar max-h-[600px]">
+              <table className="w-full text-left border-collapse min-w-[800px]">
                 <thead>
                   <tr className="bg-slate-100">
-                    <th className="px-8 py-4 text-[10px] font-black text-slate-600 tracking-widest border-b-2 border-r border-slate-400 last:border-r-0 uppercase">Code</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-600 tracking-widest border-b-2 border-r border-slate-400 last:border-r-0 uppercase">Project Name</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-600 tracking-widest border-b-2 border-r border-slate-400 last:border-r-0 uppercase text-right">Contract Cost</th>
-                    <th className="px-8 py-4 text-[10px] font-black text-slate-600 tracking-widest border-b-2 border-r border-slate-400 last:border-r-0 uppercase text-center">Actions</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-600 tracking-widest border-b-2 border-r border-slate-400 uppercase w-[160px]">Code</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-600 tracking-widest border-b-2 border-r border-slate-400 uppercase">Project Name</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-600 tracking-widest border-b-2 border-r border-slate-400 uppercase text-right sticky right-[140px] z-10 bg-slate-100 shadow-[-3px_0_0_0_#94a3b8] w-[180px]">Contract Cost</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-600 tracking-widest border-b-2 border-slate-400 uppercase text-center sticky right-0 z-10 bg-slate-100 w-[140px]">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-400">
                   {projects.map((p) => (
-                    <tr key={p.id} className="hover:bg-indigo-50/50 transition-colors group">
-                      <td className="px-8 py-4 border-r border-slate-400 last:border-r-0 bg-white group-hover:bg-indigo-50/30">
-                        <span className="font-black text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100 shadow-sm">{p.project_code}</span>
+                    <tr key={p.id} className="hover:bg-slate-50 transition-colors group">
+                      <td className="px-6 py-4 border-r border-slate-400 bg-white group-hover:bg-slate-50 w-[160px]">
+                        <span className="font-black text-indigo-700 bg-indigo-50/50 px-3 py-1.5 rounded-lg border border-indigo-100 shadow-sm group-hover:bg-white transition-colors block text-center truncate">{p.project_code}</span>
                       </td>
-                      <td className="px-6 py-4 border-r border-slate-400 last:border-r-0 bg-white group-hover:bg-indigo-50/30">
+                      <td className="px-6 py-4 border-r border-slate-400 bg-white group-hover:bg-slate-50">
                         <div className="font-bold text-slate-800">{p.project_name}</div>
                       </td>
-                      <td className="px-6 py-4 text-right border-r border-slate-400 last:border-r-0 bg-white group-hover:bg-indigo-50/30">
+                      <td className="px-6 py-4 text-right bg-white group-hover:bg-slate-50 sticky right-[140px] z-10 shadow-[-3px_0_0_0_#94a3b8] w-[180px]">
                         <div className="font-mono font-black text-slate-700 text-sm">₱{(p.contract_cost || 0).toLocaleString()}</div>
                       </td>
-                      <td className="px-8 py-4 border-r border-slate-400 last:border-r-0 bg-white group-hover:bg-indigo-50/30">
+                      <td className="px-6 py-4 bg-white group-hover:bg-slate-50 sticky right-0 z-10 w-[140px]">
                         <div className="flex items-center justify-center gap-2">
                           <button 
                             onClick={() => setEditingProject({
@@ -386,7 +386,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
               </form>
             </div>
 
-            <div className="flex-1 overflow-y-auto max-h-[600px] p-6">
+            <div className="flex-1 overflow-y-auto max-h-[600px] p-6 custom-scrollbar">
               <div className="space-y-2">
                 {sortedCategories.map((cat) => (
                   <div key={cat.id} className="group flex items-center justify-between p-3 rounded-xl border border-slate-300 hover:border-amber-200 hover:bg-amber-50/30 transition-all">
