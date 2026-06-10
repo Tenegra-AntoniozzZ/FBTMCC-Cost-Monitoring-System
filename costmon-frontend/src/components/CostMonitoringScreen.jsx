@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { 
   FileSpreadsheet, 
   AlertCircle, 
@@ -19,7 +19,7 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
   const [isSwitching, setIsSwitching] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId || projects[0]?.id || '');
 
- const [prevInitialId, setPrevInitialId] = useState(initialProjectId);
+  const [prevInitialId, setPrevInitialId] = useState(initialProjectId);
 
   if (initialProjectId !== prevInitialId) {
     setPrevInitialId(initialProjectId);
@@ -28,7 +28,7 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
       setSelectedProjectId(initialProjectId);
       setTimeout(() => setIsSwitching(false), 1000);
     }
-  }, [initialProjectId, prevInitialProjectId]);
+  }
 
   const project = useMemo(() => 
     projects.find(p => p.id === selectedProjectId), 
@@ -63,7 +63,7 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
         days_end: project.days_end || ''
       });
     }
-  }, [project]);
+  }
 
   const handleInputChange = (field, value) => {
     setEditingValues(prev => ({ ...prev, [field]: value }));
