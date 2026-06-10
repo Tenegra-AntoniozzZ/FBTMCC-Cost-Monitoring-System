@@ -16,11 +16,15 @@ export default function PasswordConfirmModal({ isOpen, onClose, onConfirm, actio
     setIsVerifying(true);
 
     const username = localStorage.getItem('fbtmcc_username');
+    const token = localStorage.getItem('fbtmcc_token'); // <-- IDINAGDAG: Kunin ang token
 
     try {
       const res = await fetch(`${API_URL}/verify-password`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // <-- IDINAGDAG: Ipadala ang token sa server
+        },
         body: JSON.stringify({ username, password })
       });
       const data = await res.json();

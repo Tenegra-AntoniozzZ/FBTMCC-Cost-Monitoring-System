@@ -1,30 +1,32 @@
 import { useState, useMemo } from 'react';
 import { 
   FileSpreadsheet, 
-  TrendingUp, 
   AlertCircle, 
-  CheckCircle2, 
-  Wallet,
-  Calendar,
-  Receipt,
   Save,
-  Trash2
+  Calendar,
+  Trash2,
+  Calculator
 } from 'lucide-react';
 import SearchableDropdown from './SearchableDropdown';
 import PasswordConfirmModal from './PasswordConfirmModal';
+import LoadingOverlay from './LoadingOverlay';
 import { API_URL } from '../utils/Constants';
 
 export default function CostMonitoringScreen({ projects, disbursements, onUpdateProject, initialProjectId, userRole, refreshData }) {
   const canEdit = userRole === 'encoder';
   const [passwordModal, setPasswordModal] = useState({ isOpen: false, action: null, payload: null });
   const [isSaving, setIsSaving] = useState(false);
+  const [isSwitching, setIsSwitching] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId || projects[0]?.id || '');
-  const [prevInitialProjectId, setPrevInitialProjectId] = useState(initialProjectId);
 
-  if (initialProjectId !== prevInitialProjectId) {
-    setPrevInitialProjectId(initialProjectId);
+ const [prevInitialId, setPrevInitialId] = useState(initialProjectId);
+
+  if (initialProjectId !== prevInitialId) {
+    setPrevInitialId(initialProjectId);
     if (initialProjectId) {
+      setIsSwitching(true);
       setSelectedProjectId(initialProjectId);
+      setTimeout(() => setIsSwitching(false), 1000);
     }
   }
 
@@ -33,29 +35,29 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
     [projects, selectedProjectId]
   );
 
-  // Local state for editable fields to ensure snappy UI
   const [editingValues, setEditingValues] = useState(() => {
     const p = projects.find(item => item.id === (initialProjectId || projects[0]?.id || ''));
     if (p) {
       return {
         contract_cost: p.contract_cost || 0,
-        profit_percentage: p.profit_percentage || 0.20,
+        profit_percentage: p.profit_percentage || 0.15,
         project_area: p.project_area || '',
         project_start: p.project_start || '',
         days_end: p.days_end || ''
       };
     }
-    return {};
+    return { profit_percentage: 0.15 };
   });
 
-  const [prevSelectedProjectId, setPrevSelectedProjectId] = useState(selectedProjectId);
+  // TAMA NA ANG PART NA ITO (Walang useEffect)
+  const [prevProject, setPrevProject] = useState(project);
 
-  if (selectedProjectId !== prevSelectedProjectId) {
-    setPrevSelectedProjectId(selectedProjectId);
+  if (project?.id !== prevProject?.id) {
+    setPrevProject(project);
     if (project) {
       setEditingValues({
         contract_cost: project.contract_cost || 0,
-        profit_percentage: project.profit_percentage || 0.20,
+        profit_percentage: project.profit_percentage || 0.15,
         project_area: project.project_area || '',
         project_start: project.project_start || '',
         days_end: project.days_end || ''
@@ -72,6 +74,11 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
     setPasswordModal({ isOpen: true, action: 'update_project', payload: editingValues });
   };
 
+  const handleDeleteClick = (id) => {
+    if (!canEdit) return;
+    setPasswordModal({ isOpen: true, action: 'delete_disbursement', payload: id });
+  };
+
   const executeSaveProject = async (values) => {
     setIsSaving(true);
     if (onUpdateProject && project) {
@@ -80,14 +87,15 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
     setIsSaving(false);
   };
 
-  const handleDeleteClick = (id) => {
-    if (!canEdit) return;
-    setPasswordModal({ isOpen: true, action: 'delete_disbursement', payload: id });
-  };
-
   const executeDeleteDisbursement = async (id) => {
+    setIsSaving(true);
     try {
-      const response = await fetch(`${API_URL}/disbursements/${id}`, { method: 'DELETE' });
+      const response = await fetch(`${API_URL}/disbursements/${id}`, { 
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
+        }
+      });
       if (response.ok) {
         if (refreshData) await refreshData();
       } else {
@@ -96,6 +104,8 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
     } catch (error) {
       console.error(error);
       alert("Network Error");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -109,34 +119,30 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
   };
 
   const financials = useMemo(() => {
-    if (!project) return { budgetCostLimit: 0, totalExpenses: 0, remainingBudget: 0, projectExpenses: [], profitPercent: 0 };
-    
     const contractCost = parseFloat(editingValues.contract_cost) || 0;
-    const budgetCost = contractCost / 1.12; 
-    const vatAmount = contractCost - budgetCost;
-    
     const profitPercent = parseFloat(editingValues.profit_percentage) || 0;
-    const profitAmount = budgetCost * profitPercent;
+
+    const vatAmount = contractCost * (1 - (1 / 1.12)); 
+    const budgetCost = contractCost - vatAmount;
+    const profitAmount = budgetCost * (1 - (1 / (1 + profitPercent)));
     const budgetCostLimit = budgetCost - profitAmount;
 
-    const projectExpenses = disbursements.filter(d => 
-      d.project_code && d.project_code.toUpperCase() === project.project_code.toUpperCase()
+    const projectExpenses = (disbursements || []).filter(d => 
+      d.project_code && d.project_code.toUpperCase() === project?.project_code?.toUpperCase()
     );
-    
-    const totalExpenses = projectExpenses.reduce((sum, item) => sum + (parseFloat(item.gross_amount) || 0), 0);
-    const remainingBudget = budgetCostLimit - totalExpenses;
 
     return { 
-      contractCost, budgetCost, vatAmount, profitAmount, profitPercent,
-      budgetCostLimit, totalExpenses, remainingBudget, 
+      contractCost, 
+      vatAmount, 
+      budgetCost, 
+      profitAmount, 
+      profitPercent,
+      budgetCostLimit,
       projectExpenses 
     };
-  }, [project, editingValues, disbursements]);
+  }, [editingValues, disbursements, project]);
 
-  const budgetPercentage = financials.budgetCostLimit > 0 ? (financials.totalExpenses / financials.budgetCostLimit) * 100 : 0;
-  let progressColor = 'bg-emerald-500';
-  if (budgetPercentage > 75) progressColor = 'bg-amber-500';
-  if (budgetPercentage > 90) progressColor = 'bg-rose-500';
+  const formatMoney = (val) => val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   if (!projects.length) {
     return (
@@ -151,7 +157,7 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
     <div className="flex flex-col h-full bg-[#f8fafc] overflow-hidden">
       
       {/* HEADER SECTION */}
-      <header className="bg-white border-b border-slate-200 px-8 py-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0 shadow-sm">
+      <header className="bg-white border-b border-slate-300 px-8 py-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0 shadow-sm z-10">
         <div>
           <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
             <div className="bg-blue-600 p-2 rounded-xl text-white shadow-lg shadow-blue-200">
@@ -160,7 +166,7 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
             COST MONITORING
           </h1>
           <p className="text-slate-500 mt-1 font-medium flex items-center gap-2">
-            Control and track your project expenses in real-time
+            Project Progress Costing
           </p>
         </div>
 
@@ -179,207 +185,328 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
 
       <main className="flex-1 overflow-y-auto p-8 space-y-8">
         
-        {/* EDITABLE PROJECT DETAILS GRID */}
-        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Project Name</label>
-            <div className="text-lg font-bold text-slate-800 line-clamp-1" title={project?.project_name}>
-              {project?.project_name}
+        {/* ==============================================
+            MODERNIZED PROJECT PROGRESS COSTING BOX
+        ============================================== */}
+        <div className="w-full overflow-x-auto pb-4">
+          <div className="bg-white border-2 border-slate-400 rounded-[2rem] shadow-xl min-w-[1100px] overflow-hidden flex flex-col">
+            
+            {/* MODERN MAIN HEADER */}
+            <div className="bg-gradient-to-r from-blue-600 to-cyan-500 text-center py-4 text-white uppercase tracking-[0.2em] text-sm font-black shadow-md flex items-center justify-center gap-3 relative z-10">
+              <Calculator size={18} /> PROJECT PROGRESS COSTING
             </div>
-            <div className="text-blue-600 font-black mt-1 text-sm">{project?.project_code}</div>
-          </div>
+            
+            <div className="flex flex-row flex-1">
+              
+              {/* ==============================================
+                  LEFT SIDE: BASIC INFO & BUDGET LIMIT
+              ============================================== */}
+              <div className="w-[420px] shrink-0 border-r-2 border-slate-400 p-8 bg-slate-50/80 flex flex-col gap-2 text-xs font-bold text-slate-600">
+                
+                <div className="grid grid-cols-[140px_1fr] items-center py-1">
+                  <span className="uppercase tracking-wider text-slate-500">Project Code:</span>
+                  <span className="font-black text-blue-600 text-sm">{project?.project_code || '---'}</span>
+                </div>
+                <div className="grid grid-cols-[140px_1fr] items-center py-1">
+                  <span className="uppercase tracking-wider text-slate-500">Project Name:</span>
+                  <span className="font-black text-slate-800">{project?.project_name || '---'}</span>
+                </div>
+                
+                <div className="grid grid-cols-[140px_1fr] items-center mt-2">
+                  <span className="uppercase tracking-wider text-slate-500">Project Area:</span>
+                  <input type="text" 
+                    className="w-full bg-white border-2 border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm" 
+                    value={editingValues.project_area} onChange={e => handleInputChange('project_area', e.target.value)} 
+                    placeholder="e.g. 150 sqm" />
+                </div>
+                <div className="grid grid-cols-[140px_1fr] items-center mt-2">
+                  <span className="uppercase tracking-wider text-slate-500">Project Start:</span>
+                  <input type="date" 
+                    className="w-full bg-white border-2 border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm" 
+                    value={editingValues.project_start} onChange={e => handleInputChange('project_start', e.target.value)} />
+                </div>
+                <div className="grid grid-cols-[140px_1fr] items-center mt-2 mb-6">
+                  <span className="uppercase tracking-wider text-slate-500">40 Days End:</span>
+                  <input type="date" 
+                    className="w-full bg-white border-2 border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all shadow-sm" 
+                    value={editingValues.days_end} onChange={e => handleInputChange('days_end', e.target.value)} />
+                </div>
 
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Contract Cost (₱)</label>
-            <input 
-              type="number"
-              className="w-full text-2xl font-black text-slate-800 focus:outline-none focus:text-blue-600 bg-transparent"
-              value={editingValues.contract_cost || ''}
-              onChange={(e) => handleInputChange('contract_cost', e.target.value)}
-              placeholder="0.00"
-            />
-          </div>
+                <div className="w-full h-[2px] bg-slate-300 my-2"></div>
 
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Profit Target (%)</label>
-            <div className="flex items-center gap-2">
-              <input 
-                type="number"
-                step="0.01"
-                className="w-full text-2xl font-black text-slate-800 focus:outline-none focus:text-blue-600 bg-transparent"
-                value={(editingValues.profit_percentage * 100).toFixed(0)}
-                onChange={(e) => handleInputChange('profit_percentage', parseFloat(e.target.value) / 100)}
-                placeholder="20"
-              />
-              <span className="text-2xl font-black text-slate-300">%</span>
+                <div className="grid grid-cols-[140px_1fr] items-center mt-2">
+                  <span className="uppercase tracking-wider text-slate-500">Contract Cost:</span>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-700">₱</span>
+                    <input type="number" 
+                      className="w-full bg-amber-50 border-2 border-amber-300 text-amber-900 rounded-lg pl-8 pr-3 py-2 focus:ring-2 focus:ring-amber-500 outline-none transition-all shadow-sm text-right font-black text-sm" 
+                      value={editingValues.contract_cost} onChange={e => handleInputChange('contract_cost', e.target.value)} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-[140px_1fr] items-center py-2">
+                  <span className="uppercase tracking-wider text-slate-500">Vat Amount:</span>
+                  <span className="text-right font-mono text-sm pr-3 font-bold text-slate-700">{formatMoney(financials.vatAmount)}</span>
+                </div>
+                <div className="grid grid-cols-[140px_1fr] items-center py-2">
+                  <span className="uppercase tracking-wider text-slate-500">Budget Cost:</span>
+                  <span className="text-right font-mono text-sm pr-3 font-bold text-slate-700">{formatMoney(financials.budgetCost)}</span>
+                </div>
+                <div className="grid grid-cols-[140px_1fr] items-center mt-1">
+                  <span className="uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                    Profit @ 
+                    <input type="number" 
+                      className="w-12 bg-white border-2 border-slate-300 rounded-md px-1 py-1 focus:ring-2 focus:ring-blue-500 outline-none text-center shadow-sm" 
+                      value={(editingValues.profit_percentage * 100).toFixed(0)} onChange={e => handleInputChange('profit_percentage', parseFloat(e.target.value) / 100)} />%
+                  </span>
+                  <span className="text-right font-mono text-sm pr-3 text-emerald-700 font-black">{formatMoney(financials.profitAmount)}</span>
+                </div>
+                <div className="grid grid-cols-[140px_1fr] items-center py-3 mt-2 bg-blue-50/80 rounded-xl px-4 -ml-4 -mr-4 border-2 border-blue-200">
+                  <span className="uppercase tracking-widest text-blue-900 font-black">Budget Limit:</span>
+                  <span className="text-right font-mono text-lg font-black text-blue-700">{formatMoney(financials.budgetCostLimit)}</span>
+                </div>
+
+                <div className="w-full h-[2px] bg-slate-300 my-4"></div>
+
+                <div className="uppercase tracking-wider text-slate-500 mb-2 font-black">Contract Labor Cost</div>
+                <div className="space-y-2 pl-4 border-l-2 border-slate-400 ml-2">
+                  <div className="flex justify-between items-center text-slate-600"><span>Carpentry:</span><span className="font-mono font-bold">-</span></div>
+                  <div className="flex justify-between items-center text-slate-600"><span>Painting:</span><span className="font-mono font-bold">-</span></div>
+                  <div className="flex justify-between items-center text-slate-600"><span>Electrical:</span><span className="font-mono font-bold">-</span></div>
+                  <div className="flex justify-between items-center text-slate-600"><span>Plumbing:</span><span className="font-mono font-bold">-</span></div>
+                </div>
+
+                <div className="w-full h-[2px] bg-slate-300 my-4"></div>
+
+                <div className="grid grid-cols-[140px_1fr] items-center py-1">
+                  <span className="uppercase tracking-wider text-slate-500 font-black">Total Contract:</span>
+                  <div className="flex justify-end gap-2 items-end">
+                    <span className="font-mono text-sm font-black text-slate-900">{formatMoney(financials.contractCost)}</span>
+                    <span className="text-[10px] text-slate-500 pb-0.5">PHP</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-[140px_1fr] items-center py-1 mb-4">
+                  <span className="uppercase tracking-wider text-slate-500 font-black">Labor cost:</span>
+                  <div className="flex justify-end gap-2 items-end">
+                    <span className="font-mono text-sm text-slate-900 font-bold">0.00</span>
+                    <span className="text-[10px] text-slate-500 pb-0.5">PHP</span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-800 text-white rounded-xl p-4 flex flex-col gap-1 shadow-lg mt-auto border-2 border-slate-900">
+                  <span className="text-[10px] uppercase tracking-widest text-slate-300 font-bold">Budget for Mat. & Misc.</span>
+                  <div className="flex justify-between items-end">
+                    <span className="text-xl font-black text-emerald-400 font-mono">₱ {formatMoney(financials.budgetCostLimit)}</span>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* ==============================================
+                  RIGHT SIDE: BREAKDOWNS & SUMMARY TABLE
+              ============================================== */}
+              <div className="flex flex-col flex-1 bg-white">
+                
+                {/* Top Split Columns */}
+                <div className="flex flex-row flex-1">
+                  
+                  {/* Progress-Based Column */}
+                  <div className="flex-1 border-r-2 border-slate-400 flex flex-col">
+                    <div className="bg-orange-100 text-orange-900 text-center font-black text-xs uppercase py-3 border-b-2 border-slate-400 tracking-wider">
+                      Progress-Based Costing
+                    </div>
+                    <div className="p-6 space-y-3 text-xs font-bold text-slate-700 uppercase flex-1 flex flex-col">
+                      <div className="flex justify-between border-b border-slate-300 pb-2"><span>Permits & Const'n Plans:</span><span className="font-mono text-slate-400">-</span></div>
+                      <div className="flex justify-between border-b border-slate-300 pb-2"><span>Supervision Cost:</span><span className="font-mono text-slate-400">-</span></div>
+                      <div className="flex justify-between border-b border-slate-300 pb-2 text-slate-900"><span>Carpentry:</span><span className="font-mono font-black">8,070.00</span></div>
+                      <div className="flex justify-between border-b border-slate-300 pb-2"><span>Painting:</span><span className="font-mono text-slate-400">-</span></div>
+                      <div className="flex justify-between border-b border-slate-300 pb-2"><span>Electrical:</span><span className="font-mono text-slate-400">-</span></div>
+                      <div className="flex justify-between border-b border-slate-300 pb-2"><span>Plumbing:</span><span className="font-mono text-slate-400">-</span></div>
+                      <div className="flex justify-between border-b border-slate-300 pb-2"><span>Tempered Glass:</span><span className="font-mono text-slate-400">-</span></div>
+                      <div className="flex justify-between border-b border-slate-300 pb-2 text-slate-900"><span>Miscellaneous Cost:</span><span className="font-mono font-black">1,409.75</span></div>
+                      <div className="flex justify-between border-b border-slate-300 pb-2 text-slate-900"><span>Labor/Payroll:</span><span className="font-mono font-black">8,000.00</span></div>
+                      
+                      <div className="pt-2 text-[10px] text-slate-500 space-y-2">
+                        <div className="flex justify-between"><span>ABB Forward</span><span className="font-mono">-</span></div>
+                        <div className="flex justify-between"><span>ZAM 546</span><span className="font-mono">-</span></div>
+                        <div className="flex justify-between"><span>NDP 9693</span><span className="font-mono">-</span></div>
+                        <div className="flex justify-between"><span>MBQ 2104</span><span className="font-mono">-</span></div>
+                      </div>
+
+                      <div className="mt-auto pt-4 flex justify-between items-center border-t-2 border-slate-400">
+                         <span className="font-black text-slate-900 tracking-wider">DIRECT COST</span>
+                         <span className="font-black font-mono text-sm text-slate-900">17,479.75</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Additional-Based Column */}
+                  <div className="flex-1 flex flex-col bg-slate-50/50">
+                    <div className="bg-purple-100 text-purple-900 text-center font-black text-xs uppercase py-3 border-b-2 border-slate-400 tracking-wider">
+                      Additional-Based Costing
+                    </div>
+                    <div className="p-6 space-y-3 text-xs font-bold text-slate-700 uppercase flex-1 flex flex-col">
+                      <div className="flex justify-between border-b border-slate-300 pb-2"><span>Approved Quotations</span><span></span></div>
+                      <div className="flex justify-between border-b border-slate-300 pb-2 pl-4 text-slate-500"><span>Permit Waiver</span><span></span></div>
+                      
+                      <div className="h-4"></div>
+                      
+                      <div className="flex justify-between border-b border-slate-300 pb-2"><span>Unapproved Quotations</span><span></span></div>
+                      
+                      <div className="h-4"></div>
+                      
+                      <div className="flex justify-between border-b border-slate-300 pb-2"><span>Additional Works:</span><span></span></div>
+                      <div className="flex justify-between border-b border-slate-300 pb-2 pl-4 text-slate-500"><span>Total Additional</span><span></span></div>
+                      <div className="flex justify-between border-b border-slate-300 pb-2 pl-4 text-slate-500"><span>Vat Amount</span><span className="font-mono">-</span></div>
+
+                      <div className="mt-auto pt-4 flex justify-between items-center border-t-2 border-slate-400 text-slate-600">
+                         <span className="font-black tracking-wider">ADD'L COST LIMIT</span>
+                         <span className="font-black font-mono text-sm">-</span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Bottom Summary Table Spanning the Right Section */}
+                <div className="p-6 border-t-2 border-slate-400 bg-slate-100/50">
+                  <div className="overflow-hidden rounded-xl border-2 border-slate-400 shadow-sm">
+                    <table className="w-full text-[11px] font-black uppercase text-slate-800 border-collapse bg-white">
+                      <tbody>
+                        <tr className="border-b-2 border-slate-400">
+                          <td className="py-2.5 px-4 bg-orange-100/80 text-orange-900 border-r-2 border-slate-400 w-[40%]">TOTAL CONTRACT COST</td>
+                          <td className="py-2.5 px-4 border-r-2 border-slate-400 text-center font-mono w-[20%]">1,000.00</td>
+                          <td className="py-2.5 px-4 border-r-2 border-slate-400 text-center font-mono text-slate-500 w-[20%]">0.00</td>
+                          <td className="py-2.5 px-4 text-center font-mono w-[20%]">1,000.00</td>
+                        </tr>
+                        <tr className="border-b-2 border-slate-400">
+                          <td className="py-2.5 px-4 bg-emerald-100/80 text-emerald-900 border-r-2 border-slate-400">TOTAL VAT AMOUNT</td>
+                          <td className="py-2.5 px-4 border-r-2 border-slate-400 text-center font-mono">107.14</td>
+                          <td className="py-2.5 px-4 border-r-2 border-slate-400 text-center font-mono text-slate-500">0.00</td>
+                          <td className="py-2.5 px-4 text-center font-mono bg-orange-50">107.14</td>
+                        </tr>
+                        <tr className="border-b-2 border-slate-400">
+                          <td className="py-2.5 px-4 bg-orange-100/80 text-orange-900 border-r-2 border-slate-400">TOTAL BUDGET COST</td>
+                          <td className="py-2.5 px-4 border-r-2 border-slate-400 text-center font-mono">892.86</td>
+                          <td className="py-2.5 px-4 border-r-2 border-slate-400 text-center font-mono text-slate-500">0.00</td>
+                          <td className="py-2.5 px-4 text-center font-mono bg-orange-50">892.86</td>
+                        </tr>
+                        <tr className="border-b-2 border-slate-400">
+                          <td className="py-2.5 px-4 bg-orange-100/80 text-orange-900 border-r-2 border-slate-400">TOTAL PROFIT</td>
+                          <td className="py-2.5 px-4 border-r-2 border-slate-400 text-center font-mono">116.46</td>
+                          <td className="py-2.5 px-4 border-r-2 border-slate-400 text-center font-mono text-slate-500">0.00</td>
+                          <td className="py-2.5 px-4 text-center font-mono bg-orange-50">116.46</td>
+                        </tr>
+                        <tr className="border-b-2 border-slate-400">
+                          <td className="py-2.5 px-4 bg-blue-100/80 text-blue-900 border-r-2 border-slate-400">TOTAL COST LIMIT (DLM)</td>
+                          <td className="py-2.5 px-4 border-r-2 border-slate-400 text-center font-mono">776.40</td>
+                          <td className="py-2.5 px-4 border-r-2 border-slate-400 text-center font-mono text-slate-500">0.00</td>
+                          <td className="py-2.5 px-4 text-center font-mono bg-blue-50/50">776.40</td>
+                        </tr>
+                        <tr className="border-b-2 border-slate-400">
+                          <td className="py-3 px-4 border-r-2 border-slate-400">TOTAL PROGRESS COSTING</td>
+                          <td className="py-3 px-4 border-r-2 border-slate-400 text-center font-mono">17,479.75</td>
+                          <td className="py-3 px-4 border-r-2 border-slate-400 text-center font-mono text-slate-500">0.00</td>
+                          <td className="py-3 px-4 text-center font-mono">17,479.75</td>
+                        </tr>
+                        <tr>
+                          <td className="py-3 px-4 border-r-2 border-slate-400 text-slate-600">TOTAL EXCESS BUDGET</td>
+                          <td className="py-3 px-4 border-r-2 border-slate-400 text-center font-mono text-slate-600">-16,703.35</td>
+                          <td className="py-3 px-4 border-r-2 border-slate-400 text-center font-mono text-slate-500">0.00</td>
+                          <td className="py-3 px-4 text-center font-mono bg-rose-200 text-rose-800 text-sm">(16,703.35)</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+              </div>
             </div>
           </div>
+        </div>
 
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Project Area</label>
-            <input 
-              type="text"
-              className="w-full text-lg font-bold text-slate-800 focus:outline-none focus:text-blue-600 bg-transparent"
-              value={editingValues.project_area || ''}
-              onChange={(e) => handleInputChange('project_area', e.target.value)}
-              placeholder="e.g. 150 sqm"
-            />
-          </div>
-        </section>
-
+        {/* SAVE BUTTON */}
         {canEdit && (
-          <div className="flex justify-end -mt-4 animate-in fade-in">
-            <button 
-              onClick={handleSaveClick}
-              disabled={isSaving}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-blue-200 transition-all flex items-center gap-2 disabled:opacity-50"
-            >
-              <Save size={18} /> {isSaving ? 'Saving...' : 'Save Changes'}
+          <div className="flex justify-end mt-2 animate-in fade-in">
+            <button onClick={handleSaveClick} disabled={isSaving} className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3.5 rounded-2xl font-black shadow-xl shadow-blue-200/50 transition-all flex items-center gap-3 disabled:opacity-50">
+              <Save size={20} /> {isSaving ? 'SAVING DATA...' : 'SAVE CHANGES'}
             </button>
           </div>
         )}
 
-        {/* FINANCIAL SUMMARY CARDS */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* BUDGET LIMIT */}
-          <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 to-slate-800 p-8 rounded-[2rem] shadow-xl text-white group">
-            <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-500">
-              <Wallet size={120} />
-            </div>
-            <div className="relative z-10">
-              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-xs font-bold tracking-wider uppercase mb-6">
-                <CheckCircle2 size={14} className="text-emerald-400" /> Budget Limit
-              </span>
-              <div className="text-4xl font-black mb-2">
-                ₱{financials.budgetCostLimit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </div>
-              <p className="text-slate-400 text-sm font-medium">After {financials.profitPercent * 100}% Profit & 12% VAT</p>
-            </div>
-          </div>
-
-          {/* TOTAL EXPENSES */}
-          <div className="relative overflow-hidden bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm group">
-            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform duration-500 text-blue-600">
-              <TrendingUp size={120} />
-            </div>
-            <div className="relative z-10">
-              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-bold tracking-wider uppercase mb-6">
-                <Receipt size={14} /> Total Expenses
-              </span>
-              <div className="text-4xl font-black text-slate-800 mb-2">
-                ₱{financials.totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </div>
-              <p className="text-slate-500 text-sm font-medium">Accumulated project costs</p>
-            </div>
-          </div>
-
-          {/* REMAINING PONDO */}
-          <div className={`relative overflow-hidden p-8 rounded-[2rem] shadow-sm group border ${
-            financials.remainingBudget < 0 ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100'
-          }`}>
-            <div className="relative z-10">
-              <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold tracking-wider uppercase mb-6 ${
-                financials.remainingBudget < 0 ? 'bg-rose-200 text-rose-700' : 'bg-emerald-200 text-emerald-700'
-              }`}>
-                <AlertCircle size={14} /> Remaining Pondo
-              </span>
-              <div className={`text-4xl font-black mb-2 ${
-                financials.remainingBudget < 0 ? 'text-rose-600' : 'text-emerald-600'
-              }`}>
-                ₱{financials.remainingBudget.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </div>
-              <p className="text-slate-500 text-sm font-medium">Available project funds</p>
-            </div>
-          </div>
-        </section>
-
-        {/* BUDGET PROGRESS BAR */}
-        <section className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Budget Utilization</span>
-            <span className={`text-sm font-black ${progressColor.replace('bg-', 'text-')}`}>
-              {budgetPercentage.toFixed(1)}%
-            </span>
-          </div>
-          <div className="w-full bg-slate-100 rounded-full h-4 overflow-hidden shadow-inner">
-            <div 
-              className={`h-full rounded-full transition-all duration-1000 ${progressColor}`} 
-              style={{ width: `${Math.min(budgetPercentage, 100)}%` }}
-            ></div>
-          </div>
-        </section>
-
-        {/* DISBURSEMENT LIST SECTION */}
-        <section className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
-          <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        {/* ==============================================
+            DISBURSEMENT LIST SECTION (PROJECT LEDGER)
+        ============================================== */}
+        <section className="bg-white rounded-[2rem] border-2 border-slate-300 shadow-sm overflow-hidden flex flex-col min-h-[500px] mt-8">
+          <div className="px-8 py-6 border-b-2 border-slate-300 flex items-center justify-between bg-slate-50/80">
             <div>
               <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
                 Project Ledger
-                <span className="ml-2 px-2.5 py-0.5 rounded-lg bg-slate-200 text-slate-600 text-xs font-bold">
+                <span className="ml-2 px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold border border-blue-200">
                   {financials.projectExpenses.length} Entries
                 </span>
               </h3>
-              <p className="text-slate-500 text-xs font-medium mt-1 tracking-widest">Linked disbursements for {project?.project_code}</p>
+              <p className="text-slate-500 text-xs font-medium mt-1 tracking-widest uppercase">Linked disbursements for {project?.project_code}</p>
             </div>
-            <button className="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors shadow-sm">
+            <button className="px-5 py-2.5 bg-white border-2 border-slate-300 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-100 transition-colors shadow-sm">
               Export to Excel
             </button>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto border-2 border-slate-300 rounded-2xl shadow-sm m-6 mt-4">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-white">
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Date</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">CV Number</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Payee</th>
-                  <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Description</th>
-                  <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-right">Amount</th>
+                <tr className="bg-slate-100">
+                  <th className="px-8 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r-2 border-slate-300 last:border-r-0">Date</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r-2 border-slate-300 last:border-r-0">CV Number</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r-2 border-slate-300 last:border-r-0">Payee</th>
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r-2 border-slate-300 last:border-r-0">Description</th>
+                  <th className="px-8 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r-2 border-slate-300 last:border-r-0 text-right">Amount</th>
+                  {canEdit && <th className="px-6 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-slate-300 text-center">Action</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y-2 divide-slate-200">
                 {financials.projectExpenses.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="px-8 py-20 text-center">
-                      <div className="flex flex-col items-center opacity-30">
-                        <Calendar size={48} className="mb-2" />
+                    <td colSpan={canEdit ? "6" : "5"} className="px-8 py-20 text-center">
+                      <div className="flex flex-col items-center opacity-50 text-slate-500">
+                        <Calendar size={48} className="mb-3" strokeWidth={1.5} />
                         <p className="text-lg font-bold">Walang Disbursement na Nahanap</p>
-                        <p className="text-sm">Siguraduhin na ang Project Code ay tugma sa disbursement entry.</p>
+                        <p className="text-sm font-medium mt-1">Siguraduhin na ang Project Code ay tugma sa disbursement entry.</p>
                       </div>
                     </td>
                   </tr>
                 ) : (
                   financials.projectExpenses.map((d) => (
-                    <tr key={d.id} className="hover:bg-slate-50/80 transition-colors group">
-                      <td className="px-8 py-5">
+                    <tr key={d.id} className="hover:bg-blue-50/80 transition-colors group">
+                      <td className="px-8 py-5 border-r-2 border-slate-200 last:border-r-0 bg-white group-hover:bg-transparent">
                         <div className="text-sm font-bold text-slate-700">{d.date}</div>
                       </td>
-                      <td className="px-6 py-5">
-                        <span className="px-2 py-1 rounded bg-slate-100 text-slate-500 font-mono text-xs font-bold">
+                      <td className="px-6 py-5 border-r-2 border-slate-200 last:border-r-0 bg-white group-hover:bg-transparent">
+                        <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 font-mono text-xs font-bold border-2 border-slate-300">
                           {d.cv_no || 'N/A'}
                         </span>
                       </td>
-                      <td className="px-6 py-5">
+                      <td className="px-6 py-5 border-r-2 border-slate-200 last:border-r-0 bg-white group-hover:bg-transparent">
                         <div className="text-sm font-bold text-slate-800">{d.payee}</div>
                       </td>
-                      <td className="px-6 py-5">
-                        <div className="text-sm text-slate-500 font-medium max-w-xs truncate" title={d.particulars}>
+                      <td className="px-6 py-5 border-r-2 border-slate-200 last:border-r-0 bg-white group-hover:bg-transparent">
+                        <div className="text-sm text-slate-600 font-medium max-w-xs truncate" title={d.particulars}>
                           {d.particulars}
                         </div>
                       </td>
-                      <td className="px-8 py-5 text-right">
-                        <div className="text-base font-black text-slate-800">
+                      <td className="px-8 py-5 text-right border-r-2 border-slate-200 last:border-r-0 bg-white group-hover:bg-transparent">
+                        <div className="text-base font-black font-mono text-slate-900">
                           ₱{parseFloat(d.gross_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </div>
                       </td>
                       {canEdit && (
-                        <td className="px-6 py-5 text-center">
+                        <td className="px-6 py-5 text-center bg-white group-hover:bg-transparent border-l-2 border-slate-200">
                           <button 
                             onClick={(e) => { e.stopPropagation(); handleDeleteClick(d.id); }} 
-                            className="p-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors" 
+                            className="p-2 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 rounded-lg transition-colors border border-transparent hover:border-rose-200" 
                             title="Delete"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={18} />
                           </button>
                         </td>
                       )}
@@ -390,6 +517,7 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
             </table>
           </div>
         </section>
+
       </main>
 
       <PasswordConfirmModal
@@ -398,6 +526,13 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
         onClose={() => setPasswordModal({ isOpen: false, action: null, payload: null })}
         onConfirm={handlePasswordConfirm}
       />
+
+      {(isSaving || isSwitching) && (
+        <LoadingOverlay 
+          message={isSwitching ? "Switching Project" : "Saving Changes"} 
+          subtext={isSwitching ? "Inihahanda ang data..." : "Paki-antay lamang..."} 
+        />
+      )}
     </div>
   );
 }

@@ -133,7 +133,6 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
   const handleLineChange = (id, field, value) => {
     setExpenseLines(lines => lines.map(line => line.id === id ? { ...line, [field]: value } : line));
     
-    // Kapag nakapili na siya ng category, tatanggalin natin ang pula
     if (field === 'category' && value.trim() !== '') {
       setLineErrors(errors => errors.filter(errId => errId !== id));
     }
@@ -169,9 +168,10 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
     setExpenseLines([{ id: Date.now(), category: '', amount: '' }]);
     setShowTaxFields(false);
     setErrorMessage('');
-    setLineErrors([]); // <-- Idagdag ito para malinis ang mga error lines
+    setLineErrors([]); 
     setEditingId(null);
   };
+  
   const closeAndResetModal = () => {
     setIsModalOpen(false);
     resetForm();
@@ -230,9 +230,6 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
     if (isDuplicateCV) { setErrorMessage("May kaparehas na CV#! Paki-palitan bago i-save."); return; }
     if (!isVarianceZero) { setErrorMessage("Hindi pwedeng i-save! Paki-check ang Variance. Kailangang pantay ang Target CIB sa Computed CIB."); return; }
 
-    // ==========================================
-    // BAGONG VALIDATION: Hanapin ang mga walang category at papulahin
-    // ==========================================
     const emptyCategoryLines = expenseLines.filter(line => !line.category || line.category.trim() === '');
     if (emptyCategoryLines.length > 0) {
       const errorIds = emptyCategoryLines.map(line => line.id);
@@ -252,23 +249,26 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
     };
 
     if (editingId) {
-      // If it's an update, prompt for password
       setPasswordModal({ isOpen: true, action: 'update', payload: newDisbursement });
     } else {
-      // If it's a new entry, just save directly (user requested password for update/delete)
       executeSave(newDisbursement);
     }
   };
 
+  // --- IDINAGDAG: TOKEN SA EXECUTE SAVE ---
   const executeSave = async (disbursementData) => {
     setIsSaving(true);
     try {
+      const token = localStorage.getItem('fbtmcc_token'); // <-- KUNIN ANG TOKEN
       const url = editingId ? `${API_URL}/disbursements/${editingId}` : `${API_URL}/disbursements`;
       const method = editingId ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
         method: method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // <-- IPADALA ANG TOKEN SA HEADER
+        },
         body: JSON.stringify(disbursementData)
       });
 
@@ -292,9 +292,16 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
     setPasswordModal({ isOpen: true, action: 'delete', payload: id });
   };
 
+  // --- IDINAGDAG: TOKEN SA EXECUTE DELETE ---
   const executeDelete = async (id) => {
     try {
-      const response = await fetch(`${API_URL}/disbursements/${id}`, { method: 'DELETE' });
+      const token = localStorage.getItem('fbtmcc_token'); // <-- KUNIN ANG TOKEN
+      const response = await fetch(`${API_URL}/disbursements/${id}`, { 
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}` // <-- IPADALA ANG TOKEN SA HEADER
+        }
+      });
       if (response.ok) {
         await refreshData();
       } else {
@@ -627,8 +634,7 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
                       <input type="text" name="particulars" placeholder="Details..." className="w-full p-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                         value={headerData.particulars} onChange={handleHeaderChange} required />
                     </div>
-                    <div className="space-y-
-                    1">
+                    <div className="space-y-1">
                       <label className="text-xs font-semibold text-slate-500">TIN</label>
                       <input type="text" name="tin" placeholder="000-000-000-000" className="w-full p-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                         value={headerData.tin} onChange={handleHeaderChange} />
