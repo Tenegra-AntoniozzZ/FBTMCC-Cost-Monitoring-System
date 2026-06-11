@@ -15,7 +15,7 @@ import PasswordConfirmModal from './PasswordConfirmModal';
 import LoadingOverlay from './LoadingOverlay';
 import { API_URL } from '../utils/constants';
 
-export default function ProjectsSetupScreen({ projects, categories, refreshData, onNavigateToCostMonitoring }) {
+export default function ProjectsSetupScreen({ projects, categories, refreshData, onNavigateToCostMonitoring, onModalStateChange }) {
   const [newProject, setNewProject] = useState({ project_code: '', project_name: '', contract_cost: '', profit_percentage: '20' });
   const [newCategory, setNewCategory] = useState('');
   const [editingProject, setEditingProject] = useState(null);
@@ -27,6 +27,13 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
   const [recentlyAddedProject, setRecentlyAddedProject] = useState(null);
   
   const [passwordModal, setPasswordModal] = useState({ isOpen: false, action: null, payload: null });
+
+  // Notify parent of modal state changes
+  useEffect(() => {
+    if (onModalStateChange) {
+      onModalStateChange(showSuccessModal || showCategorySuccessModal || passwordModal.isOpen || isSaving);
+    }
+  }, [showSuccessModal, showCategorySuccessModal, passwordModal.isOpen, isSaving, onModalStateChange]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {

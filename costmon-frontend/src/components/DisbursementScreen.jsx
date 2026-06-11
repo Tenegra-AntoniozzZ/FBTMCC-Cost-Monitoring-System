@@ -8,7 +8,7 @@ import UnsavedChangesModal from './UnsavedChangesModal';
 import DraftFoundModal from './DraftFoundModal';
 import { API_URL } from '../utils/Constants';
 
-export default function DisbursementScreen({ projects, disbursements, refreshData, isLoading, userRole, categories }) {
+export default function DisbursementScreen({ projects, disbursements, refreshData, isLoading, userRole, categories, initialSearchQuery = '', onModalStateChange }) {
   const canEdit = userRole === 'encoder';
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -25,13 +25,30 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
   const [passwordModal, setPasswordModal] = useState({ isOpen: false, action: null, payload: null });
 
   // --- SEARCH BAR STATE ---
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
 
   // --- MONTH FILTER LOGIC ---
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedMonths, setSelectedMonths] = useState(['All']);
   const [tempSelectedMonths, setTempSelectedMonths] = useState(['All']);
   const filterRef = useRef(null);
+
+  // Notify parent of modal state changes
+  useEffect(() => {
+    if (onModalStateChange) {
+      onModalStateChange(isModalOpen || showUnsavedModal || showDraftModal || passwordModal.isOpen);
+    }
+  }, [isModalOpen, showUnsavedModal, showDraftModal, passwordModal.isOpen, onModalStateChange]);
+
+  useEffect(() => {
+    if (initialSearchQuery) {
+      const timer = setTimeout(() => {
+        setSearchQuery(initialSearchQuery);
+        setSelectedMonths(['All']); 
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [initialSearchQuery]);
 
   // --- ZOOM LOGIC ---
   const [zoomLevel, setZoomLevel] = useState(() => {

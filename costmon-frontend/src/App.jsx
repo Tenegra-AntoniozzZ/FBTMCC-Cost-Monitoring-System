@@ -7,22 +7,26 @@ import NavItem from './components/NavItem';
 import DisbursementScreen from './components/DisbursementScreen';
 import CostMonitoringScreen from './components/CostMonitoringScreen';
 import ProjectsSetupScreen from './components/ProjectsSetupScreen';
+import GlobalSearchModal from './components/GlobalSearchModal';
 import { API_URL } from './utils/Constants';
 
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   const [userRole, setUserRole] = useState(() => localStorage.getItem('fbtmcc_role'));
   const [activeUsername, setActiveUsername] = useState(() => localStorage.getItem('fbtmcc_username') || '');
   const [initialCostMonitoringProjectId, setInitialCostMonitoringProjectId] = useState(null);
-  
+  const [initialDisbursementSearch, setInitialDisbursementSearch] = useState('');
+
   const [projects, setProjects] = useState([]);
   const [categories, setCategories] = useState([]);
   const [disbursements, setDisbursements] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isAnyModalOpen, setIsAnyModalOpen] = useState(false);
 
   const fetchAllData = useCallback(async () => {
     setIsLoading(true);
@@ -43,6 +47,7 @@ export default function App() {
       setIsLoading(false); 
     }
   }, []);
+
   useEffect(() => {
     if (userRole) {
       const timer = setTimeout(() => {
@@ -51,15 +56,24 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [userRole, fetchAllData]);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Logout Modal Escape
       if (e.key === 'Escape' && showLogoutModal) {
         setShowLogoutModal(false);
+      }
+      // Ctrl + F for Search - Only if no other modal is open
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        if (!isAnyModalOpen && !showLogoutModal) {
+          e.preventDefault();
+          setIsSearchOpen(true);
+        }
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showLogoutModal]);
+  }, [showLogoutModal, isAnyModalOpen]);
 
   const handleUpdateProject = (projectId, updatedValues) => {
     setProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updatedValues } : p));
@@ -83,7 +97,15 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    localStorage.clear();
+    localStorage.removeItem('fbtmcc_token');
+    localStorage.removeItem('fbtmcc_role');
+    localStorage.removeItem('fbtmcc_username');
+    
+    // Reset search and project states on logout
+    setInitialDisbursementSearch('');
+    setInitialCostMonitoringProjectId(null);
+    setIsAnyModalOpen(false);
+    
     setUserRole(null);
     setActiveUsername('');
     setShowLogoutModal(false);
@@ -93,6 +115,11 @@ export default function App() {
   const navigateToCostMonitoring = (projectId) => {
     setInitialCostMonitoringProjectId(projectId);
     navigate('/cost-monitoring');
+  };
+
+  const navigateToDisbursement = (cvNo) => {
+    setInitialDisbursementSearch(cvNo);
+    navigate('/disbursements');
   };
 
   if (!userRole) return <LoginScreen onLogin={handleLogin} />;
@@ -124,7 +151,7 @@ export default function App() {
             <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/projects'} icon={<Settings size={20} />} label="Projects Setup" onClick={() => navigate('/projects')} />
           )}
         </nav>
-        
+
         <div className={`p-4 border-t border-slate-800 flex flex-col gap-3 ${isSidebarOpen ? '' : 'items-center pb-6'}`}>
           {isSidebarOpen ? (
             <div className="flex items-center gap-2 text-slate-400 text-xs">
@@ -148,11 +175,21 @@ export default function App() {
       <main className="flex-1 overflow-hidden relative w-full bg-[#f8fafc] flex flex-col">
         <Routes>
           <Route path="/" element={<Navigate to="/disbursements" />} />
-          <Route path="/disbursements" element={<DisbursementScreen projects={projects} categories={categories.map(c => c.name)} disbursements={disbursements} refreshData={fetchAllData} isLoading={isLoading} userRole={userRole} />} />
-          <Route path="/cost-monitoring" element={<CostMonitoringScreen projects={projects} disbursements={disbursements} onUpdateProject={handleUpdateProject} initialProjectId={initialCostMonitoringProjectId} userRole={userRole} refreshData={fetchAllData} />} />
-          <Route path="/projects" element={<ProjectsSetupScreen projects={projects} categories={categories} refreshData={fetchAllData} onNavigateToCostMonitoring={navigateToCostMonitoring} />} />
+          <Route path="/disbursements" element={<DisbursementScreen projects={projects} categories={categories.map(c => c.name)} disbursements={disbursements} refreshData={fetchAllData} isLoading={isLoading} userRole={userRole} initialSearchQuery={initialDisbursementSearch} onModalStateChange={setIsAnyModalOpen} />} />
+          <Route path="/cost-monitoring" element={<CostMonitoringScreen projects={projects} disbursements={disbursements} onUpdateProject={handleUpdateProject} initialProjectId={initialCostMonitoringProjectId} userRole={userRole} refreshData={fetchAllData} onModalStateChange={setIsAnyModalOpen} />} />
+          <Route path="/projects" element={<ProjectsSetupScreen projects={projects} categories={categories} refreshData={fetchAllData} onNavigateToCostMonitoring={navigateToCostMonitoring} onModalStateChange={setIsAnyModalOpen} />} />
         </Routes>
       </main>
+
+      {/* GLOBAL SEARCH MODAL */}
+      <GlobalSearchModal 
+        isOpen={isSearchOpen} 
+        onClose={() => setIsSearchOpen(false)} 
+        disbursements={disbursements} 
+        projects={projects}
+        onNavigateToDisbursement={navigateToDisbursement}
+        onNavigateToProject={navigateToCostMonitoring}
+      />
 
       {/* LOGOUT CONFIRMATION MODAL */}
       {showLogoutModal && (

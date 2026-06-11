@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   FileSpreadsheet, 
   AlertCircle, 
@@ -12,12 +12,19 @@ import PasswordConfirmModal from './PasswordConfirmModal';
 import LoadingOverlay from './LoadingOverlay';
 import { API_URL } from '../utils/Constants';
 
-export default function CostMonitoringScreen({ projects, disbursements, onUpdateProject, initialProjectId, userRole, refreshData }) {
+export default function CostMonitoringScreen({ projects, disbursements, onUpdateProject, initialProjectId, userRole, refreshData, onModalStateChange }) {
   const canEdit = userRole === 'encoder';
   const [passwordModal, setPasswordModal] = useState({ isOpen: false, action: null, payload: null });
   const [isSaving, setIsSaving] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId || projects[0]?.id || '');
+
+  // Notify parent of modal state changes
+  useEffect(() => {
+    if (onModalStateChange) {
+      onModalStateChange(passwordModal.isOpen || isSaving || isSwitching);
+    }
+  }, [passwordModal.isOpen, isSaving, isSwitching, onModalStateChange]);
 
   const [prevInitialId, setPrevInitialId] = useState(initialProjectId);
 
