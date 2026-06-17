@@ -156,7 +156,9 @@ export default function App() {
           <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/dashboard'} icon={<LayoutDashboard size={20} />} label="Dashboard" onClick={() => navigate('/dashboard')} />
           <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/disbursements'} icon={<Receipt size={20} />} label="Disbursements" onClick={() => navigate('/disbursements')} />
           <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/cost-monitoring'} icon={<BarChart3 size={20} />} label="Cost Monitoring" onClick={() => navigate('/cost-monitoring')} />
-          {userRole !== 'engineer' && (
+          
+          {/* RESTRICTED SIDEBAR BUTTON: Lalabas lamang kapag "ceo" ang role */}
+          {userRole === 'ceo' && (
             <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/projects'} icon={<Settings size={20} />} label="Projects Setup" onClick={() => navigate('/projects')} />
           )}
         </nav>
@@ -167,11 +169,11 @@ export default function App() {
               <UserCircle2 size={16} className="shrink-0 text-blue-500" />
               <span className="truncate flex flex-col">
                 <strong className="text-white tracking-wider">{activeUsername}</strong>
-                <span className="text-[10px] uppercase">{userRole}</span>
+                <span className="text-[10px] uppercase">{userRole === 'ceo' ? 'President' : userRole}</span>
               </span>
             </div>
           ) : (
-            <UserCircle2 size={24} className="text-blue-500 shrink-0" title={`User: ${activeUsername} (${userRole})`} />
+            <UserCircle2 size={24} className="text-blue-500 shrink-0" title={`User: ${activeUsername} (${userRole === 'ceo' ? 'President' : userRole})`} />
           )}
 
           <button onClick={() => setShowLogoutModal(true)} className={`flex items-center text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors bg-slate-800/50 rounded-md justify-center ${isSidebarOpen ? 'gap-2 p-2' : 'p-3'}`}>
@@ -186,7 +188,18 @@ export default function App() {
           <Route path="/" element={<Navigate to="/disbursements" />} />
           <Route path="/disbursements" element={<DisbursementScreen projects={projects} categories={categories.map(c => c.name)} disbursements={disbursements} refreshData={fetchAllData} isLoading={isLoading} userRole={userRole} initialSearchQuery={initialDisbursementSearch} onModalStateChange={setIsAnyModalOpen} />} />
           <Route path="/cost-monitoring" element={<CostMonitoringScreen projects={projects} disbursements={disbursements} onUpdateProject={handleUpdateProject} initialProjectId={initialCostMonitoringProjectId} userRole={userRole} refreshData={fetchAllData} onModalStateChange={setIsAnyModalOpen} />} />
-          <Route path="/projects" element={<ProjectsSetupScreen projects={projects} categories={categories} refreshData={fetchAllData} onNavigateToCostMonitoring={navigateToCostMonitoring} onModalStateChange={setIsAnyModalOpen} />} />
+          
+          {/* SECURED ROUTE: Ibabato pabalik sa Cost Monitoring ang kahit sinong hindi 'ceo' na susubok pumunta dito */}
+          <Route 
+            path="/projects" 
+            element={
+              userRole === 'ceo' ? (
+                <ProjectsSetupScreen projects={projects} categories={categories} refreshData={fetchAllData} onNavigateToCostMonitoring={navigateToCostMonitoring} onModalStateChange={setIsAnyModalOpen} />
+              ) : (
+                <Navigate to="/cost-monitoring" replace />
+              )
+            } 
+          />
         </Routes>
       </main>
 
