@@ -1,11 +1,11 @@
-import  { useState, useMemo, useEffect } from 'react';
+import  { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   FileSpreadsheet, 
   AlertCircle, 
   Save,
-  Calendar,
   Trash2,
-  Calculator
+  Calculator,
+  ArrowUp
 } from 'lucide-react';
 import SearchableDropdown from './SearchableDropdown';
 import PasswordConfirmModal from './PasswordConfirmModal';
@@ -19,8 +19,12 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
   const [isSwitching, setIsSwitching] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId || projects[0]?.id || '');
   
-  // BAGONG STATE: Para sa "Popping/Tibok" animation
+  // State para sa "Popping/Tibok" animation
   const [pulsingCategory, setPulsingCategory] = useState(null);
+
+  // BAGONG STATE & REF: Para sa Back to Top button
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const mainScrollRef = useRef(null);
 
   // Notify parent of modal state changes
   useEffect(() => {
@@ -71,7 +75,6 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
         project_start: project.project_start || '',
         days_end: project.days_end || ''
       });
-      // Reset animations tuwing nagpapalit ng project
       setPulsingCategory(null);
     }
   }
@@ -142,12 +145,10 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
       d.project_code && d.project_code.toUpperCase() === project?.project_code?.toUpperCase()
     );
 
-    // Kuhanin ang total ng lahat ng nai-encode na expenses (Direct Cost)
     const totalActualExpenses = projectExpenses.reduce((sum, d) => {
       return sum + (d.expenses || []).reduce((s, exp) => s + (parseFloat(exp.amount) || 0), 0);
     }, 0);
 
-    // Computation para sa Excess Budget (Budget Limit - Total Actual Expenses)
     const excessBudget = budgetCostLimit - totalActualExpenses;
 
     return { 
@@ -163,65 +164,184 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
     };
   }, [editingValues, disbursements, project]);
 
-  // LOGIC: I-group ang mga expenses per category
+  const REQUIRED_CATEGORIES = useMemo(() => [
+    "PERMITS & CONSTRUCTION PLANS",
+    "DOWN PAYMENT",
+    "CARPENTRY",
+    "PAINTING",
+    "ELECTRICAL",
+    "PLUMBING",
+    "TEMPERED GLASS",
+    "MISCELLANEOUS COST",
+    "LABOR/PAYROLL",
+    "ABB 1196 FORWARD",
+    "ZAM-546"
+  ], []);
+
   const expensesByCategory = useMemo(() => {
     const grouped = {};
+    
+    REQUIRED_CATEGORIES.forEach(cat => {
+      grouped[cat] = [];
+    });
+
     financials.projectExpenses.forEach(d => {
       if (d.expenses && d.expenses.length > 0) {
         d.expenses.forEach(exp => {
-          const cat = exp.category || 'UNCATEGORIZED';
-          if (!grouped[cat]) grouped[cat] = [];
-          grouped[cat].push({
-            id: d.id, 
-            date: d.date,
-            cv_no: d.cv_no,
-            or_inv_no: d.or_inv_no,
-            payee: d.payee,
-            particulars: d.particulars,
-            amount: parseFloat(exp.amount) || 0
-          });
+          const cat = (exp.category || '').toUpperCase();
+          const matchedCat = REQUIRED_CATEGORIES.find(c => c.toUpperCase() === cat);
+          
+          if (matchedCat) {
+            const amount = parseFloat(exp.amount) || 0;
+            
+            const laborLess = 0;
+            const laborEwt = 0;
+            const laborTotal = 0;
+            const matlQty = 0;
+            const matlUnitCost = 0;
+            const matlTotal = amount; 
+            const totalMatlCost = amount;
+            const totalLaborCost = 0;
+
+            grouped[matchedCat].push({
+              id: d.id, 
+              date: d.date,
+              cv_no: d.cv_no,
+              or_inv_no: d.or_inv_no,
+              payee: d.payee,
+              particulars: d.particulars,
+              amount: amount,
+              laborLess,
+              laborEwt,
+              laborTotal,
+              matlQty,
+              matlUnitCost,
+              matlTotal,
+              totalMatlCost,
+              totalLaborCost
+            });
+          }
         });
       }
     });
     return grouped;
-  }, [financials.projectExpenses]);
+  }, [financials.projectExpenses, REQUIRED_CATEGORIES]);
 
-  // DYNAMIC COLOR MAPPING LOGIC
   const categoryColorMap = useMemo(() => {
     const colorPalette = [
       'bg-blue-600', 'bg-red-600', 'bg-emerald-600', 'bg-amber-500',
       'bg-purple-600', 'bg-teal-600', 'bg-indigo-600', 'bg-orange-600',
-      'bg-cyan-600', 'bg-pink-600'
+      'bg-cyan-600', 'bg-pink-600', 'bg-rose-700'
     ];
     
     const map = {};
-    Object.keys(expensesByCategory).forEach((category, index) => {
+    REQUIRED_CATEGORIES.forEach((category, index) => {
       map[category] = colorPalette[index % colorPalette.length]; 
     });
     return map;
-  }, [expensesByCategory]);
+  }, [REQUIRED_CATEGORIES]);
 
   const formatMoney = (val) => {
+    if (val === null || val === undefined || val === '') return '-'; 
     if (isNaN(val)) return '0.00';
+    if (val === 0) return '-'; 
     return Number(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  // UPDATED LOGIC: Smooth Scroll + Pop/Heartbeat Animation
   const handleScrollToCategory = (category) => {
     const element = document.getElementById(`category-${category}`);
     if (element) {
-      // Mag-iscroll papunta sa table, ilalagay sa gitna ng screen
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      
-      // I-trigger ang animation
       setPulsingCategory(category);
-      
-      // I-reset ang animation pagkatapos ng 1 second para bumalik sa normal
       setTimeout(() => {
         setPulsingCategory(null);
       }, 1000);
     }
   };
+
+  // BAGONG LOGIC: Pag-handle ng paglabas at pagtago ng Back to Top button
+  const handleMainScroll = () => {
+    if (mainScrollRef.current) {
+      if (mainScrollRef.current.scrollTop > 300) {
+        setShowScrollTop(true);
+      } else {
+        setShowScrollTop(false);
+      }
+    }
+  };
+
+  // BAGONG LOGIC: Smooth Scroll papunta sa pinakataas
+  const scrollToTop = () => {
+    if (mainScrollRef.current) {
+      mainScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  // Helper Function para sa Editable Rows
+  const renderEditableRow = (item, isPlaceholder = false, index = 0) => (
+    <tr key={isPlaceholder ? `empty-${index}` : item.id} className="hover:bg-slate-50 transition-colors text-[11px]">
+      <td className="p-0 border-r border-slate-800 relative focus-within:ring-2 focus-within:ring-blue-500 focus-within:z-10">
+        <input type="date" defaultValue={item?.date || ''} disabled={!canEdit} className="w-full h-full p-2.5 bg-transparent outline-none text-center font-bold text-slate-700" />
+      </td>
+      <td className="p-0 border-r border-slate-800 relative focus-within:ring-2 focus-within:ring-blue-500 focus-within:z-10">
+        <input type="text" defaultValue={item?.cv_no || ''} disabled={!canEdit} placeholder="-" className="w-full h-full p-2.5 bg-transparent outline-none text-center font-mono font-bold text-slate-800" />
+      </td>
+      <td className="p-0 border-r border-slate-800 relative focus-within:ring-2 focus-within:ring-blue-500 focus-within:z-10">
+        <input type="text" defaultValue={item?.or_inv_no || ''} disabled={!canEdit} placeholder="-" className="w-full h-full p-2.5 bg-transparent outline-none text-center font-mono font-bold text-slate-700" />
+      </td>
+      <td className="p-0 border-r border-slate-800 relative focus-within:ring-2 focus-within:ring-blue-500 focus-within:z-10">
+        <input type="text" defaultValue={item?.payee || ''} disabled={!canEdit} placeholder="..." className="w-full h-full p-2.5 bg-transparent outline-none text-left font-bold text-slate-800" />
+      </td>
+      <td className="p-0 border-r border-slate-800 relative focus-within:ring-2 focus-within:ring-blue-500 focus-within:z-10">
+        <input type="text" defaultValue={item?.particulars || ''} disabled={!canEdit} placeholder="..." className="w-full h-full p-2.5 bg-transparent outline-none text-left font-medium text-slate-600" />
+      </td>
+      
+      {/* Labor Data */}
+      <td className="p-0 border-r border-slate-800 bg-slate-50/50 relative focus-within:ring-2 focus-within:ring-blue-500 focus-within:z-10">
+        <input type="number" defaultValue={item?.laborLess || ''} disabled={!canEdit} placeholder="0.00" className="w-full h-full p-2.5 bg-transparent outline-none text-center font-mono font-medium text-slate-600" />
+      </td>
+      <td className="p-0 border-r border-slate-800 bg-slate-50/50 relative focus-within:ring-2 focus-within:ring-blue-500 focus-within:z-10">
+        <input type="number" defaultValue={item?.laborEwt || ''} disabled={!canEdit} placeholder="0.00" className="w-full h-full p-2.5 bg-transparent outline-none text-center font-mono font-medium text-slate-600" />
+      </td>
+      <td className="p-0 border-r border-slate-800 bg-slate-50/50 relative focus-within:ring-2 focus-within:ring-blue-500 focus-within:z-10">
+        <input type="number" defaultValue={item?.laborTotal || ''} disabled={!canEdit} placeholder="0.00" className="w-full h-full p-2.5 bg-transparent outline-none text-center font-mono font-medium text-slate-600" />
+      </td>
+
+      {/* Materials Data */}
+      <td className="p-0 border-r border-slate-800 relative focus-within:ring-2 focus-within:ring-blue-500 focus-within:z-10">
+        <input type="number" defaultValue={item?.matlQty || ''} disabled={!canEdit} placeholder="0" className="w-full h-full p-2.5 bg-transparent outline-none text-center font-mono font-medium text-slate-600" />
+      </td>
+      <td className="p-0 border-r border-slate-800 relative focus-within:ring-2 focus-within:ring-blue-500 focus-within:z-10">
+        <input type="number" defaultValue={item?.matlUnitCost || ''} disabled={!canEdit} placeholder="0.00" className="w-full h-full p-2.5 bg-transparent outline-none text-center font-mono font-medium text-slate-600" />
+      </td>
+      <td className="p-0 border-r border-slate-800 relative focus-within:ring-2 focus-within:ring-blue-500 focus-within:z-10">
+        <input type="number" defaultValue={item?.matlTotal || ''} disabled={!canEdit} placeholder="0.00" className="w-full h-full p-2.5 bg-transparent outline-none text-center font-mono font-medium text-slate-600" />
+      </td>
+
+      {/* Totals */}
+      <td className="p-0 border-r border-slate-800 bg-slate-100/50 relative focus-within:ring-2 focus-within:ring-blue-500 focus-within:z-10">
+        <input type="number" defaultValue={item?.totalMatlCost || ''} disabled={!canEdit} placeholder="0.00" className="w-full h-full p-2.5 bg-transparent outline-none text-right font-mono font-bold text-slate-800" />
+      </td>
+      <td className="p-0 border-r border-slate-800 bg-slate-100/50 relative focus-within:ring-2 focus-within:ring-blue-500 focus-within:z-10">
+        <input type="number" defaultValue={item?.totalLaborCost || ''} disabled={!canEdit} placeholder="0.00" className="w-full h-full p-2.5 pr-4 bg-transparent outline-none text-right font-mono font-black text-slate-900" />
+      </td>
+
+      {/* Action Button */}
+      {canEdit && (
+        <td className="p-2 text-center bg-white">
+          {!isPlaceholder && (
+            <button 
+              onClick={(e) => { e.stopPropagation(); handleDeleteClick(item.id); }} 
+              className="p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-800 rounded-lg transition-colors" 
+              title="Delete Disbursement"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </td>
+      )}
+    </tr>
+  );
 
   if (!projects.length) {
     return (
@@ -233,7 +353,7 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#f8fafc] overflow-hidden">
+    <div className="flex flex-col h-full bg-[#f8fafc] overflow-hidden relative">
       
       {/* HEADER SECTION */}
       <header className="bg-white border-b border-slate-300 px-8 py-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0 shadow-sm z-10">
@@ -262,7 +382,8 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-8 space-y-8">
+      {/* Dito in-attach ang mainScrollRef at ang handleMainScroll */}
+      <main ref={mainScrollRef} onScroll={handleMainScroll} className="flex-1 overflow-y-auto p-8 space-y-8 relative scroll-smooth">
         
         {/* ==============================================
             MODERNIZED PROJECT PROGRESS COSTING BOX
@@ -517,13 +638,13 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
         )}
 
         {/* ==============================================
-            PROJECT LEDGER (DYNAMIC CATEGORY FORMAT)
+            PROJECT LEDGER (EDITABLE SPREADSHEET FORMAT)
         ============================================== */}
-        <section className="bg-[#f8fafc] flex flex-col min-h-[500px] mt-8">
+        <section className="bg-[#f8fafc] flex flex-col min-h-[500px] mt-8 relative">
           
           <div className="flex flex-col mb-4">
             
-            {/* DYNAMIC COLOR GUIDE (With Smooth Hover & Scroll+Pop Animation) */}
+            {/* DYNAMIC COLOR GUIDE */}
             {Object.keys(categoryColorMap).length > 0 && (
               <div className="flex items-center gap-3 mb-4 pl-1 h-10">
                 <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Color Guide:</span>
@@ -562,102 +683,94 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
 
           <div className="overflow-x-auto pb-8">
             {/* MAIN TITLE */}
-            <div className="bg-slate-800 text-center py-4 rounded-t-xl font-black text-white uppercase tracking-[0.2em] text-sm shadow-md min-w-[1000px] border-2 border-b-0 border-slate-800">
+            <div className="bg-slate-800 text-center py-4 rounded-t-xl font-black text-white uppercase tracking-[0.2em] text-sm shadow-md min-w-[1400px] border-2 border-b-0 border-slate-800">
               CONSTRUCTION COST BREAKDOWN
             </div>
 
-            {Object.keys(expensesByCategory).length === 0 ? (
-              <div className="border-2 border-t-0 border-slate-800 rounded-b-xl bg-white min-w-[1000px] p-20 flex flex-col items-center opacity-50 text-slate-500 shadow-sm">
-                <Calendar size={48} className="mb-4" strokeWidth={1.5} />
-                <p className="text-xl font-bold">Walang Disbursement na Nahanap</p>
-                <p className="text-sm font-medium mt-1">Lalabas dito ang breakdown kapag may na-encode nang expenses para sa project na ito.</p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-8 min-w-[1000px] bg-white border-2 border-t-0 border-slate-800 rounded-b-xl p-6 shadow-sm relative">
-                {Object.entries(expensesByCategory).map(([category, items]) => {
-                  
-                  // Kunin ang dynamic color mula sa categoryColorMap
-                  const headerColor = categoryColorMap[category];
-                  
-                  // I-check kung ito yung kinlick para lumaki/tumibok
-                  const isPulsing = pulsingCategory === category;
+            <div className="flex flex-col gap-8 min-w-[1400px] bg-white border-2 border-t-0 border-slate-800 rounded-b-xl p-6 shadow-sm relative">
+              {Object.entries(expensesByCategory).map(([category, items]) => {
+                
+                const headerColor = categoryColorMap[category];
+                const isPulsing = pulsingCategory === category;
 
-                  return (
-                    <div 
-                      key={category} 
-                      id={`category-${category}`} 
-                      className={`border-2 border-slate-800 rounded-xl overflow-hidden scroll-mt-24 transition-all duration-500 ease-out ${
-                        isPulsing ? 'scale-[1.02] shadow-[0_15px_40px_rgba(0,0,0,0.25)] ring-4 ring-slate-400 z-10 relative -translate-y-2' : 'shadow-sm'
-                      }`}
-                    >
-                      <table className="w-full text-left border-collapse text-xs">
-                        <thead>
-                          {/* CATEGORY BANNER (DYNAMIC COLOR) */}
-                          <tr className={`${headerColor} border-b-2 border-slate-800`}>
-                            <th colSpan={canEdit ? 7 : 6} className="text-center py-3.5 font-black text-white uppercase tracking-[0.15em] text-sm">
-                              {category}
-                            </th>
-                          </tr>
-                          {/* COLUMN HEADERS */}
-                          <tr className="bg-slate-200 border-b-2 border-slate-800 text-[10px] font-black text-slate-800 text-center uppercase tracking-wider">
-                            <th className="py-3 px-4 w-[10%] border-r border-slate-800">Date</th>
-                            <th className="py-3 px-4 w-[10%] border-r border-slate-800">C.V.#</th>
-                            <th className="py-3 px-4 w-[10%] border-r border-slate-800">Invoice</th>
-                            <th className="py-3 px-4 w-[25%] text-left border-r border-slate-800">Supplier / Particulars</th>
-                            <th className="py-3 px-4 w-[25%] text-left border-r border-slate-800">Item Description</th>
-                            <th className="py-3 px-4 w-[15%] text-right pr-6 border-r border-slate-800">Amount</th>
-                            {canEdit && <th className="py-3 px-4 w-[5%]">Action</th>}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800 bg-white">
-                          {/* DATA ROWS */}
-                          {items.map((item, i) => (
-                            <tr key={`${item.id}-${i}`} className="hover:bg-slate-50 transition-colors">
-                              <td className="p-4 text-center font-bold text-slate-700 border-r border-slate-800">{item.date}</td>
-                              <td className="p-4 text-center border-r border-slate-800">
-                                <span className="px-2 py-1 bg-white text-slate-800 rounded-md font-mono font-bold text-[11px] border border-slate-300">{item.cv_no || 'N/A'}</span>
-                              </td>
-                              <td className="p-4 text-center font-mono font-bold text-slate-700 border-r border-slate-800">{item.or_inv_no || '—'}</td>
-                              <td className="p-4 font-bold text-slate-800 text-left border-r border-slate-800">{item.payee}</td>
-                              <td className="p-4 font-medium text-slate-600 text-left border-r border-slate-800">{item.particulars}</td>
-                              <td className="p-4 text-right font-mono font-black text-slate-800 pr-6 border-r border-slate-800">
-                                {item.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                              </td>
-                              {canEdit && (
-                                <td className="p-4 text-center">
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); handleDeleteClick(item.id); }} 
-                                    className="p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-800 rounded-lg transition-colors" 
-                                    title="Delete Disbursement"
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                </td>
-                              )}
-                            </tr>
-                          ))}
-                          
-                          {/* SUBTOTAL ROW */}
-                          <tr className="bg-slate-100 border-t-2 border-slate-800">
-                            <td colSpan="5" className="p-4 text-right font-black text-[11px] uppercase tracking-widest text-slate-800 border-r border-slate-800">
-                              TOTAL FOR {category}:
-                            </td>
-                            <td className="p-4 text-right font-mono font-black text-slate-800 text-[15px] pr-6 border-r border-slate-800">
-                              ₱ {items.reduce((sum, i) => sum + i.amount, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                            </td>
-                            {canEdit && <td></td>}
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                return (
+                  <div 
+                    key={category} 
+                    id={`category-${category}`} 
+                    className={`border-2 border-slate-800 rounded-xl overflow-hidden scroll-mt-24 transition-all duration-500 ease-out ${
+                      isPulsing ? 'scale-[1.02] shadow-[0_15px_40px_rgba(0,0,0,0.25)] ring-4 ring-slate-400 z-10 relative -translate-y-2' : 'shadow-sm'
+                    }`}
+                  >
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        {/* CATEGORY BANNER (DYNAMIC COLOR) */}
+                        <tr className={`${headerColor} border-b-2 border-slate-800`}>
+                          <th colSpan={canEdit ? 14 : 13} className="text-center py-3.5 font-black text-white uppercase tracking-[0.15em] text-sm">
+                            {category}
+                          </th>
+                        </tr>
+                        {/* COLUMN HEADERS */}
+                        <tr className="bg-slate-200 border-b-2 border-slate-800 text-[10px] font-black text-slate-800 text-center uppercase tracking-wider leading-tight">
+                          <th className="py-3 px-2 w-[6%] border-r border-slate-800">Date</th>
+                          <th className="py-3 px-2 w-[6%] border-r border-slate-800">C.V.#</th>
+                          <th className="py-3 px-2 w-[6%] border-r border-slate-800">Invoice</th>
+                          <th className="py-3 px-2 w-[15%] text-left border-r border-slate-800">Supplier / Particulars</th>
+                          <th className="py-3 px-2 w-[15%] text-left border-r border-slate-800">Item Description</th>
+                          <th className="py-3 px-2 w-[6%] border-r border-slate-800">Labor Less</th>
+                          <th className="py-3 px-2 w-[6%] border-r border-slate-800">Labor Ewt</th>
+                          <th className="py-3 px-2 w-[6%] border-r border-slate-800">Labor Total</th>
+                          <th className="py-3 px-2 w-[6%] border-r border-slate-800">Mat'l QTY</th>
+                          <th className="py-3 px-2 w-[6%] border-r border-slate-800">Mat'l Unit Cost</th>
+                          <th className="py-3 px-2 w-[6%] border-r border-slate-800">Mat'l Total</th>
+                          <th className="py-3 px-2 w-[8%] border-r border-slate-800">Total Mat'l Cost</th>
+                          <th className="py-3 px-2 w-[8%] border-r border-slate-800 text-right pr-4">Total Labor Cost</th>
+                          {canEdit && <th className="py-3 px-2 w-[4%]">Act</th>}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800 bg-white">
+                        
+                        {/* DATA ROWS (EDITABLE INPUTS) */}
+                        {items.map((item, i) => renderEditableRow(item, false, i))}
+                        
+                        {/* 2 EMPTY PLACEHOLDER ROWS FOR EASY ADDING LATER */}
+                        {[1, 2].map((i) => renderEditableRow(null, true, i))}
+                        
+                        {/* SUBTOTAL ROW (READ ONLY) */}
+                        <tr className="bg-slate-100 border-t-2 border-slate-800">
+                          <td colSpan="11" className="p-3 text-right font-black text-[11px] uppercase tracking-widest text-slate-800 border-r border-slate-800">
+                            TOTAL FOR {category}:
+                          </td>
+                          <td className="p-3 text-right font-mono font-black text-slate-800 text-sm border-r border-slate-800 bg-slate-200/50">
+                            ₱ {items.reduce((sum, i) => sum + i.totalMatlCost, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="p-3 text-right pr-4 font-mono font-black text-slate-800 text-sm border-r border-slate-800 bg-slate-200/50">
+                            ₱ {items.reduce((sum, i) => sum + i.totalLaborCost, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </td>
+                          {canEdit && <td></td>}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </section>
 
       </main>
+
+      {/* ==============================================
+          FLOATING BACK TO TOP BUTTON
+      ============================================== */}
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          title="Bumalik sa itaas"
+          className="absolute bottom-8 right-8 w-12 h-12 bg-slate-800 text-white rounded-full shadow-2xl flex items-center justify-center hover:bg-slate-700 hover:-translate-y-1 hover:shadow-[0_10px_20px_rgba(0,0,0,0.3)] transition-all duration-300 z-50 animate-in fade-in zoom-in"
+        >
+          <ArrowUp size={24} strokeWidth={2.5} />
+        </button>
+      )}
 
       <PasswordConfirmModal
         isOpen={passwordModal.isOpen}
