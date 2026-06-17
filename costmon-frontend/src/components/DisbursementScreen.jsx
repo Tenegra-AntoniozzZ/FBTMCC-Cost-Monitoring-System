@@ -23,6 +23,7 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
 
   // PASSWORD VERIFICATION STATE
   const [passwordModal, setPasswordModal] = useState({ isOpen: false, action: null, payload: null });
+  const [isAddingLine, setIsAddingLine] = useState(false);
 
   // --- SEARCH BAR STATE ---
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
@@ -190,10 +191,15 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
   };
 
   const addLine = () => {
+    if (isAddingLine) return;
+    setIsAddingLine(true);
+
     setExpenseLines(prev => {
       const maxId = prev.length > 0 ? Math.max(...prev.map(line => line.id)) : 0;
       return [...prev, { id: maxId + 1, category: '', amount: '' }];
     });
+
+    setTimeout(() => setIsAddingLine(false), 300);
   };
   
   const removeLine = (id) => {
@@ -727,10 +733,10 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
       </main>
 
       {isModalOpen && canEdit && (
-        <div className="fixed inset-0 z-50 flex justify-center items-start pt-10 pb-10 overflow-y-auto bg-slate-900/60 backdrop-blur-sm px-4">
-          <div className="bg-slate-50 w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex justify-center items-start pt-6 pb-6 bg-slate-900/60 backdrop-blur-sm px-4 overflow-hidden">
+          <div className="bg-slate-50 w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-full">
             
-            <div className="bg-white px-6 py-4 border-b border-slate-200 flex justify-between items-center sticky top-0 z-10">
+            <div className="bg-white px-6 py-4 border-b border-slate-200 flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
                 <div className="bg-blue-100 p-2 rounded-lg"><FileText className="text-blue-600" size={20} /></div>
                 <div>
@@ -747,7 +753,7 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
               </button>
             </div>
 
-            <div className="p-6">
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
               <form onSubmit={handleSubmit} className="space-y-6">
 
                 {errorMessage && (
@@ -868,12 +874,16 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
                     
                     <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
                       <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">2. Expense Category Breakdown <span className="text-red-500">*</span></h3>
-                      <button type="button" onClick={addLine} disabled={targetCib <= 0} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-md font-medium flex items-center gap-1 transition-colors disabled:opacity-50">
-                        <Plus size={14} /> Add Line Item
+                      <button type="button" onClick={addLine} disabled={targetCib <= 0 || isAddingLine} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-md font-medium flex items-center gap-1 transition-colors disabled:opacity-50 min-w-[120px] justify-center">
+                        {isAddingLine ? (
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce"></span> Adding...</span>
+                        ) : (
+                          <><Plus size={14} /> Add Line Item</>
+                        )}
                       </button>
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="max-h-[320px] overflow-y-auto pr-2 custom-scrollbar space-y-3">
                       {expenseLines.map((line, index) => (
                         <div key={line.id} className="flex gap-3 items-start animate-in slide-in-from-top-2">
                           <div className="w-8 h-9 bg-slate-50 border border-slate-200 rounded flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">

@@ -75,6 +75,15 @@ export default function App() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [showLogoutModal, isAnyModalOpen]);
 
+  useEffect(() => {
+    if (showLogoutModal || isSearchOpen || isAnyModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => { document.body.style.overflow = 'unset'; };
+  }, [showLogoutModal, isSearchOpen, isAnyModalOpen]);
+
   const handleUpdateProject = (projectId, updatedValues) => {
     setProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updatedValues } : p));
     fetch(`${API_URL}/projects/${projectId}`, {
