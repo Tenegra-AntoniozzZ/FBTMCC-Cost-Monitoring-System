@@ -89,9 +89,13 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
     setPasswordModal({ isOpen: true, action: 'update_project', payload: editingValues });
   };
 
-  const handleDeleteClick = (id) => {
+  const handleDeleteClick = (id, lineId = null) => {
     if (!canEdit) return;
-    setPasswordModal({ isOpen: true, action: 'delete_disbursement', payload: id });
+    setPasswordModal({ 
+      isOpen: true, 
+      action: 'delete_disbursement', 
+      payload: { id, lineId } // IPADALA ANG DALAWANG ID
+    });
   };
 
   const executeSaveProject = async (values) => {
@@ -102,19 +106,71 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
     setIsSaving(false);
   };
 
-  const executeDeleteDisbursement = async (id) => {
+  const executeDeleteDisbursement = async (payload) => {
+    // Payload can be a string (old way) or object (new way)
+    const id = typeof payload === 'string' ? payload : payload.id;
+    const lineId = typeof payload === 'object' ? payload.lineId : null;
+
     setIsSaving(true);
     try {
-      const response = await fetch(`${API_URL}/disbursements/${id}`, { 
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
+      const token = localStorage.getItem('fbtmcc_token');
+      const disbursement = disbursements.find(d => d.id === id);
+      
+      if (!disbursement) {
+        alert("Disbursement not found.");
+        return;
+      }
+
+      // KUNG MAY SPECIFIC LINE ID AT HINDI ITO ANG HULING LINE
+      if (lineId && disbursement.expenses && disbursement.expenses.length > 1) {
+        const updatedExpenses = disbursement.expenses.filter(exp => exp.id !== lineId);
+        
+        // RECALCULATE TOTALS
+        let totalDebit = 0;
+        let ewtPayable = 0;
+        updatedExpenses.forEach(line => {
+          const amt = parseFloat(line.amount) || 0;
+          totalDebit += amt;
+          if (line.category === 'Labor /SUBCONTRACTOR') ewtPayable += (amt * 0.02);
+        });
+        const cib_coh = totalDebit - ewtPayable;
+
+        const updatedDisbursement = {
+          ...disbursement,
+          expenses: updatedExpenses,
+          gross_amount: totalDebit,
+          ewt_amount: ewtPayable,
+          net_amount: cib_coh,
+          expenses_json: JSON.stringify(updatedExpenses) // Backend expects expenses_json for SQL update
+        };
+
+        const response = await fetch(`${API_URL}/disbursements/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(updatedDisbursement)
+        });
+
+        if (response.ok) {
+          if (refreshData) await refreshData();
+        } else {
+          alert("Failed to update disbursement line.");
         }
-      });
-      if (response.ok) {
-        if (refreshData) await refreshData();
       } else {
-        alert("Failed to delete disbursement.");
+        // KUNG ISA NA LANG ANG LINE O WALANG LINE ID, BURAHIN ANG BUONG VOUCHER
+        const response = await fetch(`${API_URL}/disbursements/${id}`, { 
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          if (refreshData) await refreshData();
+        } else {
+          alert("Failed to delete disbursement.");
+        }
       }
     } catch (error) {
       console.error(error);
@@ -174,6 +230,7 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
     "ELECTRICAL",
     "PLUMBING",
     "TEMPERED GLASS",
+    "SSS/PAG-IBIG / PHILHEALTH",
     "MISCELLANEOUS COST",
     "LABOR/PAYROLL",
     "ABB 1196 FORWARD",
@@ -220,6 +277,7 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
 
           grouped[targetCat].push({
             id: d.id, 
+            lineId: exp.id, // IDINAGDAG: Ang specific ID ng expense line
             date: d.date,
             cv_no: d.cv_no,
             or_inv_no: d.or_inv_no,
@@ -718,9 +776,9 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
                               {canEdit && (
                                 <td className="p-2 text-center bg-white">
                                   <button 
-                                    onClick={(e) => { e.stopPropagation(); handleDeleteClick(item.id); }} 
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteClick(item.id, item.lineId); }} 
                                     className="p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-800 rounded-lg transition-colors" 
-                                    title="Delete Disbursement"
+                                    title="Delete Item"
                                   >
                                     <Trash2 size={14} />
                                   </button>

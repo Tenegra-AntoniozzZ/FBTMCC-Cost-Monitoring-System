@@ -63,15 +63,27 @@ export default function PasswordConfirmModal({ isOpen, onClose, onConfirm, actio
       <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm border border-slate-100 animate-in zoom-in-95 duration-200">
         
         <div className="flex flex-col items-center text-center mb-6">
-          <div className={`p-4 rounded-full mb-4 ${isDelete ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
-            <KeyRound size={32} strokeWidth={2} />
+          <div className={`p-4 rounded-full mb-4 ${isDelete ? 'bg-rose-100 text-rose-600 animate-pulse' : 'bg-blue-50 text-blue-600'}`}>
+            {isDelete ? <AlertCircle size={32} strokeWidth={2.5} /> : <KeyRound size={32} strokeWidth={2} />}
           </div>
           <h3 className="text-2xl font-black text-slate-800 tracking-tight">
-            Security Check
+            {isDelete ? 'Confirm Deletion' : 'Security Check'}
           </h3>
-          <p className="text-sm text-slate-500 font-medium mt-2">
-            Please enter your password to confirm this {isDelete ? 'deletion' : 'update'}.
-          </p>
+          
+          {isDelete ? (
+            <div className="mt-3 p-3 bg-rose-50 border border-rose-100 rounded-xl">
+              <p className="text-xs font-black text-rose-600 uppercase tracking-widest mb-1 flex items-center justify-center gap-1">
+                <AlertCircle size={14} /> Warning
+              </p>
+              <p className="text-xs font-bold text-rose-500 leading-relaxed">
+                Sigurado ka ba? Ang data na ito ay <span className="underline decoration-2">PERMANENTENG MABUBURA</span> at hindi na maaaring ma-recover.
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500 font-medium mt-2">
+              Please enter your password to confirm this {isDelete ? 'deletion' : 'update'}.
+            </p>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
