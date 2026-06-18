@@ -217,9 +217,9 @@ export default function DisbursementScreen({ projects, categories, disbursements
       const cleanUpper = upperName.replace(/\(-+PHP\)/gi, '').trim();
 
       if (rawName.startsWith('[MAIN] ')) {
-        main.push(rawName);
+        main.push(rawName.replace('[MAIN] ', ''));
       } else if (rawName.startsWith('[MISC] ')) {
-        misc.push(rawName);
+        misc.push(rawName.replace('[MISC] ', ''));
       } else {
         const matchedMain = DEFAULT_MAIN_VALS.find(m => cleanUpper === m.clean || upperName.includes(m.clean));
         if (matchedMain) {

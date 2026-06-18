@@ -412,10 +412,18 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
 
                 <div className="uppercase tracking-wider text-slate-500 mb-2 font-black">Contract Labor Cost</div>
                 <div className="space-y-2 pl-4 border-l-2 border-slate-400 ml-2">
-                  <div className="flex justify-between items-center text-slate-600"><span>Carpentry:</span><span className="font-mono font-bold">-</span></div>
-                  <div className="flex justify-between items-center text-slate-600"><span>Painting:</span><span className="font-mono font-bold">-</span></div>
-                  <div className="flex justify-between items-center text-slate-600"><span>Electrical:</span><span className="font-mono font-bold">-</span></div>
-                  <div className="flex justify-between items-center text-slate-600"><span>Plumbing:</span><span className="font-mono font-bold">-</span></div>
+                  <div className="flex justify-between items-center text-slate-600">
+                    <span>Labor / Payroll:</span>
+                    <span className="font-mono font-bold">
+                      {formatMoney(expensesByCategory["LABOR/PAYROLL"]?.reduce((sum, item) => sum + item.amount, 0) || 0)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-600">
+                    <span>SSS/Pag-ibig/PhilHealth:</span>
+                    <span className="font-mono font-bold">
+                      {formatMoney(expensesByCategory["SSS/PAG-IBIG / PHILHEALTH"]?.reduce((sum, item) => sum + item.amount, 0) || 0)}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="w-full h-[2px] bg-slate-300 my-4"></div>
@@ -430,7 +438,9 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
                 <div className="grid grid-cols-[140px_1fr] items-center py-1 mb-4">
                   <span className="uppercase tracking-wider text-slate-500 font-black">Labor cost:</span>
                   <div className="flex justify-end gap-2 items-end">
-                    <span className="font-mono text-sm text-slate-900 font-bold">0.00</span>
+                    <span className="font-mono text-sm text-slate-900 font-bold">
+                      {formatMoney(expensesByCategory["LABOR/PAYROLL"]?.reduce((sum, item) => sum + item.amount, 0) || 0)}
+                    </span>
                     <span className="text-[10px] text-slate-500 pb-0.5">PHP</span>
                   </div>
                 </div>
@@ -458,21 +468,40 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
                       Progress-Based Costing
                     </div>
                     <div className="p-6 space-y-3 text-xs font-bold text-slate-700 uppercase flex-1 flex flex-col">
-                      <div className="flex justify-between border-b border-slate-300 pb-2"><span>Permits & Const'n Plans:</span><span className="font-mono text-slate-400">-</span></div>
-                      <div className="flex justify-between border-b border-slate-300 pb-2"><span>Supervision Cost:</span><span className="font-mono text-slate-400">-</span></div>
-                      <div className="flex justify-between border-b border-slate-300 pb-2 text-slate-900"><span>Carpentry:</span><span className="font-mono font-black">8,070.00</span></div>
-                      <div className="flex justify-between border-b border-slate-300 pb-2"><span>Painting:</span><span className="font-mono text-slate-400">-</span></div>
-                      <div className="flex justify-between border-b border-slate-300 pb-2"><span>Electrical:</span><span className="font-mono text-slate-400">-</span></div>
-                      <div className="flex justify-between border-b border-slate-300 pb-2"><span>Plumbing:</span><span className="font-mono text-slate-400">-</span></div>
-                      <div className="flex justify-between border-b border-slate-300 pb-2"><span>Tempered Glass:</span><span className="font-mono text-slate-400">-</span></div>
-                      <div className="flex justify-between border-b border-slate-300 pb-2 text-slate-900"><span>Miscellaneous Cost:</span><span className="font-mono font-black">1,409.75</span></div>
-                      <div className="flex justify-between border-b border-slate-300 pb-2 text-slate-900"><span>Labor/Payroll:</span><span className="font-mono font-black">8,000.00</span></div>
+                      {[
+                        "PERMITS & CONSTRUCTION PLANS",
+                        "DOWN PAYMENT",
+                        "CARPENTRY",
+                        "PAINTING",
+                        "ELECTRICAL",
+                        "PLUMBING",
+                        "TEMPERED GLASS",
+                        "MISCELLANEOUS COST",
+                        "LABOR/PAYROLL"
+                      ].map(cat => {
+                        const catTotal = expensesByCategory[cat]?.reduce((sum, item) => sum + item.amount, 0) || 0;
+                        if (catTotal === 0) return null; // ALISIN KAPAG WALANG LAMAN
+                        
+                        return (
+                          <div key={cat} className="flex justify-between border-b border-slate-300 pb-2">
+                            <span className="truncate pr-2">{cat === "PERMITS & CONSTRUCTION PLANS" ? "Permits & Const'n Plans" : cat.charAt(0) + cat.slice(1).toLowerCase()}:</span>
+                            <span className="font-mono font-black">{formatMoney(catTotal)}</span>
+                          </div>
+                        );
+                      })}
                       
                       <div className="pt-2 text-[10px] text-slate-500 space-y-2">
-                        <div className="flex justify-between"><span>ABB Forward</span><span className="font-mono">-</span></div>
-                        <div className="flex justify-between"><span>ZAM 546</span><span className="font-mono">-</span></div>
-                        <div className="flex justify-between"><span>NDP 9693</span><span className="font-mono">-</span></div>
-                        <div className="flex justify-between"><span>MBQ 2104</span><span className="font-mono">-</span></div>
+                        {["ABB 1196 FORWARD", "ZAM-546"].map(cat => {
+                          const catTotal = expensesByCategory[cat]?.reduce((sum, item) => sum + item.amount, 0) || 0;
+                          if (catTotal === 0) return null; // ALISIN KAPAG WALANG LAMAN
+                          
+                          return (
+                            <div key={cat} className="flex justify-between">
+                              <span>{cat === "ABB 1196 FORWARD" ? "ABB Forward" : "ZAM 546"}</span>
+                              <span className="font-mono">{formatMoney(catTotal)}</span>
+                            </div>
+                          );
+                        })}
                       </div>
 
                       <div className="mt-auto pt-4 flex justify-between items-center border-t-2 border-slate-400">

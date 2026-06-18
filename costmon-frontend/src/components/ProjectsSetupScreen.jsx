@@ -210,7 +210,8 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
     const valueToAdd = isMisc ? newSubCategory.trim() : newCategory.trim();
     if (!valueToAdd) return;
     
-    // Lagyan ng hidden tag para sa automatic classification sa susunod na pag-load
+    // Lagyan ULI ng hidden tag para sa automatic classification sa susunod na pag-load
+    // Pero hindi ito makikita ng user sa dropdown dahil sa 'displayName' logic
     const finalName = isMisc ? `[MISC] ${valueToAdd}` : `[MAIN] ${valueToAdd}`;
     
     setIsSaving(true);
