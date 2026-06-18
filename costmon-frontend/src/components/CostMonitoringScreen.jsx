@@ -13,9 +13,8 @@ import {
 import SearchableDropdown from './SearchableDropdown';
 import PasswordConfirmModal from './PasswordConfirmModal';
 import LoadingOverlay from './LoadingOverlay';
-import { API_URL } from '../utils/Constants';
 
-export default function CostMonitoringScreen({ projects, disbursements, onUpdateProject, initialProjectId, userRole, refreshData, onModalStateChange, onNavigateToDisbursement }) {
+export default function CostMonitoringScreen({ projects, disbursements, onUpdateProject, initialProjectId, userRole, onModalStateChange, onNavigateToDisbursement }) {
   const canEdit = userRole === 'encoder';
   const [passwordModal, setPasswordModal] = useState({ isOpen: false, action: null, payload: null });
   const [redirectionModal, setRedirectionModal] = useState({ isOpen: false, disbursementId: null, cvNo: '' });
@@ -92,6 +91,22 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
     if (!canEdit) return;
     setPasswordModal({ isOpen: true, action: 'update_project', payload: editingValues });
   };
+
+  // BAGONG LOGIC: Ctrl + S Shortcut para i-save ang changes
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault(); // Pipigilan yung default "Save Webpage" ng browser
+        if (!isSaving && canEdit && !passwordModal.isOpen && !redirectionModal.isOpen && !isAdditionalsModalOpen) {
+          handleSaveClick();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isSaving, canEdit, passwordModal.isOpen, redirectionModal.isOpen, isAdditionalsModalOpen, editingValues]);
+
 
   const handleDeleteClick = (id) => {
     if (!canEdit) return;
@@ -739,7 +754,7 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
 
         {/* SAVE BUTTON */}
         {canEdit && (
-          <div className="flex justify-end mt-2 animate-in fade-in">
+          <div className="flex justify-end mt-2 animate-in fade-in items-center gap-4">
             <button onClick={handleSaveClick} disabled={isSaving} className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3.5 rounded-2xl font-black shadow-xl shadow-blue-200/50 transition-all flex items-center gap-3 disabled:opacity-50">
               <Save size={20} /> {isSaving ? 'SAVING DATA...' : 'SAVE CHANGES'}
             </button>
@@ -1023,7 +1038,6 @@ function AdditionalsLedgerModal({ isOpen, onClose, data, canEdit, onDeleteClick 
                 <div key={category} className="border-2 border-slate-800 rounded-xl overflow-hidden shadow-sm">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      {/* Pinalitan ang bg-red-600 ng bg-slate-800 para katulad ng main ledger */}
                       <tr className="bg-slate-800 border-b-2 border-slate-800">
                         <th colSpan={canEdit ? 14 : 13} className="text-center py-3.5 font-black text-white uppercase tracking-[0.15em] text-sm">
                           {category}
@@ -1049,7 +1063,7 @@ function AdditionalsLedgerModal({ isOpen, onClose, data, canEdit, onDeleteClick 
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800 bg-white">
-                      {/* DATA ROWS - Pinalitan ang hover:bg-red-50/30 ng standard na hover:bg-slate-50 */}
+                      {/* DATA ROWS */}
                       {items.map((item, i) => (
                         <tr key={`${item.id}-${i}`} className="hover:bg-slate-50 transition-colors text-[11px]">
                           <td className="p-3 text-center font-bold text-slate-700 border-r border-slate-800">{item.date}</td>
@@ -1085,7 +1099,7 @@ function AdditionalsLedgerModal({ isOpen, onClose, data, canEdit, onDeleteClick 
                         </tr>
                       ))}
 
-                      {/* SUBTOTAL ROW - Pinalitan pabalik sa slate ang background */}
+                      {/* SUBTOTAL ROW */}
                       <tr className="bg-slate-100 border-t-2 border-slate-800">
                         <td colSpan="11" className="p-3 text-right font-black text-[11px] uppercase tracking-widest text-slate-800 border-r border-slate-800">
                           TOTAL FOR {category}:

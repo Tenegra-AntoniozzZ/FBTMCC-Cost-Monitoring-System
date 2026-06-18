@@ -99,6 +99,16 @@ export default function SearchableDropdown({ options, value, onChange, placehold
             placeholder="Mag-type para maghanap..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                // Kunin agad ang pinaka-una sa listahan kapag nag-enter
+                if (filteredOptions.length > 0) {
+                  onChange(filteredOptions[0]);
+                  setIsOpen(false);
+                }
+              }
+            }}
             autoFocus
           />
         </div>

@@ -44,7 +44,23 @@ export default function GlobalSearchModal({ isOpen, onClose, disbursements, proj
             className="flex-1 text-xl font-bold outline-none placeholder:text-slate-300"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            onKeyDown={e => e.key === 'Escape' && onClose()}
+            onKeyDown={e => {
+              if (e.key === 'Escape') {
+                onClose();
+              } else if (e.key === 'Enter') {
+                e.preventDefault();
+                // Uunahin niyang i-check kung may lumabas na disbursement
+                if (filteredDisbursements.length > 0) {
+                  onNavigateToDisbursement(filteredDisbursements[0].cv_no);
+                  onClose();
+                } 
+                // Kung walang disbursement pero may project, yun ang iseselect
+                else if (filteredProjects.length > 0) {
+                  onNavigateToProject(filteredProjects[0].id);
+                  onClose();
+                }
+              }
+            }}
           />
           <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-1 text-xs font-bold text-slate-400 bg-slate-50 border border-slate-200 rounded-md">
             ESC
@@ -134,7 +150,7 @@ export default function GlobalSearchModal({ isOpen, onClose, disbursements, proj
         <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
           <div className="flex gap-4">
             <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 bg-white border border-slate-200 rounded">↑↓</kbd> Navigate</span>
-            <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 bg-white border border-slate-200 rounded">Enter</kbd> Select</span>
+            <span className="flex items-center gap-1"><kbd className="px-1.5 py-0.5 bg-white border border-slate-200 rounded">Enter</kbd> Select First Option</span>
           </div>
           <span>FBTMCC COST MONITORING SYSTEM</span>
         </div>

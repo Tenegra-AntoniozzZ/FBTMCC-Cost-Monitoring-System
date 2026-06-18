@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, Plus, Trash2, FileText, ChevronDown, Filter, X, Lock, Save, Receipt, Edit2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { Search, Plus, Trash2, FileText, ChevronDown, Filter, X, Lock, Save, Receipt, Edit2, ZoomIn, ZoomOut, RotateCcw, CheckCircle2 } from 'lucide-react';
 import SearchableDropdown from './SearchableDropdown';
 import HealthCard from './HealthCard';
 import PasswordConfirmModal from './PasswordConfirmModal';
@@ -11,21 +11,6 @@ import { API_URL } from '../utils/Constants';
 export default function DisbursementScreen({ projects, categories, disbursements, refreshData, isLoading, userRole, initialSearchQuery, initialDisbursementId, onClearInitialDisbursement, onModalStateChange }) {
   const canEdit = userRole === 'encoder';
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // Auto-open modal if initialDisbursementId is provided
-  useEffect(() => {
-    if (initialDisbursementId && disbursements.length > 0) {
-      const disbursement = disbursements.find(d => d.id === initialDisbursementId);
-      if (disbursement) {
-        // Delay slightly to ensure component is ready
-        const timer = setTimeout(() => {
-          handleEditRow(disbursement);
-          if (onClearInitialDisbursement) onClearInitialDisbursement();
-        }, 100);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [initialDisbursementId, disbursements]);
   const [editingId, setEditingId] = useState(null);
   const [showTaxFields, setShowTaxFields] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -35,6 +20,7 @@ export default function DisbursementScreen({ projects, categories, disbursements
   const [initialFormState, setInitialFormState] = useState(null);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const [showDraftModal, setShowDraftModal] = useState(false);
+  const [postSavePrompt, setPostSavePrompt] = useState(false); // BAGONG STATE para sa after-save prompt
 
   // PASSWORD VERIFICATION STATE
   const [passwordModal, setPasswordModal] = useState({ isOpen: false, action: null, payload: null });
@@ -52,9 +38,9 @@ export default function DisbursementScreen({ projects, categories, disbursements
   // Notify parent of modal state changes
   useEffect(() => {
     if (onModalStateChange) {
-      onModalStateChange(isModalOpen || showUnsavedModal || showDraftModal || passwordModal.isOpen);
+      onModalStateChange(isModalOpen || showUnsavedModal || showDraftModal || passwordModal.isOpen || postSavePrompt);
     }
-  }, [isModalOpen, showUnsavedModal, showDraftModal, passwordModal.isOpen, onModalStateChange]);
+  }, [isModalOpen, showUnsavedModal, showDraftModal, passwordModal.isOpen, postSavePrompt, onModalStateChange]);
 
   useEffect(() => {
     if (initialSearchQuery) {
@@ -191,7 +177,7 @@ export default function DisbursementScreen({ projects, categories, disbursements
     input_tax: '',
     output_tax: '',
     target_cib: '',
-    costing_type: 'normal' // IDINAGDAG: Bagong field para sa type ng costing
+    costing_type: 'normal' 
   });
 
   // --- CATEGORY SPLITTING LOGIC ---
@@ -264,7 +250,6 @@ export default function DisbursementScreen({ projects, categories, disbursements
 
     const setter = type === 'construction' ? setConstructionLines : setMiscLines;
     setter(prev => {
-      // Find max ID across BOTH lists to ensure uniqueness
       const allLines = [...constructionLines, ...miscLines];
       const maxId = allLines.length > 0 ? Math.max(...allLines.map(line => typeof line.id === 'number' ? line.id : 0)) : 0;
       return [...prev, { id: maxId + 1, category: '', amount: '' }];
@@ -275,10 +260,6 @@ export default function DisbursementScreen({ projects, categories, disbursements
   
   const removeLine = (id, type = 'construction') => {
     const setter = type === 'construction' ? setConstructionLines : setMiscLines;
-    const lines = type === 'construction' ? constructionLines : miscLines;
-    
-    // Allow removing if it's not the last line of BOTH? 
-    // Actually, user should be able to clear misc if they want.
     if (type === 'construction' && constructionLines.length === 1 && miscLines.length === 0) return;
     setter(prev => prev.filter(line => line.id !== id));
   };
@@ -297,6 +278,10 @@ export default function DisbursementScreen({ projects, categories, disbursements
     const cib_coh = totalDebit - ewtPayable;
     return { totalDebit, ewtPayable, cib_coh };
   }, [constructionLines, miscLines]);
+
+  // ==========================================
+  // FUNCTION DECLARATIONS
+  // ==========================================
 
   const resetForm = () => {
     setHeaderData({ date: new Date().toISOString().split('T')[0], project_code: '', payee: '', particulars: '', tin: '', cv_no: '', check_no: '', or_inv_no: '', accts_pay: '', input_tax: '', output_tax: '', target_cib: '', costing_type: 'normal' });
@@ -328,17 +313,6 @@ export default function DisbursementScreen({ projects, categories, disbursements
       closeAndResetModal();
     }
   };
-
-  useEffect(() => {
-    function handleKeyDown(event) {
-      if (event.key === 'Escape') {
-        if (isModalOpen && !showUnsavedModal && !showDraftModal) handleCloseRequest();
-        if (isFilterOpen) setIsFilterOpen(false);
-      }
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isModalOpen, isFilterOpen, showUnsavedModal, showDraftModal, headerData, constructionLines, miscLines, initialFormState]);
 
   const handleSaveDraft = () => {
     localStorage.setItem('disbursement_draft', JSON.stringify({ 
@@ -384,7 +358,6 @@ export default function DisbursementScreen({ projects, categories, disbursements
     setShowDraftModal(false);
     resetForm();
     
-    // Set initial state for new form
     const initHeader = { date: new Date().toISOString().split('T')[0], project_code: '', payee: '', particulars: '', tin: '', cv_no: '', check_no: '', or_inv_no: '', accts_pay: '', input_tax: '', output_tax: '', target_cib: '', costing_type: 'normal' };
     const initC = [{ id: Date.now(), category: '', amount: '' }];
     const initM = [{ id: Date.now() + 1, category: '', amount: '' }];
@@ -435,17 +408,15 @@ export default function DisbursementScreen({ projects, categories, disbursements
       input_tax: d.input_tax || '',
       output_tax: d.output_tax || '',
       target_cib: d.target_cib || d.net_amount || '',
-      costing_type: d.costing_type || 'normal' // IDINAGDAG: Load costing type
+      costing_type: d.costing_type || 'normal' 
     };
     setHeaderData(newHeader);
     
-    // Split loaded expenses into Construction and Misc
     const loadedExpenses = d.expenses && d.expenses.length > 0 ? d.expenses : [];
     const cLines = [];
     const mLines = [];
     
     loadedExpenses.forEach(exp => {
-      // Check if it belongs to mainCategoriesList
       if (mainCategoriesList.includes(exp.category)) {
         cLines.push(exp);
       } else {
@@ -483,8 +454,58 @@ export default function DisbursementScreen({ projects, categories, disbursements
   const targetCib = parseFloat(headerData.target_cib) || 0;
   const isVarianceZero = Math.abs(targetCib - totals.cib_coh) < 0.01; 
 
+  // --- ACTIONS FOR POST-SAVE PROMPT ---
+  const handleStayInModal = () => {
+    setPostSavePrompt(false);
+    resetForm(); 
+    // Magse-set ng bagong initial form state para hindi mag-trigger yung unsaved changes kapag cinlose agad
+    const initHeader = { date: new Date().toISOString().split('T')[0], project_code: '', payee: '', particulars: '', tin: '', cv_no: '', check_no: '', or_inv_no: '', accts_pay: '', input_tax: '', output_tax: '', target_cib: '', costing_type: 'normal' };
+    const initC = [{ id: Date.now(), category: '', amount: '' }];
+    const initM = [{ id: Date.now() + 1, category: '', amount: '' }];
+    setInitialFormState({
+      headerData: JSON.stringify(initHeader),
+      expenseLines: JSON.stringify([...initC, ...initM])
+    });
+  };
+
+  const handleCloseModalAfterSave = () => {
+    setPostSavePrompt(false);
+    closeAndResetModal();
+  };
+
+  const executeSave = async (disbursementData) => {
+    setIsSaving(true);
+    try {
+      const token = localStorage.getItem('fbtmcc_token'); 
+      const url = editingId ? `${API_URL}/disbursements/${editingId}` : `${API_URL}/disbursements`;
+      const method = editingId ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method: method,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(disbursementData)
+      });
+
+      if (response.ok) {
+        await refreshData(); 
+        setPostSavePrompt(true); // Lalabas yung prompt instead na mag-close agad
+      } else {
+        const errData = await response.json();
+        setErrorMessage("Server Error: " + (errData.error || "Hindi ma-save ang data."));
+      }
+    } catch (error) {
+      console.error(error);
+      setErrorMessage("Network Error: Hindi makonekta sa Local Server.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     setErrorMessage(''); 
 
     if (!headerData.project_code || !canEdit || totals.totalDebit === 0) return;
@@ -494,7 +515,7 @@ export default function DisbursementScreen({ projects, categories, disbursements
 
     const combinedLines = [...constructionLines, ...miscLines].map(line => ({
       ...line,
-      id: line.id || Date.now() + Math.random() // Siguraduhing may ID ang bawat line item
+      id: line.id || Date.now() + Math.random()
     }));
     const emptyCategoryLines = combinedLines.filter(line => !line.category || line.category.trim() === '');
     if (emptyCategoryLines.length > 0) {
@@ -521,51 +542,72 @@ export default function DisbursementScreen({ projects, categories, disbursements
     }
   };
 
-  // --- IDINAGDAG: TOKEN SA EXECUTE SAVE ---
-  const executeSave = async (disbursementData) => {
-    setIsSaving(true);
-    try {
-      const token = localStorage.getItem('fbtmcc_token'); // <-- KUNIN ANG TOKEN
-      const url = editingId ? `${API_URL}/disbursements/${editingId}` : `${API_URL}/disbursements`;
-      const method = editingId ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method: method,
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` // <-- IPADALA ANG TOKEN SA HEADER
-        },
-        body: JSON.stringify(disbursementData)
-      });
-
-      if (response.ok) {
-        await refreshData(); 
-        closeAndResetModal(); 
-      } else {
-        const errData = await response.json();
-        setErrorMessage("Server Error: " + (errData.error || "Hindi ma-save ang data."));
+  // Safe to call useEffect below handleCloseRequest, handleSubmit, and handleStayInModal
+  useEffect(() => {
+    function handleKeyDown(event) {
+      // Kapag nakabukas yung Post-Save Prompt
+      if (postSavePrompt) {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          handleStayInModal();
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          handleCloseModalAfterSave();
+        }
+        return; // Pigilan ang ibang keys kung nakabukas ito
       }
-    } catch (error) {
-      console.error(error);
-      setErrorMessage("Network Error: Hindi makonekta sa Local Server.");
-    } finally {
-      setIsSaving(false);
+
+      // Default Escape handling
+      if (event.key === 'Escape') {
+        if (isModalOpen && !showUnsavedModal && !showDraftModal) handleCloseRequest();
+        if (isFilterOpen) setIsFilterOpen(false);
+      }
+      
+      // Ctrl+Enter / Cmd+Enter para mag-save
+      if (isModalOpen && !postSavePrompt && (event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        
+        const isDup = disbursements.some((d) => d.id !== editingId && d.cv_no && d.cv_no.trim().toLowerCase() === headerData.cv_no.trim().toLowerCase());
+        const tCib = parseFloat(headerData.target_cib) || 0;
+        const isVarZero = Math.abs(tCib - totals.cib_coh) < 0.01;
+        
+        if (!isDup && isVarZero && tCib > 0 && !isSaving && canEdit && headerData.project_code && headerData.cv_no) {
+           const fakeEvent = { preventDefault: () => {} };
+           handleSubmit(fakeEvent);
+        }
+      }
     }
-  };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isModalOpen, isFilterOpen, showUnsavedModal, showDraftModal, postSavePrompt, headerData, constructionLines, miscLines, initialFormState, isSaving, totals, disbursements, editingId, canEdit]);
+
+  // Auto-open modal if initialDisbursementId is provided
+  useEffect(() => {
+    if (initialDisbursementId && disbursements.length > 0) {
+      const disbursement = disbursements.find(d => d.id === initialDisbursementId);
+      if (disbursement) {
+        const timer = setTimeout(() => {
+          handleEditRow(disbursement);
+          if (onClearInitialDisbursement) onClearInitialDisbursement();
+        }, 100);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [initialDisbursementId, disbursements]);
+
 
   const handleDeleteClick = (id) => {
     if (!canEdit) return;
     setPasswordModal({ isOpen: true, action: 'delete', payload: id });
   };
 
-  // --- IDINAGDAG: TOKEN SA EXECUTE DELETE ---
   const executeDelete = async (id) => {
     try {
-      const token = localStorage.getItem('fbtmcc_token'); // <-- KUNIN ANG TOKEN
+      const token = localStorage.getItem('fbtmcc_token');
       const response = await fetch(`${API_URL}/disbursements/${id}`, { 
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${token}` // <-- IPADALA ANG TOKEN SA HEADER
+          'Authorization': `Bearer ${token}` 
         }
       });
       if (response.ok) {
@@ -845,7 +887,45 @@ export default function DisbursementScreen({ projects, categories, disbursements
         </section>
       </main>
 
-      {isModalOpen && canEdit && (
+      {/* POST SAVE PROMPT MODAL (Stay or Close) */}
+      {postSavePrompt && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200 px-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-8 flex flex-col items-center text-center">
+              <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-6 shadow-inner">
+                <CheckCircle2 size={40} />
+              </div>
+              <h3 className="text-2xl font-black text-slate-800 mb-2">Voucher Saved!</h3>
+              <p className="text-slate-500 font-medium mb-8">
+                Ang disbursement voucher ay matagumpay na na-record sa ledger. Gusto mo bang magdagdag ng panibago?
+              </p>
+              
+              <div className="flex flex-col sm:flex-row w-full gap-3">
+                <button 
+                  onClick={handleCloseModalAfterSave}
+                  className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-xl transition-all"
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <X size={16} /> Close 
+                  </span>
+                  <div className="text-[10px] font-medium text-slate-400 mt-0.5 uppercase tracking-widest">(ESC)</div>
+                </button>
+                <button 
+                  onClick={handleStayInModal}
+                  className="flex-[1.5] py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl transition-all shadow-lg shadow-blue-200"
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    <Plus size={16} /> Stay & Add New
+                  </span>
+                  <div className="text-[10px] font-medium text-blue-300 mt-0.5 uppercase tracking-widest">(ENTER)</div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isModalOpen && canEdit && !postSavePrompt && (
         <div className="fixed inset-0 z-50 flex justify-center items-start pt-6 pb-6 bg-slate-900/60 backdrop-blur-sm px-4 overflow-hidden">
           <div className="bg-slate-50 w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-full">
             
@@ -1027,7 +1107,7 @@ export default function DisbursementScreen({ projects, categories, disbursements
                       <div className="max-h-[250px] overflow-y-auto pr-2 custom-scrollbar space-y-3">
                         {constructionLines.map((line, index) => (
                           <div key={line.id} className="flex gap-3 items-start animate-in slide-in-from-top-2">
-                            <div className="w-8 h-9 bg-slate-50 border border-slate-200 rounded flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">
+                            <div className="w-8 h-9 mt-1 bg-slate-50 border border-slate-200 rounded flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">
                               {index + 1}
                             </div>
                             <div className="flex-1">
@@ -1039,14 +1119,14 @@ export default function DisbursementScreen({ projects, categories, disbursements
                                   hasError={lineErrors.includes(line.id)}
                                   />
                               </div>
-                            <div className="w-40 relative">
+                            <div className="w-40 relative mt-1">
                               <span className="absolute left-3 top-2 text-slate-400 text-sm font-medium">₱</span>
                               <input type="number" step="0.01" placeholder="0.00" 
                                 className="w-full pl-7 p-2 border border-slate-300 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none text-right"
                                 value={line.amount} onChange={(e) => handleLineChange(line.id, 'amount', e.target.value, 'construction')} required={line.category !== ''} />
                             </div>
                             <button type="button" onClick={() => removeLine(line.id, 'construction')} disabled={constructionLines.length === 1 && miscLines.length === 0}
-                              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors disabled:opacity-30 disabled:hover:bg-transparent">
+                              className="p-2 mt-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors disabled:opacity-30 disabled:hover:bg-transparent">
                               <Trash2 size={18} />
                             </button>
                           </div>
@@ -1077,7 +1157,7 @@ export default function DisbursementScreen({ projects, categories, disbursements
                           </div>
                         ) : miscLines.map((line, index) => (
                           <div key={line.id} className="flex gap-3 items-start animate-in slide-in-from-top-2">
-                            <div className="w-8 h-9 bg-teal-50/50 border border-teal-100 rounded flex items-center justify-center text-xs font-bold text-teal-300 shrink-0">
+                            <div className="w-8 h-9 mt-1 bg-teal-50/50 border border-teal-100 rounded flex items-center justify-center text-xs font-bold text-teal-300 shrink-0">
                               {index + 1}
                             </div>
                             <div className="flex-1">
@@ -1089,14 +1169,14 @@ export default function DisbursementScreen({ projects, categories, disbursements
                                   hasError={lineErrors.includes(line.id)}
                                   />
                               </div>
-                            <div className="w-40 relative">
+                            <div className="w-40 relative mt-1">
                               <span className="absolute left-3 top-2 text-slate-400 text-sm font-medium">₱</span>
                               <input type="number" step="0.01" placeholder="0.00" 
                                 className="w-full pl-7 p-2 border border-slate-300 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none text-right"
                                 value={line.amount} onChange={(e) => handleLineChange(line.id, 'amount', e.target.value, 'misc')} required={line.category !== ''} />
                             </div>
                             <button type="button" onClick={() => removeLine(line.id, 'misc')}
-                              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors">
+                              className="p-2 mt-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors">
                               <Trash2 size={18} />
                             </button>
                           </div>
@@ -1149,17 +1229,20 @@ export default function DisbursementScreen({ projects, categories, disbursements
                          </span>
                       </div>
                       
-                      <button 
-                        type="submit" 
-                        disabled={isDuplicateCV || !isVarianceZero || targetCib === 0 || isSaving}
-                        className={`w-full text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all shadow-lg ${
-                          (isDuplicateCV || !isVarianceZero || targetCib === 0 || isSaving) 
-                            ? 'bg-slate-500 cursor-not-allowed opacity-50 shadow-none' 
-                            : 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/20'
-                        }`}
-                      >
-                        <Save size={18} /> {isSaving ? 'Nagsa-save...' : (editingId ? 'Update Disbursement' : 'Post Disbursement')}
-                      </button>
+                      <div className="flex flex-col gap-2">
+                        <button 
+                          type="submit" 
+                          disabled={isDuplicateCV || !isVarianceZero || targetCib === 0 || isSaving}
+                          className={`w-full text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all shadow-lg ${
+                            (isDuplicateCV || !isVarianceZero || targetCib === 0 || isSaving) 
+                              ? 'bg-slate-500 cursor-not-allowed opacity-50 shadow-none' 
+                              : 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/20'
+                          }`}
+                        >
+                          <Save size={18} /> {isSaving ? 'Nagsa-save...' : (editingId ? 'Update Disbursement' : 'Post Disbursement')}
+                        </button>
+                        
+                      </div>
                     </div>
                   </div>
                 </div>
