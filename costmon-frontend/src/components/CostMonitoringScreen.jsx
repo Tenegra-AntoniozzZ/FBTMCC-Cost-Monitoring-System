@@ -6,16 +6,18 @@ import {
   Calendar,
   Trash2,
   Calculator,
-  ArrowUp
+  ArrowUp,
+  Receipt
 } from 'lucide-react';
 import SearchableDropdown from './SearchableDropdown';
 import PasswordConfirmModal from './PasswordConfirmModal';
 import LoadingOverlay from './LoadingOverlay';
 import { API_URL } from '../utils/Constants';
 
-export default function CostMonitoringScreen({ projects, disbursements, onUpdateProject, initialProjectId, userRole, refreshData, onModalStateChange }) {
+export default function CostMonitoringScreen({ projects, disbursements, onUpdateProject, initialProjectId, userRole, refreshData, onModalStateChange, onNavigateToDisbursement }) {
   const canEdit = userRole === 'encoder';
   const [passwordModal, setPasswordModal] = useState({ isOpen: false, action: null, payload: null });
+  const [redirectionModal, setRedirectionModal] = useState({ isOpen: false, disbursementId: null, cvNo: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId || projects[0]?.id || '');
@@ -89,13 +91,22 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
     setPasswordModal({ isOpen: true, action: 'update_project', payload: editingValues });
   };
 
-  const handleDeleteClick = (id, lineId = null) => {
+  const handleDeleteClick = (id) => {
     if (!canEdit) return;
-    setPasswordModal({ 
+    const disbursement = disbursements.find(d => d.id === id);
+    setRedirectionModal({ 
       isOpen: true, 
-      action: 'delete_disbursement', 
-      payload: { id, lineId } // IPADALA ANG DALAWANG ID
+      disbursementId: id, 
+      cvNo: disbursement?.cv_no || '' 
     });
+  };
+
+  const handleConfirmRedirection = () => {
+    const { disbursementId, cvNo } = redirectionModal;
+    setRedirectionModal({ isOpen: false, disbursementId: null, cvNo: '' });
+    if (onNavigateToDisbursement) {
+      onNavigateToDisbursement(cvNo, disbursementId);
+    }
   };
 
   const executeSaveProject = async (values) => {
@@ -106,85 +117,9 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
     setIsSaving(false);
   };
 
-  const executeDeleteDisbursement = async (payload) => {
-    // Payload can be a string (old way) or object (new way)
-    const id = typeof payload === 'string' ? payload : payload.id;
-    const lineId = typeof payload === 'object' ? payload.lineId : null;
-
-    setIsSaving(true);
-    try {
-      const token = localStorage.getItem('fbtmcc_token');
-      const disbursement = disbursements.find(d => d.id === id);
-      
-      if (!disbursement) {
-        alert("Disbursement not found.");
-        return;
-      }
-
-      // KUNG MAY SPECIFIC LINE ID AT HINDI ITO ANG HULING LINE
-      if (lineId && disbursement.expenses && disbursement.expenses.length > 1) {
-        const updatedExpenses = disbursement.expenses.filter(exp => exp.id !== lineId);
-        
-        // RECALCULATE TOTALS
-        let totalDebit = 0;
-        let ewtPayable = 0;
-        updatedExpenses.forEach(line => {
-          const amt = parseFloat(line.amount) || 0;
-          totalDebit += amt;
-          if (line.category === 'Labor /SUBCONTRACTOR') ewtPayable += (amt * 0.02);
-        });
-        const cib_coh = totalDebit - ewtPayable;
-
-        const updatedDisbursement = {
-          ...disbursement,
-          expenses: updatedExpenses,
-          gross_amount: totalDebit,
-          ewt_amount: ewtPayable,
-          net_amount: cib_coh,
-          expenses_json: JSON.stringify(updatedExpenses) // Backend expects expenses_json for SQL update
-        };
-
-        const response = await fetch(`${API_URL}/disbursements/${id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(updatedDisbursement)
-        });
-
-        if (response.ok) {
-          if (refreshData) await refreshData();
-        } else {
-          alert("Failed to update disbursement line.");
-        }
-      } else {
-        // KUNG ISA NA LANG ANG LINE O WALANG LINE ID, BURAHIN ANG BUONG VOUCHER
-        const response = await fetch(`${API_URL}/disbursements/${id}`, { 
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        if (response.ok) {
-          if (refreshData) await refreshData();
-        } else {
-          alert("Failed to delete disbursement.");
-        }
-      }
-    } catch (error) {
-      console.error(error);
-      alert("Network Error");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const handlePasswordConfirm = () => {
     if (passwordModal.action === 'update_project') {
       executeSaveProject(passwordModal.payload);
-    } else if (passwordModal.action === 'delete_disbursement') {
-      executeDeleteDisbursement(passwordModal.payload);
     }
     setPasswordModal({ isOpen: false, action: null, payload: null });
   };
@@ -776,9 +711,9 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
                               {canEdit && (
                                 <td className="p-2 text-center bg-white">
                                   <button 
-                                    onClick={(e) => { e.stopPropagation(); handleDeleteClick(item.id, item.lineId); }} 
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteClick(item.id); }} 
                                     className="p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-800 rounded-lg transition-colors" 
-                                    title="Delete Item"
+                                    title="Update/Delete in Disbursement"
                                   >
                                     <Trash2 size={14} />
                                   </button>
@@ -831,6 +766,38 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
         onClose={() => setPasswordModal({ isOpen: false, action: null, payload: null })}
         onConfirm={handlePasswordConfirm}
       />
+
+      {/* REDIRECTION WARNING MODAL */}
+      {redirectionModal.isOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="flex flex-col items-center text-center">
+              <div className="bg-amber-100 p-4 rounded-full text-amber-600 mb-5">
+                <Receipt size={32} strokeWidth={2.5} />
+              </div>
+              <h3 className="text-2xl font-black text-slate-800 mb-2">Redirect to Disbursement</h3>
+              <p className="text-slate-500 font-medium mb-6">
+                Para i-update o idelete ang item na ito, kailangan nating lumipat sa <span className="font-bold text-slate-800 underline">Disbursement Ledger</span>. Awtomatikong bubukas ang voucher <span className="font-mono font-bold text-blue-600">#{redirectionModal.cvNo}</span> para sa iyo.
+              </p>
+              
+              <div className="flex w-full gap-3">
+                <button 
+                  onClick={() => setRedirectionModal({ isOpen: false, disbursementId: null, cvNo: '' })}
+                  className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-xl transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleConfirmRedirection}
+                  className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2"
+                >
+                  Confirm & Go <ArrowUp className="rotate-90" size={18} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {(isSaving || isSwitching) && (
         <LoadingOverlay 

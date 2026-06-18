@@ -18,6 +18,7 @@ export default function App() {
   const [activeUsername, setActiveUsername] = useState(() => localStorage.getItem('fbtmcc_username') || '');
   const [initialCostMonitoringProjectId, setInitialCostMonitoringProjectId] = useState(null);
   const [initialDisbursementSearch, setInitialDisbursementSearch] = useState('');
+  const [initialDisbursementId, setInitialDisbursementId] = useState(null);
 
   const [projects, setProjects] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -126,8 +127,9 @@ export default function App() {
     navigate('/cost-monitoring');
   };
 
-  const navigateToDisbursement = (cvNo) => {
-    setInitialDisbursementSearch(cvNo);
+  const navigateToDisbursement = (cvNo, disbursementId = null) => {
+    setInitialDisbursementSearch(cvNo || '');
+    setInitialDisbursementId(disbursementId);
     navigate('/disbursements');
   };
 
@@ -186,8 +188,41 @@ export default function App() {
       <main className="flex-1 overflow-hidden relative w-full bg-[#f8fafc] flex flex-col">
         <Routes>
           <Route path="/" element={<Navigate to="/disbursements" />} />
-          <Route path="/disbursements" element={<DisbursementScreen projects={projects} categories={categories.map(c => c.name)} disbursements={disbursements} refreshData={fetchAllData} isLoading={isLoading} userRole={userRole} initialSearchQuery={initialDisbursementSearch} onModalStateChange={setIsAnyModalOpen} />} />
-          <Route path="/cost-monitoring" element={<CostMonitoringScreen projects={projects} disbursements={disbursements} onUpdateProject={handleUpdateProject} initialProjectId={initialCostMonitoringProjectId} userRole={userRole} refreshData={fetchAllData} onModalStateChange={setIsAnyModalOpen} />} />
+          <Route 
+            path="/disbursements" 
+            element={
+              <DisbursementScreen 
+                projects={projects} 
+                categories={categories.map(c => c.name)} 
+                disbursements={disbursements} 
+                refreshData={fetchAllData} 
+                isLoading={isLoading} 
+                userRole={userRole} 
+                initialSearchQuery={initialDisbursementSearch} 
+                initialDisbursementId={initialDisbursementId}
+                onClearInitialDisbursement={() => {
+                  setInitialDisbursementSearch('');
+                  setInitialDisbursementId(null);
+                }}
+                onModalStateChange={setIsAnyModalOpen} 
+              />
+            } 
+          />
+          <Route 
+            path="/cost-monitoring" 
+            element={
+              <CostMonitoringScreen 
+                projects={projects} 
+                disbursements={disbursements} 
+                onUpdateProject={handleUpdateProject} 
+                initialProjectId={initialCostMonitoringProjectId} 
+                userRole={userRole} 
+                refreshData={fetchAllData} 
+                onNavigateToDisbursement={navigateToDisbursement}
+                onModalStateChange={setIsAnyModalOpen} 
+              />
+            } 
+          />
           
           {/* SECURED ROUTE: Ibabato pabalik sa Cost Monitoring ang kahit sinong hindi 'ceo' na susubok pumunta dito */}
           <Route 
