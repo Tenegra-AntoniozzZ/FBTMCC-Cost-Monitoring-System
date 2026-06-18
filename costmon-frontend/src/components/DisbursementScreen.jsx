@@ -8,9 +8,24 @@ import UnsavedChangesModal from './UnsavedChangesModal';
 import DraftFoundModal from './DraftFoundModal';
 import { API_URL } from '../utils/Constants';
 
-export default function DisbursementScreen({ projects, disbursements, refreshData, isLoading, userRole, categories, initialSearchQuery = '', onModalStateChange }) {
+export default function DisbursementScreen({ projects, categories, disbursements, refreshData, isLoading, userRole, initialSearchQuery, initialDisbursementId, onClearInitialDisbursement, onModalStateChange }) {
   const canEdit = userRole === 'encoder';
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Auto-open modal if initialDisbursementId is provided
+  useEffect(() => {
+    if (initialDisbursementId && disbursements.length > 0) {
+      const disbursement = disbursements.find(d => d.id === initialDisbursementId);
+      if (disbursement) {
+        // Delay slightly to ensure component is ready
+        const timer = setTimeout(() => {
+          handleEditRow(disbursement);
+          if (onClearInitialDisbursement) onClearInitialDisbursement();
+        }, 100);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [initialDisbursementId, disbursements]);
   const [editingId, setEditingId] = useState(null);
   const [showTaxFields, setShowTaxFields] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
