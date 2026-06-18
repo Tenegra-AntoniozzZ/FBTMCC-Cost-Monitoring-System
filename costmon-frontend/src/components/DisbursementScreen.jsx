@@ -178,39 +178,101 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
     target_cib: ''
   });
 
-  const [expenseLines, setExpenseLines] = useState([{ id: 1, category: '', amount: '' }]);
+  // --- CATEGORY SPLITTING LOGIC ---
+  const { mainCategoriesList, miscCategoriesList } = useMemo(() => {
+    const main = [];
+    const misc = [];
+    const foundMains = new Set();
+    const DEFAULT_MAIN_VALS = [
+      { raw: "PERMITS & CONSTRUCTION PLANS", clean: "PERMITS & CONSTRUCTION PLANS" },
+      { raw: "DOWN PAYMENT", clean: "DOWN PAYMENT" },
+      { raw: "CARPENTRY", clean: "CARPENTRY" },
+      { raw: "PAINTING", clean: "PAINTING" },
+      { raw: "ELECTRICAL", clean: "ELECTRICAL" },
+      { raw: "PLUMBING", clean: "PLUMBING" },
+      { raw: "TEMPERED GLASS", clean: "TEMPERED GLASS" },
+      { raw: "SSS/PAG-IBIG / PHILHEALTH", clean: "SSS/PAG-IBIG / PHILHEALTH" },
+      { raw: "LABOR/PAYROLL", clean: "LABOR/PAYROLL" },
+      { raw: "ABB 1196 FORWARD", clean: "ABB 1196 FORWARD" },
+      { raw: "ZAM-546", clean: "ZAM-546" }
+    ];
+
+    categories.forEach(rawName => {
+      const upperName = rawName.toUpperCase();
+      const cleanUpper = upperName.replace(/\(-+PHP\)/gi, '').trim();
+
+      if (rawName.startsWith('[MAIN] ')) {
+        main.push(rawName);
+      } else if (rawName.startsWith('[MISC] ')) {
+        misc.push(rawName);
+      } else {
+        const matchedMain = DEFAULT_MAIN_VALS.find(m => cleanUpper === m.clean || upperName.includes(m.clean));
+        if (matchedMain) {
+          foundMains.add(matchedMain.raw);
+          main.push(rawName);
+        } else {
+          misc.push(rawName);
+        }
+      }
+    });
+
+    DEFAULT_MAIN_VALS.forEach(m => {
+      if (!foundMains.has(m.raw) && !main.includes(m.raw)) {
+        main.push(m.raw);
+      }
+    });
+
+    return { 
+      mainCategoriesList: [...new Set(main)].sort((a, b) => a.localeCompare(b)), 
+      miscCategoriesList: [...new Set(misc)].sort((a, b) => a.localeCompare(b)) 
+    };
+  }, [categories]);
+
+  const [constructionLines, setConstructionLines] = useState([{ id: 1, category: '', amount: '' }]);
+  const [miscLines, setMiscLines] = useState([{ id: 2, category: '', amount: '' }]);
 
   const handleHeaderChange = (e) => setHeaderData({ ...headerData, [e.target.name]: e.target.value });
   
-  const handleLineChange = (id, field, value) => {
-    setExpenseLines(lines => lines.map(line => line.id === id ? { ...line, [field]: value } : line));
+  const handleLineChange = (id, field, value, type = 'construction') => {
+    const setter = type === 'construction' ? setConstructionLines : setMiscLines;
+    setter(lines => lines.map(line => line.id === id ? { ...line, [field]: value } : line));
     
     if (field === 'category' && value.trim() !== '') {
       setLineErrors(errors => errors.filter(errId => errId !== id));
     }
   };
 
-  const addLine = () => {
+  const addLine = (type = 'construction') => {
     if (isAddingLine) return;
     setIsAddingLine(true);
 
-    setExpenseLines(prev => {
-      const maxId = prev.length > 0 ? Math.max(...prev.map(line => line.id)) : 0;
+    const setter = type === 'construction' ? setConstructionLines : setMiscLines;
+    setter(prev => {
+      // Find max ID across BOTH lists to ensure uniqueness
+      const allLines = [...constructionLines, ...miscLines];
+      const maxId = allLines.length > 0 ? Math.max(...allLines.map(line => typeof line.id === 'number' ? line.id : 0)) : 0;
       return [...prev, { id: maxId + 1, category: '', amount: '' }];
     });
 
     setTimeout(() => setIsAddingLine(false), 300);
   };
   
-  const removeLine = (id) => {
-    if (expenseLines.length > 1) setExpenseLines(lines => lines.filter(line => line.id !== id));
+  const removeLine = (id, type = 'construction') => {
+    const setter = type === 'construction' ? setConstructionLines : setMiscLines;
+    const lines = type === 'construction' ? constructionLines : miscLines;
+    
+    // Allow removing if it's not the last line of BOTH? 
+    // Actually, user should be able to clear misc if they want.
+    if (type === 'construction' && constructionLines.length === 1 && miscLines.length === 0) return;
+    setter(prev => prev.filter(line => line.id !== id));
   };
 
   const totals = useMemo(() => {
     let totalDebit = 0;
     let ewtPayable = 0;
+    const allLines = [...constructionLines, ...miscLines];
 
-    expenseLines.forEach(line => {
+    allLines.forEach(line => {
       const amt = parseFloat(line.amount) || 0;
       totalDebit += amt;
       if (line.category === 'Labor /SUBCONTRACTOR') ewtPayable += (amt * 0.02); 
@@ -218,11 +280,13 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
 
     const cib_coh = totalDebit - ewtPayable;
     return { totalDebit, ewtPayable, cib_coh };
-  }, [expenseLines]);
+  }, [constructionLines, miscLines]);
 
   const resetForm = () => {
     setHeaderData({ date: new Date().toISOString().split('T')[0], project_code: '', payee: '', particulars: '', tin: '', cv_no: '', check_no: '', or_inv_no: '', accts_pay: '', input_tax: '', output_tax: '', target_cib: '' });
-    setExpenseLines([{ id: Date.now(), category: '', amount: '' }]);
+    const now = Date.now();
+    setConstructionLines([{ id: now, category: '', amount: '' }]);
+    setMiscLines([{ id: now + 1, category: '', amount: '' }]);
     setShowTaxFields(false);
     setErrorMessage('');
     setLineErrors([]); 
@@ -236,8 +300,9 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
 
   const checkUnsavedChanges = () => {
     if (!initialFormState) return false;
+    const currentLines = [...constructionLines, ...miscLines];
     return JSON.stringify(headerData) !== initialFormState.headerData || 
-           JSON.stringify(expenseLines) !== initialFormState.expenseLines;
+           JSON.stringify(currentLines) !== initialFormState.expenseLines;
   };
 
   const handleCloseRequest = () => {
@@ -257,10 +322,15 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
     }
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isModalOpen, isFilterOpen, showUnsavedModal, showDraftModal, headerData, expenseLines, initialFormState]);
+  }, [isModalOpen, isFilterOpen, showUnsavedModal, showDraftModal, headerData, constructionLines, miscLines, initialFormState]);
 
   const handleSaveDraft = () => {
-    localStorage.setItem('disbursement_draft', JSON.stringify({ headerData, expenseLines, editingId }));
+    localStorage.setItem('disbursement_draft', JSON.stringify({ 
+      headerData, 
+      constructionLines, 
+      miscLines, 
+      editingId 
+    }));
     setShowUnsavedModal(false);
     closeAndResetModal();
   };
@@ -275,7 +345,9 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
     if (draftStr) {
       const draft = JSON.parse(draftStr);
       setHeaderData(draft.headerData);
-      setExpenseLines(draft.expenseLines);
+      setConstructionLines(draft.constructionLines || []);
+      setMiscLines(draft.miscLines || []);
+      
       if (draft.headerData.accts_pay || draft.headerData.input_tax || draft.headerData.output_tax) {
         setShowTaxFields(true);
       } else {
@@ -284,7 +356,7 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
       setEditingId(draft.editingId || null);
       setInitialFormState({
         headerData: JSON.stringify(draft.headerData),
-        expenseLines: JSON.stringify(draft.expenseLines)
+        expenseLines: JSON.stringify([...(draft.constructionLines || []), ...(draft.miscLines || [])])
       });
       setShowDraftModal(false);
       setIsModalOpen(true);
@@ -298,12 +370,14 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
     
     // Set initial state for new form
     const initHeader = { date: new Date().toISOString().split('T')[0], project_code: '', payee: '', particulars: '', tin: '', cv_no: '', check_no: '', or_inv_no: '', accts_pay: '', input_tax: '', output_tax: '', target_cib: '' };
-    const initLines = [{ id: Date.now(), category: '', amount: '' }];
+    const initC = [{ id: Date.now(), category: '', amount: '' }];
+    const initM = [{ id: Date.now() + 1, category: '', amount: '' }];
     setHeaderData(initHeader);
-    setExpenseLines(initLines);
+    setConstructionLines(initC);
+    setMiscLines(initM);
     setInitialFormState({
       headerData: JSON.stringify(initHeader),
-      expenseLines: JSON.stringify(initLines)
+      expenseLines: JSON.stringify([...initC, ...initM])
     });
     
     setIsModalOpen(true);
@@ -316,12 +390,14 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
     } else {
       resetForm();
       const initHeader = { date: new Date().toISOString().split('T')[0], project_code: '', payee: '', particulars: '', tin: '', cv_no: '', check_no: '', or_inv_no: '', accts_pay: '', input_tax: '', output_tax: '', target_cib: '' };
-      const initLines = [{ id: Date.now(), category: '', amount: '' }];
+      const initC = [{ id: Date.now(), category: '', amount: '' }];
+      const initM = [{ id: Date.now() + 1, category: '', amount: '' }];
       setHeaderData(initHeader);
-      setExpenseLines(initLines);
+      setConstructionLines(initC);
+      setMiscLines(initM);
       setInitialFormState({
         headerData: JSON.stringify(initHeader),
-        expenseLines: JSON.stringify(initLines)
+        expenseLines: JSON.stringify([...initC, ...initM])
       });
       setIsModalOpen(true);
     }
@@ -346,8 +422,24 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
     };
     setHeaderData(newHeader);
     
-    const newLines = d.expenses && d.expenses.length > 0 ? d.expenses : [{ id: 1, category: '', amount: '' }];
-    setExpenseLines(newLines);
+    // Split loaded expenses into Construction and Misc
+    const loadedExpenses = d.expenses && d.expenses.length > 0 ? d.expenses : [];
+    const cLines = [];
+    const mLines = [];
+    
+    loadedExpenses.forEach(exp => {
+      // Check if it belongs to mainCategoriesList
+      if (mainCategoriesList.includes(exp.category)) {
+        cLines.push(exp);
+      } else {
+        mLines.push(exp);
+      }
+    });
+
+    if (cLines.length === 0) cLines.push({ id: Date.now(), category: '', amount: '' });
+    
+    setConstructionLines(cLines);
+    setMiscLines(mLines);
 
     if (d.accts_pay || d.input_tax || d.output_tax) {
       setShowTaxFields(true);
@@ -357,7 +449,7 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
     
     setInitialFormState({
       headerData: JSON.stringify(newHeader),
-      expenseLines: JSON.stringify(newLines)
+      expenseLines: JSON.stringify(loadedExpenses)
     });
     
     setErrorMessage('');
@@ -383,7 +475,11 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
     if (isDuplicateCV) { setErrorMessage("May kaparehas na CV#! Paki-palitan bago i-save."); return; }
     if (!isVarianceZero) { setErrorMessage("Hindi pwedeng i-save! Paki-check ang Variance. Kailangang pantay ang Target CIB sa Computed CIB."); return; }
 
-    const emptyCategoryLines = expenseLines.filter(line => !line.category || line.category.trim() === '');
+    const combinedLines = [...constructionLines, ...miscLines].map(line => ({
+      ...line,
+      id: line.id || Date.now() + Math.random() // Siguraduhing may ID ang bawat line item
+    }));
+    const emptyCategoryLines = combinedLines.filter(line => !line.category || line.category.trim() === '');
     if (emptyCategoryLines.length > 0) {
       const errorIds = emptyCategoryLines.map(line => line.id);
       setLineErrors(errorIds); 
@@ -394,7 +490,7 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
       // eslint-disable-next-line react-hooks/purity
       id: editingId || Date.now().toString(36) + Math.floor(Math.random()*1000).toString(), 
       ...headerData,
-      expenses: expenseLines,
+      expenses: combinedLines,
       gross_amount: totals.totalDebit,
       ewt_amount: totals.ewtPayable,
       net_amount: totals.cib_coh,
@@ -870,55 +966,105 @@ export default function DisbursementScreen({ projects, disbursements, refreshDat
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  <div className={`lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden transition-all duration-300 ${targetCib <= 0 ? 'opacity-40 pointer-events-none bg-slate-50 grayscale-[50%]' : ''}`}>
+                  <div className={`lg:col-span-2 space-y-6 transition-all duration-300 ${targetCib <= 0 ? 'opacity-40 pointer-events-none grayscale-[50%]' : ''}`}>
                     
-                    <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
-                      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">2. Expense Category Breakdown <span className="text-red-500">*</span></h3>
-                      <button type="button" onClick={addLine} disabled={targetCib <= 0 || isAddingLine} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-md font-medium flex items-center gap-1 transition-colors disabled:opacity-50 min-w-[120px] justify-center">
-                        {isAddingLine ? (
-                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce"></span> Adding...</span>
-                        ) : (
-                          <><Plus size={14} /> Add Line Item</>
-                        )}
-                      </button>
+                    {/* 2. CONSTRUCTION COST BREAKDOWN */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
+                      <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
+                        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">2. CONSTRUCTION COST BREAKDOWN <span className="text-red-500">*</span></h3>
+                        <button type="button" onClick={() => addLine('construction')} disabled={targetCib <= 0 || isAddingLine} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-md font-medium flex items-center gap-1 transition-colors disabled:opacity-50 min-w-[120px] justify-center">
+                          {isAddingLine ? (
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce"></span> Adding...</span>
+                          ) : (
+                            <><Plus size={14} /> Add Line Item</>
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="max-h-[250px] overflow-y-auto pr-2 custom-scrollbar space-y-3">
+                        {constructionLines.map((line, index) => (
+                          <div key={line.id} className="flex gap-3 items-start animate-in slide-in-from-top-2">
+                            <div className="w-8 h-9 bg-slate-50 border border-slate-200 rounded flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">
+                              {index + 1}
+                            </div>
+                            <div className="flex-1">
+                                  <SearchableDropdown 
+                                  options={mainCategoriesList}
+                                  value={line.category}
+                                  onChange={(val) => handleLineChange(line.id, 'category', val, 'construction')}
+                                  placeholder="-- Find Construction Category --"
+                                  hasError={lineErrors.includes(line.id)}
+                                  />
+                              </div>
+                            <div className="w-40 relative">
+                              <span className="absolute left-3 top-2 text-slate-400 text-sm font-medium">₱</span>
+                              <input type="number" step="0.01" placeholder="0.00" 
+                                className="w-full pl-7 p-2 border border-slate-300 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none text-right"
+                                value={line.amount} onChange={(e) => handleLineChange(line.id, 'amount', e.target.value, 'construction')} required={line.category !== ''} />
+                            </div>
+                            <button type="button" onClick={() => removeLine(line.id, 'construction')} disabled={constructionLines.length === 1 && miscLines.length === 0}
+                              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors disabled:opacity-30 disabled:hover:bg-transparent">
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-4 pt-3 text-[10px] text-slate-500 border-t border-slate-100 italic">
+                        * If "Labor /SUBCONTRACTOR" is chosen, it will calculate automatically by 2% for the EWT Payable.
+                      </div>
                     </div>
 
-                    <div className="max-h-[320px] overflow-y-auto pr-2 custom-scrollbar space-y-3">
-                      {expenseLines.map((line, index) => (
-                        <div key={line.id} className="flex gap-3 items-start animate-in slide-in-from-top-2">
-                          <div className="w-8 h-9 bg-slate-50 border border-slate-200 rounded flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">
-                            {index + 1}
+                    {/* 3. MISCELLANEOUS COST */}
+                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
+                      <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
+                        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">3. MISCELLANEOUS COST</h3>
+                        <button type="button" onClick={() => addLine('misc')} disabled={targetCib <= 0 || isAddingLine} className="text-xs bg-teal-50 hover:bg-teal-100 text-teal-700 px-3 py-1.5 rounded-md font-medium flex items-center gap-1 transition-colors disabled:opacity-50 min-w-[120px] justify-center border border-teal-100">
+                          {isAddingLine ? (
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-teal-400 animate-bounce"></span> Adding...</span>
+                          ) : (
+                            <><Plus size={14} /> Add Misc Item</>
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="max-h-[250px] overflow-y-auto pr-2 custom-scrollbar space-y-3">
+                        {miscLines.length === 0 ? (
+                          <div className="py-8 text-center border-2 border-dashed border-slate-100 rounded-xl">
+                            <p className="text-slate-400 text-xs font-medium">Walang miscellaneous cost na idinagdag. I-click ang button sa itaas para mag-add.</p>
                           </div>
-                          <div className="flex-1">
-                                <SearchableDropdown 
-                                options={categories}
-                                value={line.category}
-                                onChange={(val) => handleLineChange(line.id, 'category', val)}
-                                placeholder="-- Find Category --"
-                                hasError={lineErrors.includes(line.id)}
-                                />
+                        ) : miscLines.map((line, index) => (
+                          <div key={line.id} className="flex gap-3 items-start animate-in slide-in-from-top-2">
+                            <div className="w-8 h-9 bg-teal-50/50 border border-teal-100 rounded flex items-center justify-center text-xs font-bold text-teal-300 shrink-0">
+                              {index + 1}
                             </div>
-                          <div className="w-40 relative">
-                            <span className="absolute left-3 top-2 text-slate-400 text-sm font-medium">₱</span>
-                            <input type="number" step="0.01" placeholder="0.00" 
-                              className="w-full pl-7 p-2 border border-slate-300 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none text-right"
-                              value={line.amount} onChange={(e) => handleLineChange(line.id, 'amount', e.target.value)} required />
+                            <div className="flex-1">
+                                  <SearchableDropdown 
+                                  options={miscCategoriesList}
+                                  value={line.category}
+                                  onChange={(val) => handleLineChange(line.id, 'category', val, 'misc')}
+                                  placeholder="-- Find Miscellaneous Item --"
+                                  hasError={lineErrors.includes(line.id)}
+                                  />
+                              </div>
+                            <div className="w-40 relative">
+                              <span className="absolute left-3 top-2 text-slate-400 text-sm font-medium">₱</span>
+                              <input type="number" step="0.01" placeholder="0.00" 
+                                className="w-full pl-7 p-2 border border-slate-300 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none text-right"
+                                value={line.amount} onChange={(e) => handleLineChange(line.id, 'amount', e.target.value, 'misc')} required={line.category !== ''} />
+                            </div>
+                            <button type="button" onClick={() => removeLine(line.id, 'misc')}
+                              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors">
+                              <Trash2 size={18} />
+                            </button>
                           </div>
-                          <button type="button" onClick={() => removeLine(line.id)} disabled={expenseLines.length === 1}
-                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors disabled:opacity-30 disabled:hover:bg-transparent">
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-4 pt-3 text-xs text-slate-500 border-t border-slate-100 italic">
-                      * If "Labor /SUBCONTRACTOR" is chosen, it will calculate automatically by 2% for the EWT Payable.
+                        ))}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="bg-slate-800 text-white p-6 rounded-xl shadow-md flex flex-col justify-between">
+                  <div className="bg-slate-800 text-white p-6 rounded-xl shadow-md flex flex-col justify-between h-fit lg:sticky lg:top-0">
                     <div>
-                      <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4 pb-2 border-b border-slate-700">3. Accounting Summary</h3>
+                      <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4 pb-2 border-b border-slate-700">4. Accounting Summary</h3>
                       <div className="space-y-3">
                         <div className="flex justify-between items-center text-slate-300 text-sm">
                           <span>Total of Debit (Gross Exp.)</span>
