@@ -8,7 +8,10 @@ import {
   Calculator,
   ArrowUp,
   Receipt,
-  X
+  X,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw
 } from 'lucide-react';
 import SearchableDropdown from './SearchableDropdown';
 import PasswordConfirmModal from './PasswordConfirmModal';
@@ -29,6 +32,33 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
   // State & Ref para sa Back to Top button
   const [showScrollTop, setShowScrollTop] = useState(false);
   const mainScrollRef = useRef(null);
+
+  // --- ZOOM LOGIC ---
+  const [zoomLevel, setZoomLevel] = useState(() => {
+    const saved = localStorage.getItem('costmon_zoom');
+    return saved ? parseFloat(saved) : 1;
+  });
+
+  const handleZoomIn = () => {
+    setZoomLevel(prev => {
+      const next = Math.min(prev + 0.1, 1.5);
+      localStorage.setItem('costmon_zoom', next.toString());
+      return next;
+    });
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel(prev => {
+      const next = Math.max(prev - 0.1, 0.5);
+      localStorage.setItem('costmon_zoom', next.toString());
+      return next;
+    });
+  };
+
+  const resetZoom = () => {
+    setZoomLevel(1);
+    localStorage.setItem('costmon_zoom', '1');
+  };
 
   // Notify parent of modal state changes
   useEffect(() => {
@@ -755,6 +785,7 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
         {/* SAVE BUTTON */}
         {canEdit && (
           <div className="flex justify-end mt-2 animate-in fade-in items-center gap-4">
+            <span className="text-xs text-slate-400 font-bold tracking-widest hidden sm:inline-block">CTRL + S</span>
             <button onClick={handleSaveClick} disabled={isSaving} className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3.5 rounded-2xl font-black shadow-xl shadow-blue-200/50 transition-all flex items-center gap-3 disabled:opacity-50">
               <Save size={20} /> {isSaving ? 'SAVING DATA...' : 'SAVE CHANGES'}
             </button>
@@ -788,6 +819,38 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
                     );
                   })}
                 </div>
+
+                {/* ZOOM CONTROLS FOR LEDGER */}
+                <div className="ml-auto flex items-center bg-white border border-slate-200 rounded-xl px-2 py-1 shadow-sm gap-1">
+                  <button 
+                    onClick={handleZoomOut} 
+                    className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors disabled:opacity-30" 
+                    title="Zoom Out"
+                    disabled={zoomLevel <= 0.6}
+                  >
+                    <ZoomOut size={16} />
+                  </button>
+                  <div className="text-[10px] font-black text-slate-400 w-12 text-center select-none uppercase tracking-tighter">
+                    {Math.round(zoomLevel * 100)}%
+                  </div>
+                  <button 
+                    onClick={handleZoomIn} 
+                    className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors disabled:opacity-30" 
+                    title="Zoom In"
+                    disabled={zoomLevel >= 1.5}
+                  >
+                    <ZoomIn size={16} />
+                  </button>
+                  <div className="w-px h-4 bg-slate-200 mx-1"></div>
+                  <button 
+                    onClick={resetZoom} 
+                    className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-blue-600 transition-colors" 
+                    title="Reset Zoom"
+                  >
+                    <RotateCcw size={14} />
+                  </button>
+                </div>
+
               </div>
             )}
 
@@ -838,7 +901,7 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
                         isPulsing ? 'scale-[1.02] shadow-[0_15px_40px_rgba(0,0,0,0.25)] ring-4 ring-slate-400 z-10 relative -translate-y-2' : 'shadow-sm'
                       }`}
                     >
-                      <table className="w-full text-left border-collapse text-xs">
+                      <table className="w-full text-left border-collapse text-xs" style={{ zoom: zoomLevel }}>
                         <thead>
                           {/* CATEGORY BANNER */}
                           <tr className={`${headerColor} border-b-2 border-slate-800`}>
@@ -994,13 +1057,14 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
         data={additionalExpensesByCategory} 
         canEdit={canEdit}
         onDeleteClick={handleDeleteClick}
+        zoomLevel={zoomLevel} // Ipinasa ang zoom level
       />
     </div>
   );
 }
 
-// BAGONG MODAL COMPONENT para sa Additional Works
-function AdditionalsLedgerModal({ isOpen, onClose, data, canEdit, onDeleteClick }) {
+// MODAL COMPONENT para sa Additional Works (na may zoom)
+function AdditionalsLedgerModal({ isOpen, onClose, data, canEdit, onDeleteClick, zoomLevel }) {
   if (!isOpen) return null;
 
   const totalAmount = Object.values(data).flat().reduce((sum, item) => sum + item.amount, 0);
@@ -1036,7 +1100,7 @@ function AdditionalsLedgerModal({ isOpen, onClose, data, canEdit, onDeleteClick 
             ) : (
               Object.entries(data).map(([category, items]) => (
                 <div key={category} className="border-2 border-slate-800 rounded-xl overflow-hidden shadow-sm">
-                  <table className="w-full text-left border-collapse text-xs">
+                  <table className="w-full text-left border-collapse text-xs" style={{ zoom: zoomLevel }}>
                     <thead>
                       <tr className="bg-slate-800 border-b-2 border-slate-800">
                         <th colSpan={canEdit ? 14 : 13} className="text-center py-3.5 font-black text-white uppercase tracking-[0.15em] text-sm">
