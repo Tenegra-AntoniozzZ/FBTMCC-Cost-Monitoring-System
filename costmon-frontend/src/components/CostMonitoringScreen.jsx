@@ -11,13 +11,14 @@ import {
   X,
   ZoomIn,
   ZoomOut,
-  RotateCcw
+  RotateCcw,
+  Filter
 } from 'lucide-react';
 import SearchableDropdown from './SearchableDropdown';
 import PasswordConfirmModal from './PasswordConfirmModal';
 import LoadingOverlay from './LoadingOverlay';
 
-export default function CostMonitoringScreen({ projects, disbursements, onUpdateProject, initialProjectId, userRole, onModalStateChange, onNavigateToDisbursement }) {
+export default function CostMonitoringScreen({ projects, disbursements, onUpdateProject, initialProjectId, userRole, refreshData, onModalStateChange, onNavigateToDisbursement }) {
   const canEdit = userRole === 'encoder';
   const [passwordModal, setPasswordModal] = useState({ isOpen: false, action: null, payload: null });
   const [redirectionModal, setRedirectionModal] = useState({ isOpen: false, disbursementId: null, cvNo: '' });
@@ -58,6 +59,52 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
   const resetZoom = () => {
     setZoomLevel(1);
     localStorage.setItem('costmon_zoom', '1');
+  };
+
+  // --- CATEGORY FILTER LOGIC (WITH LOCAL STORAGE) ---
+  const [isCategoryFilterOpen, setIsCategoryFilterOpen] = useState(false);
+  
+  const [selectedCategories, setSelectedCategories] = useState(() => {
+    const saved = localStorage.getItem('costmon_category_filter');
+    return saved ? JSON.parse(saved) : ['All'];
+  });
+  
+  const [tempSelectedCategories, setTempSelectedCategories] = useState(() => {
+    const saved = localStorage.getItem('costmon_category_filter');
+    return saved ? JSON.parse(saved) : ['All'];
+  });
+  
+  const categoryFilterRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (categoryFilterRef.current && !categoryFilterRef.current.contains(event.target)) {
+        setIsCategoryFilterOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleToggleCategory = (cat) => {
+    if (cat === 'All') {
+      setTempSelectedCategories(['All']);
+    } else {
+      let updated = tempSelectedCategories.filter(c => c !== 'All');
+      if (updated.includes(cat)) {
+        updated = updated.filter(c => c !== cat);
+      } else {
+        updated.push(cat);
+      }
+      if (updated.length === 0) updated = ['All'];
+      setTempSelectedCategories(updated);
+    }
+  };
+
+  const applyCategoryFilter = () => {
+    setSelectedCategories(tempSelectedCategories);
+    localStorage.setItem('costmon_category_filter', JSON.stringify(tempSelectedCategories));
+    setIsCategoryFilterOpen(false);
   };
 
   // Notify parent of modal state changes
@@ -110,6 +157,7 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
         days_end: project.days_end || ''
       });
       setPulsingCategory(null);
+      // NOTE: Hindi na natin ire-reset ang filter dito para mag-persist siya kahit mag-switch ng project!
     }
   }
 
@@ -126,7 +174,7 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault(); // Pipigilan yung default "Save Webpage" ng browser
+        e.preventDefault(); 
         if (!isSaving && canEdit && !passwordModal.isOpen && !redirectionModal.isOpen && !isAdditionalsModalOpen) {
           handleSaveClick();
         }
@@ -198,12 +246,12 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
     const budgetCostLimitNormal = budgetCostNormal - profitAmountNormal;
     const excessBudgetNormal = budgetCostLimitNormal - totalNormalExpenses;
 
-    // ADDITIONAL COMPUTATIONS (Based on Screenshot 24 Excel formulas)
+    // ADDITIONAL COMPUTATIONS
     const vatAdditional = totalAdditionalExpenses * (1 - (1 / 1.12));
     const budgetCostAdditional = totalAdditionalExpenses - vatAdditional;
     const profitAmountAdditional = budgetCostAdditional * (1 - (1 / (1 + profitPercent)));
     const budgetCostLimitAdditional = budgetCostAdditional - profitAmountAdditional;
-    const excessBudgetAdditional = budgetCostLimitAdditional; // Row 23 in Excel: Total Additional 306,318.68
+    const excessBudgetAdditional = budgetCostLimitAdditional; 
 
     // OVERALL TOTALS
     const contractOverall = contractCost + totalAdditionalExpenses;
@@ -211,7 +259,7 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
     const budgetOverall = budgetCostNormal + budgetCostAdditional;
     const profitOverall = profitAmountNormal + profitAmountAdditional;
     const limitOverall = budgetCostLimitNormal + budgetCostLimitAdditional;
-    const progressOverall = totalNormalExpenses; // Additionals not counted in progress (Row 22)
+    const progressOverall = totalNormalExpenses; 
     const excessOverall = excessBudgetNormal + excessBudgetAdditional;
 
     return { 
@@ -267,7 +315,6 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
     });
 
     financials.projectExpenses.forEach(d => {
-      // NORMAL COSTING LANG ANG PAPASOK DITO
       if (d.costing_type === 'normal' && d.expenses && d.expenses.length > 0) {
         d.expenses.forEach(exp => {
           const originalCat = exp.category || 'UNCATEGORIZED';
@@ -320,12 +367,10 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
     return grouped;
   }, [financials.projectExpenses, REQUIRED_CATEGORIES]);
 
-  // BAGONG USEMEMO PARA SA ADDITIONAL COSTING
   const additionalExpensesByCategory = useMemo(() => {
     const grouped = {};
 
     financials.projectExpenses.forEach(d => {
-      // ADDITIONAL COSTING LANG ANG PAPASOK DITO
       if (d.costing_type === 'additional' && d.expenses && d.expenses.length > 0) {
         d.expenses.forEach(exp => {
           const originalCat = exp.category || 'UNCATEGORIZED';
@@ -337,7 +382,6 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
           
           const amount = parseFloat(exp.amount) || 0;
 
-          // Same computation logic as main ledger for consistency
           const laborLess = 0;
           const laborEwt = 0;
           const laborTotal = 0;
@@ -375,6 +419,14 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
   const displayedCategories = useMemo(() => {
     return REQUIRED_CATEGORIES.filter(category => expensesByCategory[category] && expensesByCategory[category].length > 0);
   }, [REQUIRED_CATEGORIES, expensesByCategory]);
+
+  // CATEGORY FILTER APPLICATION
+  const filteredDisplayedCategories = useMemo(() => {
+    if (selectedCategories.includes('All')) {
+      return displayedCategories;
+    }
+    return displayedCategories.filter(cat => selectedCategories.includes(cat));
+  }, [displayedCategories, selectedCategories]);
 
   const categoryColorMap = useMemo(() => {
     const colorPalette = [
@@ -799,43 +851,104 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
           
           <div className="flex flex-col mb-4">
             
-            {/* DYNAMIC COLOR GUIDE (Filtered na din) */}
-            {displayedCategories.length > 0 && (
-              <div className="flex items-center gap-3 mb-4 pl-1 h-10 flex-wrap">
-                <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Color Guide:</span>
-                <div className="flex flex-row gap-2.5 items-center flex-wrap">
-                  {displayedCategories.map((category) => {
-                    const color = categoryColorMap[category];
-                    return (
-                      <div 
-                        key={category} 
-                        onClick={() => handleScrollToCategory(category)}
-                        className={`group h-7 min-w-[1.75rem] rounded-md border border-black/10 shadow-sm cursor-pointer flex items-center justify-center transition-all duration-700 ease-in-out ${color} hover:px-4`} 
-                      >
-                        <span className={`text-xs font-bold text-white whitespace-nowrap overflow-hidden transition-all duration-700 ease-in-out max-w-0 opacity-0 group-hover:max-w-[250px] group-hover:opacity-100`}>
-                          {category}
-                        </span>
+            <div className="flex items-center justify-between mb-4">
+              {/* DYNAMIC COLOR GUIDE (Filtered na din) */}
+              <div className="flex items-center gap-3 pl-1 h-10 flex-wrap">
+                {filteredDisplayedCategories.length > 0 && (
+                  <>
+                    <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Color Guide:</span>
+                    <div className="flex flex-row gap-2.5 items-center flex-wrap">
+                      {filteredDisplayedCategories.map((category) => {
+                        const color = categoryColorMap[category];
+                        return (
+                          <div 
+                            key={category} 
+                            onClick={() => handleScrollToCategory(category)}
+                            className={`group h-7 min-w-[1.75rem] rounded-md border border-black/10 shadow-sm cursor-pointer flex items-center justify-center transition-all duration-700 ease-in-out ${color} hover:px-4`} 
+                          >
+                            <span className={`text-xs font-bold text-white whitespace-nowrap overflow-hidden transition-all duration-700 ease-in-out max-w-0 opacity-0 group-hover:max-w-[250px] group-hover:opacity-100`}>
+                              {category}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* ACTION BUTTONS (FILTER & ZOOM) */}
+              <div className="flex items-center gap-3">
+                
+                {/* CATEGORY FILTER DROPDOWN */}
+                <div className="relative" ref={categoryFilterRef}>
+                  <button 
+                    onClick={() => {
+                      setTempSelectedCategories(selectedCategories);
+                      setIsCategoryFilterOpen(!isCategoryFilterOpen);
+                    }}
+                    className="flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm"
+                  >
+                    <Filter size={16} className={selectedCategories.includes('All') ? 'text-slate-400' : 'text-blue-600'} />
+                    <span>{selectedCategories.includes('All') ? 'All Categories' : `${selectedCategories.length} Selected`}</span>
+                  </button>
+
+                  {isCategoryFilterOpen && (
+                    <div className="absolute right-0 mt-3 w-72 bg-white border border-slate-200 rounded-2xl shadow-2xl z-20 overflow-hidden animate-in fade-in zoom-in-95">
+                      <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                        <span className="font-black text-slate-700 text-sm tracking-tight uppercase">Filter Tables</span>
+                        <button onClick={() => setIsCategoryFilterOpen(false)} className="text-slate-400 hover:text-rose-500 transition-colors"><X size={18} /></button>
                       </div>
-                    );
-                  })}
+                      <div className="p-3 max-h-64 overflow-y-auto space-y-1 custom-scrollbar">
+                        <label className="flex items-center gap-3 p-3 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors group">
+                          <input 
+                            type="checkbox" 
+                            checked={tempSelectedCategories.includes('All')}
+                            onChange={() => handleToggleCategory('All')}
+                            className="rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500 w-5 h-5 cursor-pointer"
+                          />
+                          <span className={`text-sm ${tempSelectedCategories.includes('All') ? 'font-black text-slate-800' : 'text-slate-500 font-bold'}`}>Show All Categories</span>
+                        </label>
+                        {displayedCategories.map(cat => (
+                          <label key={cat} className="flex items-center gap-3 p-3 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors group">
+                            <input 
+                              type="checkbox" 
+                              checked={tempSelectedCategories.includes(cat)}
+                              onChange={() => handleToggleCategory(cat)}
+                              className="rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500 w-5 h-5 cursor-pointer"
+                            />
+                            <span className={`text-sm ${tempSelectedCategories.includes(cat) ? 'font-black text-slate-800' : 'text-slate-500 font-bold'}`}>{cat}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="p-4 border-t border-slate-100 bg-slate-50">
+                        <button 
+                          onClick={applyCategoryFilter}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-black transition-all shadow-lg shadow-blue-100"
+                        >
+                          Apply Filter
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* ZOOM CONTROLS FOR LEDGER */}
-                <div className="ml-auto flex items-center bg-white border border-slate-200 rounded-xl px-2 py-1 shadow-sm gap-1">
+                <div className="flex items-center bg-white border border-slate-300 rounded-xl px-2 py-1 shadow-sm gap-1">
                   <button 
                     onClick={handleZoomOut} 
-                    className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors disabled:opacity-30" 
+                    className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors disabled:opacity-30" 
                     title="Zoom Out"
                     disabled={zoomLevel <= 0.6}
                   >
                     <ZoomOut size={16} />
                   </button>
-                  <div className="text-[10px] font-black text-slate-400 w-12 text-center select-none uppercase tracking-tighter">
+                  <div className="text-[10px] font-black text-slate-500 w-10 text-center select-none uppercase tracking-tighter">
                     {Math.round(zoomLevel * 100)}%
                   </div>
                   <button 
                     onClick={handleZoomIn} 
-                    className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors disabled:opacity-30" 
+                    className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors disabled:opacity-30" 
                     title="Zoom In"
                     disabled={zoomLevel >= 1.5}
                   >
@@ -844,18 +957,17 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
                   <div className="w-px h-4 bg-slate-200 mx-1"></div>
                   <button 
                     onClick={resetZoom} 
-                    className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-blue-600 transition-colors" 
+                    className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-blue-600 transition-colors" 
                     title="Reset Zoom"
                   >
                     <RotateCcw size={14} />
                   </button>
                 </div>
-
               </div>
-            )}
+            </div>
 
             {/* HEADER LABEL */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mt-2">
               <div>
                 <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
                   Project Ledger
@@ -865,7 +977,7 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
                 </h3>
                 <p className="text-slate-500 text-xs font-medium mt-1 tracking-widest uppercase">Construction Cost Breakdown by Category</p>
               </div>
-              <button className="px-5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm">
+              <button className="px-5 py-2 bg-white border border-slate-300 rounded-xl text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm">
                 Export to Excel
               </button>
             </div>
@@ -877,17 +989,17 @@ export default function CostMonitoringScreen({ projects, disbursements, onUpdate
               CONSTRUCTION COST BREAKDOWN
             </div>
 
-            {displayedCategories.length === 0 ? (
+            {filteredDisplayedCategories.length === 0 ? (
               <div className="border-2 border-t-0 border-slate-800 rounded-b-xl bg-white min-w-[1400px] p-20 flex flex-col items-center opacity-50 text-slate-500 shadow-sm">
                 <Calendar size={48} className="mb-4" strokeWidth={1.5} />
-                <p className="text-xl font-bold">Walang Laman</p>
-                <p className="text-sm font-medium mt-1">Wala pang nai-encode na disbursement para sa project na ito.</p>
+                <p className="text-xl font-bold">Walang Resulta</p>
+                <p className="text-sm font-medium mt-1">Wala sa listahan ang napiling kategorya o walang nai-encode na data para dito.</p>
               </div>
             ) : (
               <div className="flex flex-col gap-8 min-w-[1400px] bg-white border-2 border-t-0 border-slate-800 rounded-b-xl p-6 shadow-sm relative">
                 
-                {/* LOOP: Ididisplay lang ang may laman (displayedCategories) */}
-                {displayedCategories.map((category) => {
+                {/* LOOP: Ididisplay lang ang may laman AT NASA FILTER (filteredDisplayedCategories) */}
+                {filteredDisplayedCategories.map((category) => {
                   
                   const items = expensesByCategory[category] || [];
                   const headerColor = categoryColorMap[category];
