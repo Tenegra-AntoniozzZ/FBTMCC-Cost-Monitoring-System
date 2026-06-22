@@ -2,13 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Smooth na pagpapalit ng theme (Day/Dark) */
+/* Smooth na pagpapalit ng theme para sa mga bagay na di apektado ng view transition */
 body {
-  @apply transition-colors duration-300;
   @apply bg-slate-50 dark:bg-slate-900;
 }
 
-/* Custom Scrollbar na ginamit sa app natin */
+/* ==========================================
+   VIEW TRANSITION DARK MODE EFFECT STYLES
+   ========================================== */
+
+/* Patayin ang default cross-fade fade animation ng browser */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* DAY MODE PORTAL (Kapag walang .dark class sa html):
+   Gusto nating makita yung lumang dark mode canvas na liliit pabalik sa button para makita ang light screen sa ilalim */
+::view-transition-old(root) {
+  z-index: 9999;
+}
+::view-transition-new(root) {
+  z-index: 1;
+}
+
+/* DARK MODE PORTAL (Kapag na-activate na ang .dark class):
+   Gusto nating makita yung bagong maitim na canvas na lalaki mula sa button para takpan ang lumang light screen sa ilalim */
+.dark::view-transition-old(root) {
+  z-index: 1;
+}
+.dark::view-transition-new(root) {
+  z-index: 9999;
+}
+
+/* ==========================================
+   CUSTOM SCROLLBARS
+   ========================================== */
 .scrollbar-hide::-webkit-scrollbar {
     display: none;
 }

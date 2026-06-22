@@ -30,7 +30,7 @@ export default function App() {
   const [isAnyModalOpen, setIsAnyModalOpen] = useState(false);
 
   // ==========================================
-  // DARK MODE LOGIC (UPDATED)
+  // DARK MODE LOGIC (CINEMATIC RIPPLE ANIMATION)
   // ==========================================
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -56,8 +56,45 @@ export default function App() {
     }
   }, [isDarkMode]);
 
-  const toggleTheme = () => {
-    setIsDarkMode((prevMode) => !prevMode);
+  const toggleTheme = (e) => {
+    if (!document.startViewTransition) {
+      setIsDarkMode((prevMode) => !prevMode);
+      return;
+    }
+
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    const endRadius = Math.hypot(
+      Math.max(x, window.innerWidth - x),
+      Math.max(y, window.innerHeight - y)
+    );
+
+    const isDark = isDarkMode;
+
+    const transition = document.startViewTransition(() => {
+      setIsDarkMode((prevMode) => !prevMode);
+    });
+
+    transition.ready.then(() => {
+      const clipPath = [
+        `circle(0px at ${x}px ${y}px)`,
+        `circle(${endRadius}px at ${x}px ${y}px)`
+      ];
+      
+      document.documentElement.animate(
+        {
+          clipPath: isDark ? [...clipPath].reverse() : clipPath
+        },
+        {
+          duration: 1200, // PINABAGAL: Ginawang 1.2 seconds para kitang-kita ang bagsak ng kulay!
+          easing: 'ease-in-out',
+          pseudoElement: isDark 
+            ? '::view-transition-old(root)' 
+            : '::view-transition-new(root)' 
+        }
+      );
+    });
   };
   // ==========================================
 
@@ -210,7 +247,7 @@ export default function App() {
 
           <div className={`flex ${isSidebarOpen ? 'gap-2' : 'flex-col gap-2'}`}>
             <button 
-              onClick={toggleTheme} 
+              onClick={(e) => toggleTheme(e)} 
               className={`flex-1 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 dark:bg-slate-900/50 dark:hover:bg-slate-800 transition-colors bg-slate-800/50 rounded-md ${isSidebarOpen ? 'p-2' : 'p-3'}`}
               title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
