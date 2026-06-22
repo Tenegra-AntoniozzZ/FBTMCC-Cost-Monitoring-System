@@ -210,8 +210,6 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
     const valueToAdd = isMisc ? newSubCategory.trim() : newCategory.trim();
     if (!valueToAdd) return;
     
-    // Lagyan ULI ng hidden tag para sa automatic classification sa susunod na pag-load
-    // Pero hindi ito makikita ng user sa dropdown dahil sa 'displayName' logic
     const finalName = isMisc ? `[MISC] ${valueToAdd}` : `[MAIN] ${valueToAdd}`;
     
     setIsSaving(true);
@@ -245,7 +243,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
   };
 
   const executeDeleteCategory = async (category) => {
-    if (category.isHardcoded) return; // Prevent deleting hardcoded defaults
+    if (category.isHardcoded) return; 
     
     setIsSaving(true);
     try {
@@ -278,22 +276,22 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#f8fafc] overflow-hidden">
+    <div className="flex flex-col h-full bg-[#f8fafc] dark:bg-slate-900 overflow-hidden transition-colors duration-300">
       {/* HEADER */}
-      <header className="bg-white border-b border-slate-200 px-8 py-6 flex items-center justify-between shrink-0 shadow-sm">
+      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-8 py-6 flex items-center justify-between shrink-0 shadow-sm transition-colors duration-300">
         <div>
-          <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-            <div className="bg-indigo-600 p-2 rounded-xl text-white shadow-lg shadow-indigo-200">
+          <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-3">
+            <div className="bg-indigo-600 dark:bg-indigo-700 p-2 rounded-xl text-white shadow-lg shadow-indigo-200 dark:shadow-none">
               <Settings2 size={28} />
             </div>
             SYSTEM SETUP
           </h1>
-          <p className="text-slate-500 mt-1 font-medium">Manage project codes and expense categories</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-1 font-medium">Manage project codes and expense categories</p>
         </div>
 
         {message.text && (
           <div className={`px-6 py-3 rounded-2xl font-bold flex items-center gap-2 animate-in slide-in-from-top-4 ${
-            message.type === 'error' ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+            message.type === 'error' ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-500/20' : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-500/20'
           }`}>
             {message.type === 'error' ? <AlertCircle size={18} /> : <Save size={18} />}
             {message.text}
@@ -301,31 +299,31 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
         )}
       </header>
 
-      <main className="flex-1 overflow-y-auto p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <main className="flex-1 overflow-y-auto p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 custom-scrollbar">
         
         {/* PROJECTS MANAGEMENT (7 COLS) */}
         <section className="lg:col-span-7 space-y-6">
-          <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-            <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
-                <FileCode className="text-indigo-600" size={24} />
+          <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col transition-colors duration-300">
+            <div className="px-8 py-6 bg-slate-50/50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+              <h2 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-2">
+                <FileCode className="text-indigo-600 dark:text-indigo-400" size={24} />
                 Project Codes
               </h2>
-              <span className="px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-black text-slate-500 tracking-widest">
+              <span className="px-3 py-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-full text-xs font-black text-slate-500 dark:text-slate-300 tracking-widest transition-colors duration-300">
                 {projects.length} Registered
               </span>
             </div>
 
             {/* ADD / EDIT FORM */}
-            <div className="p-8 border-b border-slate-100 bg-indigo-50/30">
+            <div className="p-8 border-b border-slate-100 dark:border-slate-700 bg-indigo-50/30 dark:bg-indigo-900/10 transition-colors duration-300">
               <form onSubmit={(e) => { e.preventDefault(); if (editingProject) { setPasswordModal({ isOpen: true, action: 'update_project', payload: null }); } else { handleAddProject(e); } }} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                 <div className="md:col-span-1 space-y-1.5 relative">
-                  <label className="text-[10px] font-black text-slate-600 tracking-widest ml-1 uppercase">Code</label>
+                  <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase">Code</label>
                   <input 
                     className={`w-full px-4 py-3 rounded-xl border-2 font-bold focus:outline-none focus:ring-2 transition-all shadow-sm ${
                       projectCodeError 
-                        ? 'border-rose-500 bg-rose-50/50 focus:ring-rose-500 text-rose-700' 
-                        : 'border-slate-400 focus:ring-indigo-500 bg-white'
+                        ? 'border-rose-500 bg-rose-50/50 dark:bg-rose-900/20 focus:ring-rose-500 text-rose-700 dark:text-rose-400' 
+                        : 'border-slate-400 dark:border-slate-600 focus:ring-indigo-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white'
                     }`}
                     placeholder="RF-000"
                     value={editingProject ? editingProject.project_code : newProject.project_code}
@@ -351,9 +349,9 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                   )}
                 </div>
                 <div className="md:col-span-2 space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-600 tracking-widest ml-1 uppercase">Project Name</label>
+                  <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase">Project Name</label>
                   <input 
-                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-400 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white shadow-sm"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-400 dark:border-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm transition-colors duration-300"
                     placeholder="Enter site name..."
                     value={editingProject ? editingProject.project_name : newProject.project_name}
                     onChange={(e) => editingProject ? setEditingProject({...editingProject, project_name: e.target.value}) : setNewProject({...newProject, project_name: e.target.value})}
@@ -366,8 +364,8 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                     disabled={isSaving || (!!projectCodeError && !editingProject)}
                     className={`flex-1 text-white font-black py-3 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
                       (!!projectCodeError && !editingProject)
-                        ? 'bg-slate-400 shadow-slate-100' 
-                        : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'
+                        ? 'bg-slate-400 dark:bg-slate-600 shadow-slate-100 dark:shadow-none' 
+                        : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100 dark:shadow-none'
                     }`}
                   >
                     {editingProject ? <Save size={18} /> : <Plus size={18} />}
@@ -377,7 +375,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                     <button 
                       type="button" 
                       onClick={() => setEditingProject(null)}
-                      className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-slate-600 rounded-xl"
+                      className="p-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-400 dark:text-slate-300 hover:text-slate-600 dark:hover:text-white rounded-xl transition-colors duration-300"
                     >
                       <X size={18} />
                     </button>
@@ -386,38 +384,38 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
               </form>
             </div>
 
-            <div className="overflow-auto border border-slate-400 rounded-xl shadow-md bg-white custom-scrollbar max-h-[600px] m-4">
+            <div className="overflow-auto border border-slate-400 dark:border-slate-600 rounded-xl shadow-md bg-white dark:bg-slate-800 custom-scrollbar max-h-[600px] m-4 transition-colors duration-300">
               <table className="w-full text-left border-collapse min-w-[600px]">
                 <thead>
-                  <tr className="bg-slate-100">
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-600 tracking-widest border-b-2 border-r border-slate-400 uppercase w-[140px]">Code</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-600 tracking-widest border-b-2 border-r border-slate-400 uppercase">Project Name</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-600 tracking-widest border-b-2 border-slate-400 uppercase text-center sticky right-0 z-10 bg-slate-100 w-[140px]">Actions</th>
+                  <tr className="bg-slate-100 dark:bg-slate-700 transition-colors duration-300">
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-600 dark:text-slate-300 tracking-widest border-b-2 border-r border-slate-400 dark:border-slate-600 uppercase w-[140px]">Code</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-600 dark:text-slate-300 tracking-widest border-b-2 border-r border-slate-400 dark:border-slate-600 uppercase">Project Name</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-600 dark:text-slate-300 tracking-widest border-b-2 border-slate-400 dark:border-slate-600 uppercase text-center sticky right-0 z-10 bg-slate-100 dark:bg-slate-700 w-[140px]">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-400">
+                <tbody className="divide-y divide-slate-400 dark:divide-slate-600">
                   {projects.map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-50 transition-colors group">
-                      <td className="px-6 py-4 border-r border-slate-400 bg-white group-hover:bg-slate-50 w-[140px]">
-                        <span className="font-black text-indigo-700 bg-indigo-50/50 px-3 py-1.5 rounded-lg border border-indigo-100 shadow-sm group-hover:bg-white transition-colors block text-center truncate">{p.project_code}</span>
+                    <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
+                      <td className="px-6 py-4 border-r border-slate-400 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50 w-[140px] transition-colors duration-300">
+                        <span className="font-black text-indigo-700 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-800 shadow-sm group-hover:bg-white dark:group-hover:bg-slate-800 transition-colors block text-center truncate">{p.project_code}</span>
                       </td>
-                      <td className="px-6 py-4 border-r border-slate-400 bg-white group-hover:bg-slate-50">
-                        <div className="font-bold text-slate-800">{p.project_name}</div>
+                      <td className="px-6 py-4 border-r border-slate-400 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50 transition-colors duration-300">
+                        <div className="font-bold text-slate-800 dark:text-slate-200">{p.project_name}</div>
                       </td>
-                      <td className="px-6 py-4 bg-white group-hover:bg-slate-50 sticky right-0 z-10 w-[140px]">
+                      <td className="px-6 py-4 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50 sticky right-0 z-10 w-[140px] transition-colors duration-300">
                         <div className="flex items-center justify-center gap-2">
                           <button 
                             onClick={() => setEditingProject({
                               ...p, 
                               profit_percentage: (p.profit_percentage * 100).toFixed(0)
                             })}
-                            className="p-2 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-100 border border-indigo-50 rounded-lg transition-colors shadow-sm"
+                            className="p-2 text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-50 dark:border-indigo-900/30 rounded-lg transition-colors shadow-sm"
                           >
                             <Settings2 size={18} />
                           </button>
                           <button 
                             onClick={() => setPasswordModal({ isOpen: true, action: 'delete_project', payload: p })}
-                            className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-100 border border-rose-50 rounded-lg transition-colors shadow-sm"
+                            className="p-2 text-rose-500 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 border border-rose-50 dark:border-rose-900/30 rounded-lg transition-colors shadow-sm"
                           >
                             <Trash2 size={18} />
                           </button>
@@ -437,29 +435,29 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
         <section className="lg:col-span-5 space-y-6 flex flex-col h-[calc(100vh-140px)]">
           
           {/* 1. MAIN CATEGORIES BOX */}
-          <div className="bg-white rounded-[2rem] border border-slate-400 shadow-sm overflow-hidden flex flex-col flex-1 min-h-[300px]">
-            <div className="px-8 py-5 bg-slate-50/50 border-b border-slate-400 flex items-center justify-between">
-              <h2 className="text-lg font-black text-slate-800 flex items-center gap-2">
-                <Tags className="text-amber-500" size={20} />
+          <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-400 dark:border-slate-600 shadow-sm overflow-hidden flex flex-col flex-1 min-h-[300px] transition-colors duration-300">
+            <div className="px-8 py-5 bg-slate-50/50 dark:bg-slate-800/50 border-b border-slate-400 dark:border-slate-600 flex items-center justify-between">
+              <h2 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
+                <Tags className="text-amber-500 dark:text-amber-400" size={20} />
                 Main Categories
               </h2>
-              <span className="px-3 py-1 bg-white border border-slate-400 rounded-full text-[10px] font-black text-slate-500 tracking-widest">
+              <span className="px-3 py-1 bg-white dark:bg-slate-700 border border-slate-400 dark:border-slate-600 rounded-full text-[10px] font-black text-slate-500 dark:text-slate-300 tracking-widest transition-colors duration-300">
                 {mainCategories.length}
               </span>
             </div>
 
-            <div className="p-5 border-b border-slate-400 bg-amber-50/20">
+            <div className="p-5 border-b border-slate-400 dark:border-slate-600 bg-amber-50/20 dark:bg-amber-900/10 transition-colors duration-300">
               <form onSubmit={(e) => handleAddCategory(e, false)} className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-600 tracking-widest ml-1 uppercase">Add Main Category</label>
+                <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase">Add Main Category</label>
                 <div className="flex gap-2">
                   <input 
-                    className="flex-1 px-4 py-2.5 rounded-xl border-2 border-slate-400 font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white shadow-sm text-sm"
+                    className="flex-1 px-4 py-2.5 rounded-xl border-2 border-slate-400 dark:border-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm text-sm transition-colors duration-300"
                     placeholder="Enter category name..."
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value)}
                     required
                   />
-                  <button type="submit" className="p-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl shadow-lg shadow-amber-100 transition-all">
+                  <button type="submit" className="p-2.5 bg-amber-500 hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500 text-white rounded-xl shadow-lg shadow-amber-100 dark:shadow-none transition-all">
                     <Plus size={18} />
                   </button>
                 </div>
@@ -469,14 +467,13 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
             <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
               <div className="space-y-2">
                 {mainCategories.map((cat) => (
-                  <div key={cat.id} className="group flex items-center justify-between p-3 rounded-xl border border-slate-300 hover:border-amber-200 hover:bg-amber-50/30 transition-all">
-                    <span className="text-xs font-bold text-slate-600">{cat.displayName}</span>
+                  <div key={cat.id} className="group flex items-center justify-between p-3 rounded-xl border border-slate-300 dark:border-slate-600 hover:border-amber-200 dark:hover:border-amber-500/50 hover:bg-amber-50/30 dark:hover:bg-amber-900/20 transition-all duration-300">
+                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{cat.displayName}</span>
                     
-                    {/* HIDE delete button for hardcoded DEFAULT tables */}
                     {!cat.isHardcoded && (
                       <button 
                         onClick={() => setPasswordModal({ isOpen: true, action: 'delete_category', payload: cat })}
-                        className="p-1.5 text-slate-300 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-all"
+                        className="p-1.5 text-slate-300 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all"
                         title="Delete Category"
                       >
                         <Trash2 size={16} />
@@ -489,29 +486,29 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
           </div>
 
           {/* 2. MISCELLANEOUS SUB-CATEGORIES BOX */}
-          <div className="bg-white rounded-[2rem] border border-slate-400 shadow-sm overflow-hidden flex flex-col flex-1 min-h-[300px]">
-            <div className="px-8 py-5 bg-teal-50/50 border-b border-slate-400 flex items-center justify-between">
-              <h2 className="text-lg font-black text-slate-800 flex items-center gap-2">
-                <Layers className="text-teal-600" size={20} />
+          <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-400 dark:border-slate-600 shadow-sm overflow-hidden flex flex-col flex-1 min-h-[300px] transition-colors duration-300">
+            <div className="px-8 py-5 bg-teal-50/50 dark:bg-teal-900/10 border-b border-slate-400 dark:border-slate-600 flex items-center justify-between transition-colors duration-300">
+              <h2 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
+                <Layers className="text-teal-600 dark:text-teal-400" size={20} />
                 Misc. Sub-Categories
               </h2>
-              <span className="px-3 py-1 bg-white border border-slate-400 rounded-full text-[10px] font-black text-slate-500 tracking-widest">
+              <span className="px-3 py-1 bg-white dark:bg-slate-700 border border-slate-400 dark:border-slate-600 rounded-full text-[10px] font-black text-slate-500 dark:text-slate-300 tracking-widest transition-colors duration-300">
                 {subCategories.length}
               </span>
             </div>
 
-            <div className="p-5 border-b border-slate-400 bg-teal-50/30">
+            <div className="p-5 border-b border-slate-400 dark:border-slate-600 bg-teal-50/30 dark:bg-teal-900/10 transition-colors duration-300">
               <form onSubmit={(e) => handleAddCategory(e, true)} className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-600 tracking-widest ml-1 uppercase">Add Misc Sub-Category</label>
+                <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase">Add Misc Sub-Category</label>
                 <div className="flex gap-2">
                   <input 
-                    className="flex-1 px-4 py-2.5 rounded-xl border-2 border-slate-400 font-bold focus:outline-none focus:ring-2 focus:ring-teal-600 bg-white shadow-sm text-sm"
+                    className="flex-1 px-4 py-2.5 rounded-xl border-2 border-slate-400 dark:border-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-teal-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm text-sm transition-colors duration-300"
                     placeholder="e.g. EXTRA LABOR..."
                     value={newSubCategory}
                     onChange={(e) => setNewSubCategory(e.target.value)}
                     required
                   />
-                  <button type="submit" className="p-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl shadow-lg shadow-teal-200 transition-all">
+                  <button type="submit" className="p-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl shadow-lg shadow-teal-200 dark:shadow-none transition-all">
                     <Plus size={18} />
                   </button>
                 </div>
@@ -521,11 +518,11 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
             <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
               <div className="space-y-2">
                 {subCategories.map((cat) => (
-                  <div key={cat.id} className="group flex items-center justify-between p-3 rounded-xl border border-slate-300 hover:border-teal-200 hover:bg-teal-50/30 transition-all">
-                    <span className="text-xs font-bold text-slate-600">{cat.displayName}</span>
+                  <div key={cat.id} className="group flex items-center justify-between p-3 rounded-xl border border-slate-300 dark:border-slate-600 hover:border-teal-200 dark:hover:border-teal-500/50 hover:bg-teal-50/30 dark:hover:bg-teal-900/20 transition-all duration-300">
+                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{cat.displayName}</span>
                     <button 
                       onClick={() => setPasswordModal({ isOpen: true, action: 'delete_category', payload: cat })}
-                      className="p-1.5 text-slate-300 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-all"
+                      className="p-1.5 text-slate-300 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -540,19 +537,19 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
 
       {/* SUCCESS MODAL: MAIN CATEGORY */}
       {showCategorySuccessModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-[2rem] p-10 max-w-md w-full shadow-2xl animate-in zoom-in-95">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 dark:bg-black/70 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-10 max-w-md w-full shadow-2xl animate-in zoom-in-95 border border-slate-100 dark:border-slate-700">
             <div className="flex flex-col items-center text-center space-y-6">
-              <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-2 shadow-inner">
+              <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-full flex items-center justify-center mb-2 shadow-inner">
                 <CheckCircle2 size={40} />
               </div>
               <div>
-                <h3 className="text-2xl font-black text-slate-800">Main Category Added!</h3>
-                <p className="text-slate-500 font-medium mt-2">
+                <h3 className="text-2xl font-black text-slate-800 dark:text-white">Main Category Added!</h3>
+                <p className="text-slate-500 dark:text-slate-400 font-medium mt-2">
                   Bagong main category ay matagumpay na naidagdag.
                 </p>
               </div>
-              <button onClick={() => setShowCategorySuccessModal(false)} className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-xl shadow-lg shadow-amber-100 transition-all text-lg">
+              <button onClick={() => setShowCategorySuccessModal(false)} className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-xl shadow-lg shadow-amber-100 dark:shadow-none transition-all text-lg">
                 Understood
               </button>
             </div>
@@ -562,19 +559,19 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
 
       {/* SUCCESS MODAL: SUB-CATEGORY */}
       {showSubCategorySuccessModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-[2rem] p-10 max-w-md w-full shadow-2xl animate-in zoom-in-95">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 dark:bg-black/70 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-slate-800 rounded-[2rem] p-10 max-w-md w-full shadow-2xl animate-in zoom-in-95 border border-slate-100 dark:border-slate-700">
             <div className="flex flex-col items-center text-center space-y-6">
-              <div className="w-20 h-20 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center mb-2 shadow-inner">
+              <div className="w-20 h-20 bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 rounded-full flex items-center justify-center mb-2 shadow-inner">
                 <CheckCircle2 size={40} />
               </div>
               <div>
-                <h3 className="text-2xl font-black text-slate-800">Sub-Category Added!</h3>
-                <p className="text-slate-500 font-medium mt-2">
+                <h3 className="text-2xl font-black text-slate-800 dark:text-white">Sub-Category Added!</h3>
+                <p className="text-slate-500 dark:text-slate-400 font-medium mt-2">
                   Papasok ito sa loob ng Miscellaneous Cost table.
                 </p>
               </div>
-              <button onClick={() => setShowSubCategorySuccessModal(false)} className="w-full py-4 bg-teal-600 hover:bg-teal-700 text-white font-black rounded-xl shadow-lg shadow-teal-200 transition-all text-lg">
+              <button onClick={() => setShowSubCategorySuccessModal(false)} className="w-full py-4 bg-teal-600 hover:bg-teal-700 text-white font-black rounded-xl shadow-lg shadow-teal-200 dark:shadow-none transition-all text-lg">
                 Understood
               </button>
             </div>
@@ -584,16 +581,16 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
 
       {/* SUCCESS MODAL: PROJECT */}
       {showSuccessModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-[2.5rem] p-10 max-w-xl w-full shadow-2xl animate-in zoom-in-95">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 dark:bg-black/70 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-slate-800 rounded-[2.5rem] p-10 max-w-xl w-full shadow-2xl animate-in zoom-in-95 border border-slate-100 dark:border-slate-700">
             <div className="flex flex-col items-center text-center space-y-6">
-              <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-2 shadow-inner">
+              <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mb-2 shadow-inner">
                 <CheckCircle2 size={40} />
               </div>
               <div>
-                <h3 className="text-3xl font-black text-slate-800">Project Added Successfully!</h3>
-                <p className="text-slate-500 font-medium mt-2 text-lg">
-                  Successfully created project code <strong className="text-indigo-600">{recentlyAddedProject?.code}</strong>.
+                <h3 className="text-3xl font-black text-slate-800 dark:text-white">Project Added Successfully!</h3>
+                <p className="text-slate-500 dark:text-slate-400 font-medium mt-2 text-lg">
+                  Successfully created project code <strong className="text-indigo-600 dark:text-indigo-400">{recentlyAddedProject?.code}</strong>.
                 </p>
               </div>
               
@@ -603,14 +600,14 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                     setShowSuccessModal(false);
                     onNavigateToCostMonitoring(recentlyAddedProject?.id);
                   }}
-                  className="flex-[1.2] py-5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl shadow-xl shadow-indigo-200 transition-all flex items-center justify-center gap-3 text-lg"
+                  className="flex-[1.2] py-5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-2xl shadow-xl shadow-indigo-200 dark:shadow-none transition-all flex items-center justify-center gap-3 text-lg"
                 >
                   <BarChart3 size={24} strokeWidth={2.5} />
                   Go to Monitoring
                 </button>
                 <button 
                   onClick={() => setShowSuccessModal(false)}
-                  className="flex-1 py-5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition-all text-lg"
+                  className="flex-1 py-5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-2xl transition-all text-lg"
                 >
                   Stay Here
                 </button>

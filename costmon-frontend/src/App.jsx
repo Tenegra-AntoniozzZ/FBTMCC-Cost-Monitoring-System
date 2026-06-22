@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { LayoutDashboard, Receipt, BarChart3, Settings, Wallet, UserCircle2, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { LayoutDashboard, Receipt, BarChart3, Settings, Wallet, UserCircle2, LogOut, PanelLeftClose, PanelLeftOpen, Sun, Moon } from 'lucide-react';
 
 import LoginScreen from './components/LoginScreen';
 import NavItem from './components/NavItem';
@@ -28,6 +28,38 @@ export default function App() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isAnyModalOpen, setIsAnyModalOpen] = useState(false);
+
+  // ==========================================
+  // DARK MODE LOGIC (UPDATED)
+  // ==========================================
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem('fbtmcc_theme');
+      if (savedTheme) {
+        return savedTheme === 'dark';
+      }
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        return true;
+      }
+    }
+    return false; 
+  });
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (isDarkMode) {
+      root.classList.add('dark');
+      localStorage.setItem('fbtmcc_theme', 'dark');
+    } else {
+      root.classList.remove('dark');
+      localStorage.setItem('fbtmcc_theme', 'light');
+    }
+  }, [isDarkMode]);
+
+  const toggleTheme = () => {
+    setIsDarkMode((prevMode) => !prevMode);
+  };
+  // ==========================================
 
   const fetchAllData = useCallback(async () => {
     setIsLoading(true);
@@ -60,11 +92,9 @@ export default function App() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Logout Modal Escape
       if (e.key === 'Escape' && showLogoutModal) {
         setShowLogoutModal(false);
       }
-      // Ctrl + F for Search - Only if no other modal is open
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         if (!isAnyModalOpen && !showLogoutModal) {
           e.preventDefault();
@@ -111,7 +141,6 @@ export default function App() {
     localStorage.removeItem('fbtmcc_role');
     localStorage.removeItem('fbtmcc_username');
     
-    // Reset search and project states on logout
     setInitialDisbursementSearch('');
     setInitialCostMonitoringProjectId(null);
     setIsAnyModalOpen(false);
@@ -136,8 +165,10 @@ export default function App() {
   if (!userRole) return <LoginScreen onLogin={handleLogin} />;
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans text-slate-800">
-      <aside className={`${isSidebarOpen ? 'w-64' : 'w-[80px]'} bg-slate-900 text-slate-300 flex flex-col z-20 shadow-xl transition-all duration-300 shrink-0`}>
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-800 dark:text-slate-300 transition-colors duration-300">
+      
+      {/* SIDEBAR */}
+      <aside className={`${isSidebarOpen ? 'w-64' : 'w-[80px]'} bg-slate-900 dark:bg-[#050505] text-slate-300 flex flex-col z-20 shadow-xl transition-all duration-300 shrink-0 border-r border-transparent dark:border-slate-800/50`}>
         <div className={`p-4 flex items-center ${isSidebarOpen ? 'justify-between' : 'justify-center flex-col gap-4 pt-6'} min-h-[80px]`}>
           {isSidebarOpen ? (
             <div>
@@ -149,7 +180,7 @@ export default function App() {
           ) : (
             <Wallet className="text-blue-500 shrink-0" size={28} />
           )}
-          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-slate-400 hover:text-white p-1.5 hover:bg-slate-800 rounded-md">
+          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-slate-400 hover:text-white p-1.5 hover:bg-slate-800 dark:hover:bg-slate-900 rounded-md">
             {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
           </button>
         </div>
@@ -159,13 +190,12 @@ export default function App() {
           <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/disbursements'} icon={<Receipt size={20} />} label="Disbursements" onClick={() => navigate('/disbursements')} />
           <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/cost-monitoring'} icon={<BarChart3 size={20} />} label="Cost Monitoring" onClick={() => navigate('/cost-monitoring')} />
           
-          {/* RESTRICTED SIDEBAR BUTTON: Lalabas lamang kapag "ceo" ang role */}
           {userRole === 'ceo' && (
             <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/projects'} icon={<Settings size={20} />} label="Projects Setup" onClick={() => navigate('/projects')} />
           )}
         </nav>
 
-        <div className={`p-4 border-t border-slate-800 flex flex-col gap-3 ${isSidebarOpen ? '' : 'items-center pb-6'}`}>
+        <div className={`p-4 border-t border-slate-800 dark:border-slate-800/80 flex flex-col gap-3 ${isSidebarOpen ? '' : 'items-center pb-6'}`}>
           {isSidebarOpen ? (
             <div className="flex items-center gap-2 text-slate-400 text-xs">
               <UserCircle2 size={16} className="shrink-0 text-blue-500" />
@@ -178,14 +208,28 @@ export default function App() {
             <UserCircle2 size={24} className="text-blue-500 shrink-0" title={`User: ${activeUsername} (${userRole === 'ceo' ? 'President' : userRole})`} />
           )}
 
-          <button onClick={() => setShowLogoutModal(true)} className={`flex items-center text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors bg-slate-800/50 rounded-md justify-center ${isSidebarOpen ? 'gap-2 p-2' : 'p-3'}`}>
-            <LogOut size={isSidebarOpen ? 14 : 18} />
-            {isSidebarOpen && <span className="text-xs font-bold">Log out</span>}
-          </button>
+          <div className={`flex ${isSidebarOpen ? 'gap-2' : 'flex-col gap-2'}`}>
+            <button 
+              onClick={toggleTheme} 
+              className={`flex-1 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 dark:bg-slate-900/50 dark:hover:bg-slate-800 transition-colors bg-slate-800/50 rounded-md ${isSidebarOpen ? 'p-2' : 'p-3'}`}
+              title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {isDarkMode ? <Sun size={isSidebarOpen ? 16 : 18} /> : <Moon size={isSidebarOpen ? 16 : 18} />}
+            </button>
+
+            <button 
+              onClick={() => setShowLogoutModal(true)} 
+              className={`flex-[3] flex items-center text-red-400 hover:text-red-300 hover:bg-red-500/10 dark:bg-red-950/20 dark:hover:bg-red-900/40 transition-colors bg-slate-800/50 rounded-md justify-center ${isSidebarOpen ? 'gap-2 p-2' : 'p-3'}`}
+              title="Log out"
+            >
+              <LogOut size={isSidebarOpen ? 14 : 18} />
+              {isSidebarOpen && <span className="text-xs font-bold">Log out</span>}
+            </button>
+          </div>
         </div>
       </aside>
 
-      <main className="flex-1 overflow-hidden relative w-full bg-[#f8fafc] flex flex-col">
+      <main className="flex-1 overflow-hidden relative w-full bg-[#f8fafc] dark:bg-slate-950 flex flex-col transition-colors duration-300">
         <Routes>
           <Route path="/" element={<Navigate to="/disbursements" />} />
           <Route 
@@ -223,8 +267,6 @@ export default function App() {
               />
             } 
           />
-          
-          {/* SECURED ROUTE: Ibabato pabalik sa Cost Monitoring ang kahit sinong hindi 'ceo' na susubok pumunta dito */}
           <Route 
             path="/projects" 
             element={
@@ -250,26 +292,26 @@ export default function App() {
 
       {/* LOGOUT CONFIRMATION MODAL */}
       {showLogoutModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm border border-slate-100 animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 w-full max-w-sm border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 duration-200">
             <div className="flex flex-col items-center text-center">
-              <div className="bg-red-100 p-3 rounded-full text-red-600 mb-4">
+              <div className="bg-red-100 dark:bg-red-950/50 p-3 rounded-full text-red-600 dark:text-red-400 mb-4">
                 <LogOut size={28} strokeWidth={2.5} />
               </div>
-              <h3 className="text-xl font-black text-slate-800 mb-2">Confirm Logout</h3>
-              <p className="text-sm text-slate-500 font-medium mb-6">
+              <h3 className="text-xl font-black text-slate-800 dark:text-white mb-2">Confirm Logout</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mb-6">
                 Are you sure you want to log out of your current session? You will need to sign in again to access the system.
               </p>
               <div className="flex w-full gap-3">
                 <button 
                   onClick={() => setShowLogoutModal(false)}
-                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors"
+                  className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-colors"
                 >
                   Cancel
                 </button>
                 <button 
                   onClick={handleLogout}
-                  className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-red-200"
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-red-200 dark:shadow-none"
                 >
                   Yes, Log out
                 </button>

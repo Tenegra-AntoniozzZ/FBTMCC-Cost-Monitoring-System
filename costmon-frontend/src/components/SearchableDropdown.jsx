@@ -74,14 +74,14 @@ export default function SearchableDropdown({ options, value, onChange, placehold
   );
 
   const borderClass = hasError
-    ? 'border-red-500 ring-2 ring-red-500/20 bg-red-50 text-red-700'
+    ? 'border-red-500 ring-2 ring-red-500/20 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
     : isOpen
-      ? 'border-blue-500 ring-2 ring-blue-500/20'
-      : 'border-slate-300 hover:border-slate-400';
+      ? 'border-blue-500 ring-2 ring-blue-500/20 dark:border-blue-400 dark:ring-blue-400/20'
+      : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500';
 
   const dropdownMenu = (
     <div 
-      className="dropdown-portal-menu fixed z-[9999] bg-white border border-slate-200 rounded-lg shadow-2xl max-h-60 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+      className="dropdown-portal-menu fixed z-[9999] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-2xl max-h-60 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100"
       style={{
         top: expandUp ? 'auto' : `${coords.bottom + 4}px`,
         bottom: expandUp ? `${window.innerHeight - coords.top + 4}px` : 'auto',
@@ -90,12 +90,12 @@ export default function SearchableDropdown({ options, value, onChange, placehold
       }}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="p-2 border-b border-slate-100 bg-slate-50">
+      <div className="p-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
         <div className="relative">
-          <Search size={14} className="absolute left-2.5 top-2.5 text-slate-400" />
+          <Search size={14} className="absolute left-2.5 top-2.5 text-slate-400 dark:text-slate-500" />
           <input
             type="text"
-            className="w-full pl-8 p-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            className="w-full pl-8 p-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 transition-colors"
             placeholder="Mag-type para maghanap..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -115,12 +115,12 @@ export default function SearchableDropdown({ options, value, onChange, placehold
       </div>
       <div className="overflow-y-auto custom-scrollbar">
         {filteredOptions.length === 0 ? (
-          <div className="p-3 text-sm text-slate-500 text-center">Walang nahanap na kategorya.</div>
+          <div className="p-3 text-sm text-slate-500 dark:text-slate-400 text-center">Walang nahanap na kategorya.</div>
         ) : (
           filteredOptions.map((option) => (
             <div
               key={option}
-              className={`p-2.5 text-sm cursor-pointer transition-colors ${value === option ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-slate-700 hover:bg-slate-100'}`}
+              className={`p-2.5 text-sm cursor-pointer transition-colors ${value === option ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
               onClick={() => {
                 onChange(option);
                 setIsOpen(false);
@@ -139,13 +139,13 @@ export default function SearchableDropdown({ options, value, onChange, placehold
       <input type="text" required value={value} readOnly className="absolute w-0 h-0 opacity-0 pointer-events-none" />
       
       <div
-        className={`w-full p-2 border rounded-md text-sm flex justify-between items-center cursor-pointer transition-colors ${borderClass} ${hasError ? '' : 'bg-white'}`}
+        className={`w-full p-2 border rounded-md text-sm flex justify-between items-center cursor-pointer transition-colors ${borderClass} ${hasError ? '' : 'bg-white dark:bg-slate-800'}`}
         onClick={handleToggle}
       >
-        <span className={value ? (hasError ? 'font-bold' : 'text-slate-800 font-medium') : (hasError ? 'text-red-500 font-medium' : 'text-slate-500')}>
+        <span className={value ? (hasError ? 'font-bold' : 'text-slate-800 dark:text-slate-200 font-medium') : (hasError ? 'text-red-500 dark:text-red-400 font-medium' : 'text-slate-500 dark:text-slate-400')}>
           {value || placeholder}
         </span>
-        <ChevronDown size={16} className={`${hasError ? 'text-red-500' : 'text-slate-400'} transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={16} className={`${hasError ? 'text-red-500 dark:text-red-400' : 'text-slate-400 dark:text-slate-500'} transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </div>
 
       {isOpen && createPortal(dropdownMenu, document.body)}

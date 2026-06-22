@@ -637,28 +637,28 @@ export default function DisbursementScreen({ projects, categories, disbursements
   // RENDER UI
   // ==========================================
   return (
-    <div className="flex flex-col h-full bg-[#f8fafc] overflow-hidden">
+    <div className="flex flex-col h-full bg-[#f8fafc] dark:bg-slate-900 overflow-hidden transition-colors duration-300">
       {/* HEADER */}
-      <header className="bg-white border-b border-slate-200 px-8 py-6 flex items-center justify-between shrink-0 shadow-sm">
+      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-8 py-6 flex items-center justify-between shrink-0 shadow-sm transition-colors duration-300">
         <div>
-          <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-            <div className="bg-blue-600 p-2 rounded-xl text-white shadow-lg shadow-blue-200">
+          <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-3">
+            <div className="bg-blue-600 p-2 rounded-xl text-white shadow-lg shadow-blue-200 dark:shadow-none">
               <Receipt size={28} />
             </div>
             DISBURSEMENT LEDGER
           </h1>
-          <p className="text-slate-500 mt-1 font-medium italic">{activeMonthDisplay}</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-1 font-medium italic">{activeMonthDisplay}</p>
         </div>
 
         <div className="flex items-center gap-4">
           {!canEdit && (
-            <div className="bg-amber-50 border border-amber-100 text-amber-700 px-4 py-2 rounded-xl flex items-center gap-2 text-xs font-bold">
+            <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-100 dark:border-amber-800 text-amber-700 dark:text-amber-400 px-4 py-2 rounded-xl flex items-center gap-2 text-xs font-bold transition-colors duration-300">
               <Lock size={16} />
               READ-ONLY MODE
             </div>
           )}
           {isLoading && (
-            <div className="bg-blue-50 text-blue-600 px-4 py-2 rounded-xl text-xs font-black animate-pulse border border-blue-100">
+            <div className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-4 py-2 rounded-xl text-xs font-black animate-pulse border border-blue-100 dark:border-blue-800 transition-colors duration-300">
               UPDATING...
             </div>
           )}
@@ -672,35 +672,35 @@ export default function DisbursementScreen({ projects, categories, disbursements
           <HealthCard 
             title="Total of Debit (Gross)" 
             amount={ledgerTotals.dr} 
-            colorClass="bg-blue-600" 
-            textClass="text-blue-600" 
+            colorClass="bg-blue-600 dark:bg-blue-500" 
+            textClass="text-blue-600 dark:text-blue-400" 
           />
           <HealthCard 
             title="Total of Credit (Net+Tax)" 
             amount={ledgerTotals.cr} 
-            colorClass="bg-emerald-600" 
-            textClass="text-emerald-600" 
+            colorClass="bg-emerald-600 dark:bg-emerald-500" 
+            textClass="text-emerald-600 dark:text-emerald-400" 
           />
           <HealthCard 
             title="Current Variance" 
             amount={ledgerTotals.diff} 
             colorClass={ledgerTotals.diff === 0 ? "bg-emerald-500" : "bg-rose-500"} 
-            textClass={ledgerTotals.diff === 0 ? "text-emerald-600" : "text-rose-600"} 
+            textClass={ledgerTotals.diff === 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"} 
           />
         </section>
 
         {/* LEDGER TABLE SECTION */}
-        <section className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+        <section className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0 transition-colors duration-300">
           
           {/* ACTION BAR */}
-          <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4 shrink-0">
+          <div className="px-8 py-6 bg-slate-50/50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-700 flex flex-wrap items-center justify-between gap-4 shrink-0 transition-colors duration-300">
             <div className="flex items-center gap-4 flex-1">
               <div className="relative max-w-sm w-full">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
                 <input
                   type="text"
                   placeholder="Search CV No..."
-                  className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  className="w-full pl-11 pr-4 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-slate-800 dark:text-white transition-all"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -712,44 +712,44 @@ export default function DisbursementScreen({ projects, categories, disbursements
                     setTempSelectedMonths(selectedMonths);
                     setIsFilterOpen(!isFilterOpen);
                   }}
-                  className="flex items-center gap-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-5 py-3 rounded-xl font-bold transition-all shadow-sm"
+                  className="flex items-center gap-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-5 py-3 rounded-xl font-bold transition-all shadow-sm"
                 >
-                  <Filter size={18} className={selectedMonths.includes('All') ? 'text-slate-400' : 'text-blue-600'} />
+                  <Filter size={18} className={selectedMonths.includes('All') ? 'text-slate-400 dark:text-slate-500' : 'text-blue-600 dark:text-blue-400'} />
                   <span>{selectedMonths.includes('All') ? 'All Months' : `${selectedMonths.length} Months`}</span>
                 </button>
 
                 {isFilterOpen && (
-                  <div className="absolute left-0 mt-3 w-72 bg-white border border-slate-200 rounded-2xl shadow-2xl z-20 overflow-hidden animate-in fade-in zoom-in-95">
-                    <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                      <span className="font-black text-slate-700 text-sm tracking-tight uppercase">Select Months</span>
+                  <div className="absolute left-0 mt-3 w-72 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-20 overflow-hidden animate-in fade-in zoom-in-95">
+                    <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center">
+                      <span className="font-black text-slate-700 dark:text-slate-300 text-sm tracking-tight uppercase">Select Months</span>
                       <button onClick={() => setIsFilterOpen(false)} className="text-slate-400 hover:text-rose-500 transition-colors"><X size={18} /></button>
                     </div>
                     <div className="p-3 max-h-64 overflow-y-auto space-y-1 custom-scrollbar">
-                      <label className="flex items-center gap-3 p-3 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors group">
+                      <label className="flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl cursor-pointer transition-colors group">
                         <input 
                           type="checkbox" 
                           checked={tempSelectedMonths.includes('All')}
                           onChange={() => handleToggleMonth('All')}
-                          className="rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500 w-5 h-5 cursor-pointer"
+                          className="rounded-lg border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 w-5 h-5 cursor-pointer bg-white dark:bg-slate-800"
                         />
-                        <span className={`text-sm ${tempSelectedMonths.includes('All') ? 'font-black text-slate-800' : 'text-slate-500 font-bold'}`}>Show All Data</span>
+                        <span className={`text-sm ${tempSelectedMonths.includes('All') ? 'font-black text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400 font-bold'}`}>Show All Data</span>
                       </label>
                       {availableMonths.map(month => (
-                        <label key={month} className="flex items-center gap-3 p-3 hover:bg-slate-50 rounded-xl cursor-pointer transition-colors group">
+                        <label key={month} className="flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl cursor-pointer transition-colors group">
                           <input 
                             type="checkbox" 
                             checked={tempSelectedMonths.includes(month)}
                             onChange={() => handleToggleMonth(month)}
-                            className="rounded-lg border-slate-300 text-blue-600 focus:ring-blue-500 w-5 h-5 cursor-pointer"
+                            className="rounded-lg border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 w-5 h-5 cursor-pointer bg-white dark:bg-slate-800"
                           />
-                          <span className={`text-sm ${tempSelectedMonths.includes(month) ? 'font-black text-slate-800' : 'text-slate-500 font-bold'}`}>{formatMonth(month)}</span>
+                          <span className={`text-sm ${tempSelectedMonths.includes(month) ? 'font-black text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400 font-bold'}`}>{formatMonth(month)}</span>
                         </label>
                       ))}
                     </div>
-                    <div className="p-4 border-t border-slate-100 bg-slate-50">
+                    <div className="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
                       <button 
                         onClick={applyFilter}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-black transition-all shadow-lg shadow-blue-100"
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-black transition-all shadow-lg shadow-blue-100 dark:shadow-none"
                       >
                         Apply Filters
                       </button>
@@ -759,30 +759,30 @@ export default function DisbursementScreen({ projects, categories, disbursements
               </div>
 
               {/* ZOOM CONTROLS */}
-              <div className="flex items-center bg-white border border-slate-200 rounded-xl px-2 py-1 shadow-sm gap-1 ml-2">
+              <div className="flex items-center bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-2 py-1 shadow-sm gap-1 ml-2 transition-colors duration-300">
                 <button 
                   onClick={handleZoomOut} 
-                  className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors disabled:opacity-30" 
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-lg text-slate-500 dark:text-slate-400 transition-colors disabled:opacity-30" 
                   title="Zoom Out"
                   disabled={zoomLevel <= 0.6}
                 >
                   <ZoomOut size={16} />
                 </button>
-                <div className="text-[10px] font-black text-slate-400 w-12 text-center select-none uppercase tracking-tighter">
+                <div className="text-[10px] font-black text-slate-400 dark:text-slate-500 w-12 text-center select-none uppercase tracking-tighter">
                   {Math.round(zoomLevel * 100)}%
                 </div>
                 <button 
                   onClick={handleZoomIn} 
-                  className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors disabled:opacity-30" 
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-lg text-slate-500 dark:text-slate-400 transition-colors disabled:opacity-30" 
                   title="Zoom In"
                   disabled={zoomLevel >= 1.5}
                 >
                   <ZoomIn size={16} />
                 </button>
-                <div className="w-px h-4 bg-slate-200 mx-1"></div>
+                <div className="w-px h-4 bg-slate-200 dark:bg-slate-600 mx-1"></div>
                 <button 
                   onClick={resetZoom} 
-                  className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-blue-600 transition-colors" 
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors" 
                   title="Reset Zoom"
                 >
                   <RotateCcw size={14} />
@@ -793,7 +793,7 @@ export default function DisbursementScreen({ projects, categories, disbursements
             {canEdit && (
               <button 
                 onClick={handleNewDisbursement}
-                className="flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-black transition-all shadow-lg shadow-blue-200"
+                className="flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-black transition-all shadow-lg shadow-blue-200 dark:shadow-none"
               >
                 <Plus size={20} />
                 New Disbursement
@@ -802,67 +802,67 @@ export default function DisbursementScreen({ projects, categories, disbursements
           </div>
 
           {/* TABLE */}
-          <div className="overflow-auto custom-scrollbar flex-1 border border-slate-400 rounded-2xl shadow-xl bg-white">
+          <div className="overflow-auto custom-scrollbar flex-1 border border-slate-400 dark:border-slate-600 rounded-2xl shadow-xl bg-white dark:bg-slate-800 transition-colors duration-300">
             <table className="w-full text-left border-collapse min-w-[1500px]" style={{ zoom: zoomLevel }}>
               <thead>
-                <tr className="bg-slate-100">
-                  <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-r border-slate-400 sticky left-0 z-10 bg-slate-100 shadow-[3px_0_0_0_#94a3b8]">Date</th>
-                  <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-r border-slate-400">Payee</th>
-                  <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-r border-slate-400 text-center">CV No.</th>
-                  <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-r border-slate-400 text-center">Project</th>
-                  <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-r border-slate-400 text-right">Debit (Gross)</th>
-                  <th className="px-6 py-5 text-xs font-black text-emerald-800 uppercase tracking-wider border-b-2 border-r border-slate-400 text-right bg-emerald-100/50">Credit (CIB)</th>
-                  <th className="px-6 py-5 text-xs font-black text-rose-800 uppercase tracking-wider border-b-2 border-r border-slate-400 text-right bg-rose-50/50">EWT</th>
+                <tr className="bg-slate-100 dark:bg-slate-700 transition-colors duration-300">
+                  <th className="px-6 py-5 text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 sticky left-0 z-10 bg-slate-100 dark:bg-slate-700 shadow-[3px_0_0_0_#94a3b8] dark:shadow-[3px_0_0_0_#475569]">Date</th>
+                  <th className="px-6 py-5 text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600">Payee</th>
+                  <th className="px-6 py-5 text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 text-center">CV No.</th>
+                  <th className="px-6 py-5 text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 text-center">Project</th>
+                  <th className="px-6 py-5 text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 text-right">Debit (Gross)</th>
+                  <th className="px-6 py-5 text-xs font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 text-right bg-emerald-100/50 dark:bg-emerald-900/30">Credit (CIB)</th>
+                  <th className="px-6 py-5 text-xs font-black text-rose-800 dark:text-rose-400 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 text-right bg-rose-50/50 dark:bg-rose-900/30">EWT</th>
                   {categories.map(cat => (
-                    <th key={cat} className="px-4 py-5 text-[10px] font-black text-slate-600 uppercase tracking-widest border-b-2 border-r border-slate-400 text-right min-w-[120px] bg-slate-50" title={cat}>
+                    <th key={cat} className="px-4 py-5 text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest border-b-2 border-r border-slate-400 dark:border-slate-600 text-right min-w-[120px] bg-slate-50 dark:bg-slate-800" title={cat}>
                       {cat}
                     </th>
                   ))}
-                  <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-r border-slate-400 text-center">Particulars</th>
-                  {canEdit && <th className="px-6 py-5 text-xs font-black text-slate-800 uppercase tracking-wider border-b-2 border-slate-400 text-center sticky right-0 z-10 bg-slate-100 shadow-[-3px_0_0_0_#94a3b8]">Action</th>}
+                  <th className="px-6 py-5 text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 text-center">Particulars</th>
+                  {canEdit && <th className="px-6 py-5 text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider border-b-2 border-slate-400 dark:border-slate-600 text-center sticky right-0 z-10 bg-slate-100 dark:bg-slate-700 shadow-[-3px_0_0_0_#94a3b8] dark:shadow-[-3px_0_0_0_#475569]">Action</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-400">
+              <tbody className="divide-y divide-slate-400 dark:divide-slate-600">
                 {filteredDisbursements.length === 0 ? (
                   <tr>
                     <td colSpan={8 + categories.length} className="px-8 py-20 text-center">
                       <div className="flex flex-col items-center gap-4">
-                        <div className="bg-slate-100 p-6 rounded-full text-slate-300">
+                        <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-full text-slate-300 dark:text-slate-600">
                           <Receipt size={48} />
                         </div>
-                        <p className="text-slate-400 font-bold text-lg italic">No disbursements found for the selected criteria.</p>
+                        <p className="text-slate-400 dark:text-slate-500 font-bold text-lg italic">No disbursements found for the selected criteria.</p>
                       </div>
                     </td>
                   </tr>
                 ) : filteredDisbursements.map(d => (
                   <tr 
                     key={d.id} 
-                    className={`even:bg-slate-50/80 hover:bg-blue-100/50 transition-colors group ${canEdit ? 'cursor-pointer' : ''}`}
+                    className={`even:bg-slate-50/80 dark:even:bg-slate-800/80 hover:bg-blue-100/50 dark:hover:bg-blue-900/30 transition-colors group ${canEdit ? 'cursor-pointer' : ''}`}
                     onDoubleClick={() => handleEditRow(d)}
                   >
-                    <td className="px-6 py-4 font-black text-slate-600 sticky left-0 z-10 bg-white group-even:bg-slate-50 group-hover:bg-blue-100/50 border-r border-slate-400 shadow-[3px_0_0_0_#94a3b8]">{d.date}</td>
-                    <td className="px-6 py-4 font-black text-slate-800 border-r border-slate-400 group-even:bg-slate-50/30 group-hover:bg-blue-50/50">{d.payee}</td>
-                    <td className="px-6 py-4 font-black text-blue-700 text-center border-r border-slate-400 group-even:bg-slate-50/30 group-hover:bg-blue-50/50">#{d.cv_no}</td>
-                    <td className="px-6 py-4 font-black text-slate-500 text-center border-r border-slate-400 group-even:bg-slate-50/30 group-hover:bg-blue-50/50">{d.project_code}</td>
-                    <td className="px-6 py-4 text-right font-mono font-black text-slate-900 border-r border-slate-400 group-even:bg-slate-50/30 group-hover:bg-blue-50/50">₱{(d.gross_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td className="px-6 py-4 text-right font-mono font-black text-emerald-700 bg-emerald-50/30 border-r border-slate-400 group-hover:bg-emerald-100/30">₱{(d.net_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td className="px-6 py-4 text-right font-mono font-black text-rose-600 bg-rose-50/20 border-r border-slate-400 group-hover:bg-rose-100/20">₱{(d.ewt_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td className="px-6 py-4 font-black text-slate-600 dark:text-slate-300 sticky left-0 z-10 bg-white dark:bg-slate-900 group-even:bg-slate-50 dark:group-even:bg-slate-800 group-hover:bg-blue-100/50 dark:group-hover:bg-blue-900/30 border-r border-slate-400 dark:border-slate-600 shadow-[3px_0_0_0_#94a3b8] dark:shadow-[3px_0_0_0_#475569] transition-colors duration-300">{d.date}</td>
+                    <td className="px-6 py-4 font-black text-slate-800 dark:text-slate-200 border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20">{d.payee}</td>
+                    <td className="px-6 py-4 font-black text-blue-700 dark:text-blue-400 text-center border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20">#{d.cv_no}</td>
+                    <td className="px-6 py-4 font-black text-slate-500 dark:text-slate-400 text-center border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20">{d.project_code}</td>
+                    <td className="px-6 py-4 text-right font-mono font-black text-slate-900 dark:text-white border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20">₱{(d.gross_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td className="px-6 py-4 text-right font-mono font-black text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-emerald-100/30 dark:group-hover:bg-emerald-900/30">₱{(d.net_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td className="px-6 py-4 text-right font-mono font-black text-rose-600 dark:text-rose-400 bg-rose-50/20 dark:bg-rose-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-rose-100/20 dark:group-hover:bg-rose-900/30">₱{(d.ewt_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                     {categories.map(cat => {
                       const amt = getCategoryAmount(d, cat);
                       return (
-                        <td key={cat} className={`px-4 py-4 text-right font-mono text-sm border-r border-slate-400 group-even:bg-slate-50/30 group-hover:bg-blue-50/30 ${amt ? 'font-black text-slate-800 bg-slate-100/40' : 'text-slate-300'}`}>
+                        <td key={cat} className={`px-4 py-4 text-right font-mono text-sm border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/30 dark:group-hover:bg-blue-900/20 ${amt ? 'font-black text-slate-800 dark:text-slate-200 bg-slate-100/40 dark:bg-slate-700/40' : 'text-slate-300 dark:text-slate-600'}`}>
                           {amt ? `₱${amt.toLocaleString()}` : '—'}
                         </td>
                       );
                     })}
-                    <td className="px-6 py-4 text-slate-500 text-xs italic max-w-[200px] truncate border-r border-slate-400 group-even:bg-slate-50/30 group-hover:bg-blue-50/50" title={d.particulars}>{d.particulars}</td>
+                    <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs italic max-w-[200px] truncate border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20" title={d.particulars}>{d.particulars}</td>
                     {canEdit && (
-                      <td className="px-6 py-4 text-center sticky right-0 z-10 bg-white group-even:bg-slate-50 group-hover:bg-blue-100/50 shadow-[-3px_0_0_0_#94a3b8]">
+                      <td className="px-6 py-4 text-center sticky right-0 z-10 bg-white dark:bg-slate-900 group-even:bg-slate-50 dark:group-even:bg-slate-800 group-hover:bg-blue-100/50 dark:group-hover:bg-blue-900/30 shadow-[-3px_0_0_0_#94a3b8] dark:shadow-[-3px_0_0_0_#475569] transition-colors duration-300">
                         <div className="flex items-center justify-center gap-2">
-                          <button onClick={(e) => { e.stopPropagation(); handleEditRow(d); }} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-200 border border-blue-100 rounded-lg transition-colors" title="Edit">
+                          <button onClick={(e) => { e.stopPropagation(); handleEditRow(d); }} className="p-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/60 border border-blue-100 dark:border-blue-800/50 rounded-lg transition-colors" title="Edit">
                             <Edit2 size={16} />
                           </button>
-                          <button onClick={(e) => { e.stopPropagation(); handleDeleteClick(d.id); }} className="p-2 bg-red-50 text-red-600 hover:bg-red-200 border border-red-100 rounded-lg transition-colors" title="Delete">
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteClick(d.id); }} className="p-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/60 border border-red-100 dark:border-red-800/50 rounded-lg transition-colors" title="Delete">
                             <Trash2 size={16} />
                           </button>
                         </div>
@@ -872,12 +872,12 @@ export default function DisbursementScreen({ projects, categories, disbursements
                 ))}
               </tbody>
               {filteredDisbursements.length > 0 && (
-                <tfoot className="bg-slate-100 font-black text-slate-800 border-t-4 border-slate-400">
+                <tfoot className="bg-slate-100 dark:bg-slate-800 font-black text-slate-800 dark:text-slate-200 border-t-4 border-slate-400 dark:border-slate-600 transition-colors duration-300">
                   <tr>
-                    <td colSpan="4" className="px-6 py-6 text-right text-xs tracking-widest text-slate-500 sticky left-0 z-10 bg-slate-100 border-r border-slate-400 shadow-[3px_0_0_0_#94a3b8]">TOTAL SUMMARY:</td>
-                    <td className="px-6 py-6 text-right font-mono text-blue-800 border-r border-slate-400 text-lg">₱{ledgerTotals.dr.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td className="px-6 py-6 text-right font-mono text-emerald-800 border-r border-slate-400 text-lg">₱{ledgerTotals.cib.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td className="px-6 py-6 text-right font-mono text-rose-800 border-r border-slate-400 text-lg">₱{ledgerTotals.ewt.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td colSpan="4" className="px-6 py-6 text-right text-xs tracking-widest text-slate-500 dark:text-slate-400 sticky left-0 z-10 bg-slate-100 dark:bg-slate-800 border-r border-slate-400 dark:border-slate-600 shadow-[3px_0_0_0_#94a3b8] dark:shadow-[3px_0_0_0_#475569] transition-colors duration-300">TOTAL SUMMARY:</td>
+                    <td className="px-6 py-6 text-right font-mono text-blue-800 dark:text-blue-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.dr.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td className="px-6 py-6 text-right font-mono text-emerald-800 dark:text-emerald-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.cib.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td className="px-6 py-6 text-right font-mono text-rose-800 dark:text-rose-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.ewt.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                     <td colSpan={categories.length + (canEdit ? 2 : 1)} className="px-6 py-6"></td>
                   </tr>
                 </tfoot>
@@ -889,30 +889,30 @@ export default function DisbursementScreen({ projects, categories, disbursements
 
       {/* POST SAVE PROMPT MODAL (Stay or Close) */}
       {postSavePrompt && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200 px-4">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm animate-in fade-in duration-200 px-4">
+          <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-100 dark:border-slate-700">
             <div className="p-8 flex flex-col items-center text-center">
-              <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-6 shadow-inner">
+              <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mb-6 shadow-inner">
                 <CheckCircle2 size={40} />
               </div>
-              <h3 className="text-2xl font-black text-slate-800 mb-2">Voucher Saved!</h3>
-              <p className="text-slate-500 font-medium mb-8">
+              <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Voucher Saved!</h3>
+              <p className="text-slate-500 dark:text-slate-400 font-medium mb-8">
                 Ang disbursement voucher ay matagumpay na na-record sa ledger. Gusto mo bang magdagdag ng panibago?
               </p>
               
               <div className="flex flex-col sm:flex-row w-full gap-3">
                 <button 
                   onClick={handleCloseModalAfterSave}
-                  className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-xl transition-all"
+                  className="flex-1 py-3.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-black rounded-xl transition-all"
                 >
                   <span className="flex items-center justify-center gap-2">
                     <X size={16} /> Close 
                   </span>
-                  <div className="text-[10px] font-medium text-slate-400 mt-0.5 uppercase tracking-widest">(ESC)</div>
+                  <div className="text-[10px] font-medium text-slate-400 dark:text-slate-500 mt-0.5 uppercase tracking-widest">(ESC)</div>
                 </button>
                 <button 
                   onClick={handleStayInModal}
-                  className="flex-[1.5] py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl transition-all shadow-lg shadow-blue-200"
+                  className="flex-[1.5] py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl transition-all shadow-lg shadow-blue-200 dark:shadow-none"
                 >
                   <span className="flex items-center justify-center gap-2">
                     <Plus size={16} /> Stay & Add New
@@ -926,35 +926,35 @@ export default function DisbursementScreen({ projects, categories, disbursements
       )}
 
       {isModalOpen && canEdit && !postSavePrompt && (
-        <div className="fixed inset-0 z-50 flex justify-center items-start pt-6 pb-6 bg-slate-900/60 backdrop-blur-sm px-4 overflow-hidden">
-          <div className="bg-slate-50 w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-full">
+        <div className="fixed inset-0 z-50 flex justify-center items-start pt-6 pb-6 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm px-4 overflow-hidden transition-colors duration-300">
+          <div className="bg-slate-50 dark:bg-slate-900 w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-full border border-slate-200 dark:border-slate-800">
             
-            <div className="bg-white px-6 py-4 border-b border-slate-200 flex justify-between items-center shrink-0">
+            <div className="bg-white dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center shrink-0 transition-colors duration-300">
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${headerData.costing_type === 'additional' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}><FileText size={20} /></div>
+                <div className={`p-2 rounded-lg ${headerData.costing_type === 'additional' ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'}`}><FileText size={20} /></div>
                 <div>
-                  <h2 className="text-xl font-bold text-slate-800 leading-tight">
+                  <h2 className="text-xl font-bold text-slate-800 dark:text-white leading-tight">
                     {editingId ? 'Edit Disbursement Voucher' : 'Disbursement Voucher Entry'}
                   </h2>
-                  <p className="text-slate-500 text-xs">
+                  <p className="text-slate-500 dark:text-slate-400 text-xs">
                     {editingId ? 'I-update ang detalye ng pondo at i-save.' : 'Kumpletuhin ang mga detalye ng pondo.'}
                   </p>
                 </div>
               </div>
-              <button onClick={handleCloseRequest} className="p-2 hover:bg-red-50 hover:text-red-500 text-slate-400 rounded-full transition-colors">
+              <button onClick={handleCloseRequest} className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 dark:hover:text-red-400 text-slate-400 dark:text-slate-500 rounded-full transition-colors">
                 <X size={24} />
               </button>
             </div>
 
             {/* COSTING TYPE TOGGLE */}
-            <div className="bg-white px-6 py-3 border-b border-slate-200 shrink-0 flex gap-4">
+            <div className="bg-white dark:bg-slate-800 px-6 py-3 border-b border-slate-200 dark:border-slate-700 shrink-0 flex gap-4 transition-colors duration-300">
               <button
                 type="button"
                 onClick={() => handleHeaderChange({ target: { name: 'costing_type', value: 'normal' } })}
                 className={`flex-1 py-3 rounded-xl font-black text-sm uppercase tracking-wider transition-all border-2 ${
                   headerData.costing_type === 'normal' 
-                    ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm' 
-                    : 'bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                    ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500 dark:border-blue-400 text-blue-700 dark:text-blue-400 shadow-sm' 
+                    : 'bg-slate-50 dark:bg-slate-800 border-transparent text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300'
                 }`}
               >
                 Normal Disbursement
@@ -964,8 +964,8 @@ export default function DisbursementScreen({ projects, categories, disbursements
                 onClick={() => handleHeaderChange({ target: { name: 'costing_type', value: 'additional' } })}
                 className={`flex-1 py-3 rounded-xl font-black text-sm uppercase tracking-wider transition-all border-2 ${
                   headerData.costing_type === 'additional' 
-                    ? 'bg-red-50 border-red-500 text-red-700 shadow-sm' 
-                    : 'bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                    ? 'bg-red-50 dark:bg-red-900/20 border-red-500 dark:border-red-400 text-red-700 dark:text-red-400 shadow-sm' 
+                    : 'bg-slate-50 dark:bg-slate-800 border-transparent text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-600 dark:hover:text-slate-300'
                 }`}
               >
                 Additionals Costing
@@ -976,25 +976,25 @@ export default function DisbursementScreen({ projects, categories, disbursements
               <form onSubmit={handleSubmit} className="space-y-6">
 
                 {errorMessage && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl text-sm font-medium animate-in fade-in flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span>
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-400 p-4 rounded-xl text-sm font-medium animate-in fade-in flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-red-600 dark:bg-red-500 animate-pulse"></span>
                     {errorMessage}
                   </div>
                 )}
 
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex justify-between">
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors duration-300">
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 dark:border-slate-700 flex justify-between">
                     <span>1. Voucher Details</span>
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-500">Payee <span className="text-red-500">*</span></label>
-                      <input type="text" name="payee" placeholder="Name of Payee" className="w-full p-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium"
+                      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Payee <span className="text-red-500">*</span></label>
+                      <input type="text" name="payee" placeholder="Name of Payee" className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none font-medium text-slate-800 dark:text-white transition-colors"
                         value={headerData.payee} onChange={handleHeaderChange} required />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-500">Project Code (#) <span className="text-red-500">*</span></label>
+                      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Project Code (#) <span className="text-red-500">*</span></label>
                       <SearchableDropdown
                         options={projects.map(p => p.project_code)}
                         value={headerData.project_code}
@@ -1003,12 +1003,12 @@ export default function DisbursementScreen({ projects, categories, disbursements
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-500">Date <span className="text-red-500">*</span></label>
-                      <input type="date" name="date" className="w-full p-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Date <span className="text-red-500">*</span></label>
+                      <input type="date" name="date" className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors"
                         value={headerData.date} onChange={handleHeaderChange} required />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-500">CV # <span className="text-red-500">*</span></label>
+                      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">CV # <span className="text-red-500">*</span></label>
                       <input 
                         type="text" 
                         name="cv_no" 
@@ -1017,8 +1017,8 @@ export default function DisbursementScreen({ projects, categories, disbursements
                         placeholder="Unique CV#" 
                         className={`w-full p-2 rounded-md text-sm outline-none font-bold transition-all duration-200 ${
                           isDuplicateCV 
-                            ? 'border-2 border-red-500 text-red-700 bg-red-50 focus:ring-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]' 
-                            : 'border border-slate-300 text-slate-700 bg-amber-50 focus:ring-2 focus:ring-blue-500'
+                            ? 'border-2 border-red-500 dark:border-red-400 text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 focus:ring-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]' 
+                            : 'border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 bg-amber-50 dark:bg-amber-900/10 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400'
                         }`}
                         value={headerData.cv_no} 
                         onChange={(e) => {
@@ -1028,65 +1028,65 @@ export default function DisbursementScreen({ projects, categories, disbursements
                         required 
                       />
                       {isDuplicateCV && (
-                        <p className="text-[10px] text-red-600 font-bold flex items-center gap-1 animate-in slide-in-from-top-1">
+                        <p className="text-[10px] text-red-600 dark:text-red-400 font-bold flex items-center gap-1 animate-in slide-in-from-top-1">
                           <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span> Gamit na ang CV# na ito!
                         </p>
                       )}
                     </div>
                     
                     <div className="space-y-1 md:col-span-2">
-                      <label className="text-xs font-semibold text-slate-500">Particulars (Description) <span className="text-red-500">*</span></label>
-                      <input type="text" name="particulars" placeholder="Details..." className="w-full p-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Particulars (Description) <span className="text-red-500">*</span></label>
+                      <input type="text" name="particulars" placeholder="Details..." className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors"
                         value={headerData.particulars} onChange={handleHeaderChange} required />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-500">TIN</label>
-                      <input type="text" name="tin" placeholder="000-000-000-000" className="w-full p-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">TIN</label>
+                      <input type="text" name="tin" placeholder="000-000-000-000" className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors"
                         value={headerData.tin} onChange={handleHeaderChange} />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-500">OR / INV #</label>
-                      <input type="text" name="or_inv_no" placeholder="Receipt No." className="w-full p-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">OR / INV #</label>
+                      <input type="text" name="or_inv_no" placeholder="Receipt No." className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors"
                         value={headerData.or_inv_no} onChange={handleHeaderChange} />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-500">Check No.</label>
-                      <input type="text" name="check_no" placeholder="Optional" className="w-full p-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Check No.</label>
+                      <input type="text" name="check_no" placeholder="Optional" className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors"
                         value={headerData.check_no} onChange={handleHeaderChange} />
                     </div>
 
-                    <div className="space-y-1 bg-blue-50 p-2 -mt-2 -mb-2 rounded-md border border-blue-100 flex flex-col justify-center shadow-inner">
-                      <label className="text-xs font-bold text-blue-800 uppercase flex items-center justify-between">
+                    <div className="space-y-1 bg-blue-50 dark:bg-blue-900/20 p-2 -mt-2 -mb-2 rounded-md border border-blue-100 dark:border-blue-800 flex flex-col justify-center shadow-inner transition-colors duration-300">
+                      <label className="text-xs font-bold text-blue-800 dark:text-blue-300 uppercase flex items-center justify-between">
                         <span>Target CIB/COH (₱) <span className="text-red-500">*</span></span>
                       </label>
                       <input type="number" step="0.01" name="target_cib" placeholder="0.00" 
-                        className="w-full p-1.5 border border-blue-200 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none font-black text-blue-900 bg-white"
+                        className="w-full p-1.5 border border-blue-200 dark:border-blue-700 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none font-black text-blue-900 dark:text-blue-100 bg-white dark:bg-slate-800 transition-colors"
                         value={headerData.target_cib} onChange={handleHeaderChange} required />
                     </div>
 
                     <div className="space-y-1 md:col-span-2 flex items-end pb-1">
-                      <button type="button" onClick={() => setShowTaxFields(!showTaxFields)} className="text-blue-600 text-xs font-medium hover:underline flex items-center gap-1">
+                      <button type="button" onClick={() => setShowTaxFields(!showTaxFields)} className="text-blue-600 dark:text-blue-400 text-xs font-medium hover:underline flex items-center gap-1">
                         {showTaxFields ? 'Hide Tax/Payables Fields' : 'Show Advanced Fields (Accts Pay, BIR-VAT, etc.)'} <ChevronDown size={14}/>
                       </button>
                     </div>
                   </div>
 
                   {showTaxFields && (
-                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-slate-100 bg-slate-50 p-4 rounded-lg">
+                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg transition-colors duration-300">
                         <div className="space-y-1">
-                          <label className="text-xs font-semibold text-slate-500">Accts Pay</label>
-                          <input type="number" step="0.01" name="accts_pay" placeholder="0.00" className="w-full p-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                          <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Accts Pay</label>
+                          <input type="number" step="0.01" name="accts_pay" placeholder="0.00" className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors"
                             value={headerData.accts_pay} onChange={handleHeaderChange} />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-xs font-semibold text-slate-500">Input Tax (Vat Input)</label>
-                          <input type="number" step="0.01" name="input_tax" placeholder="0.00" className="w-full p-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                          <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Input Tax (Vat Input)</label>
+                          <input type="number" step="0.01" name="input_tax" placeholder="0.00" className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors"
                             value={headerData.input_tax} onChange={handleHeaderChange} />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-xs font-semibold text-slate-500">Output Tax</label>
-                          <input type="number" step="0.01" name="output_tax" placeholder="0.00" className="w-full p-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                          <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Output Tax</label>
+                          <input type="number" step="0.01" name="output_tax" placeholder="0.00" className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors"
                             value={headerData.output_tax} onChange={handleHeaderChange} />
                         </div>
                      </div>
@@ -1097,12 +1097,12 @@ export default function DisbursementScreen({ projects, categories, disbursements
                   <div className={`lg:col-span-2 space-y-6 transition-all duration-300 ${targetCib <= 0 ? 'opacity-40 pointer-events-none grayscale-[50%]' : ''}`}>
                     
                     {/* 2. CONSTRUCTION COST BREAKDOWN */}
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
-                      <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
-                        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">2. CONSTRUCTION COST BREAKDOWN <span className="text-red-500">*</span></h3>
-                        <button type="button" onClick={() => addLine('construction')} disabled={targetCib <= 0 || isAddingLine} className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-md font-medium flex items-center gap-1 transition-colors disabled:opacity-50 min-w-[120px] justify-center">
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden transition-colors duration-300">
+                      <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100 dark:border-slate-700">
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">2. CONSTRUCTION COST BREAKDOWN <span className="text-red-500">*</span></h3>
+                        <button type="button" onClick={() => addLine('construction')} disabled={targetCib <= 0 || isAddingLine} className="text-xs bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-md font-medium flex items-center gap-1 transition-colors disabled:opacity-50 min-w-[120px] justify-center">
                           {isAddingLine ? (
-                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce"></span> Adding...</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500 animate-bounce"></span> Adding...</span>
                           ) : (
                             <><Plus size={14} /> Add Line Item</>
                           )}
@@ -1112,7 +1112,7 @@ export default function DisbursementScreen({ projects, categories, disbursements
                       <div className="max-h-[250px] overflow-y-auto pr-2 custom-scrollbar space-y-3">
                         {constructionLines.map((line, index) => (
                           <div key={line.id} className="flex gap-3 items-start animate-in slide-in-from-top-2">
-                            <div className="w-8 h-9 mt-1 bg-slate-50 border border-slate-200 rounded flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">
+                            <div className="w-8 h-9 mt-1 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded flex items-center justify-center text-xs font-bold text-slate-400 dark:text-slate-500 shrink-0 transition-colors">
                               {index + 1}
                             </div>
                             <div className="flex-1">
@@ -1125,30 +1125,30 @@ export default function DisbursementScreen({ projects, categories, disbursements
                                   />
                               </div>
                             <div className="w-40 relative mt-1">
-                              <span className="absolute left-3 top-2 text-slate-400 text-sm font-medium">₱</span>
+                              <span className="absolute left-3 top-2 text-slate-400 dark:text-slate-500 text-sm font-medium">₱</span>
                               <input type="number" step="0.01" placeholder="0.00" 
-                                className="w-full pl-7 p-2 border border-slate-300 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none text-right"
+                                className="w-full pl-7 p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-right text-slate-800 dark:text-white transition-colors"
                                 value={line.amount} onChange={(e) => handleLineChange(line.id, 'amount', e.target.value, 'construction')} />
                             </div>
                             <button type="button" onClick={() => removeLine(line.id, 'construction')} disabled={constructionLines.length === 1 && miscLines.length === 0}
-                              className="p-2 mt-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors disabled:opacity-30 disabled:hover:bg-transparent">
+                              className="p-2 mt-1 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-30 disabled:hover:bg-transparent">
                               <Trash2 size={18} />
                             </button>
                           </div>
                         ))}
                       </div>
-                      <div className="mt-4 pt-3 text-[10px] text-slate-500 border-t border-slate-100 italic">
+                      <div className="mt-4 pt-3 text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700 italic">
                         * If "Labor /SUBCONTRACTOR" is chosen, it will calculate automatically by 2% for the EWT Payable.
                       </div>
                     </div>
 
                     {/* 3. MISCELLANEOUS COST */}
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden">
-                      <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
-                        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">3. MISCELLANEOUS COST</h3>
-                        <button type="button" onClick={() => addLine('misc')} disabled={targetCib <= 0 || isAddingLine} className="text-xs bg-teal-50 hover:bg-teal-100 text-teal-700 px-3 py-1.5 rounded-md font-medium flex items-center gap-1 transition-colors disabled:opacity-50 min-w-[120px] justify-center border border-teal-100">
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden transition-colors duration-300">
+                      <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100 dark:border-slate-700">
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">3. MISCELLANEOUS COST</h3>
+                        <button type="button" onClick={() => addLine('misc')} disabled={targetCib <= 0 || isAddingLine} className="text-xs bg-teal-50 dark:bg-teal-900/30 hover:bg-teal-100 dark:hover:bg-teal-900/50 text-teal-700 dark:text-teal-400 px-3 py-1.5 rounded-md font-medium flex items-center gap-1 transition-colors disabled:opacity-50 min-w-[120px] justify-center border border-teal-100 dark:border-teal-800">
                           {isAddingLine ? (
-                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-teal-400 animate-bounce"></span> Adding...</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-teal-400 dark:bg-teal-500 animate-bounce"></span> Adding...</span>
                           ) : (
                             <><Plus size={14} /> Add Misc Item</>
                           )}
@@ -1157,12 +1157,12 @@ export default function DisbursementScreen({ projects, categories, disbursements
 
                       <div className="max-h-[250px] overflow-y-auto pr-2 custom-scrollbar space-y-3">
                         {miscLines.length === 0 ? (
-                          <div className="py-8 text-center border-2 border-dashed border-slate-100 rounded-xl">
-                            <p className="text-slate-400 text-xs font-medium">Walang miscellaneous cost na idinagdag. I-click ang button sa itaas para mag-add.</p>
+                          <div className="py-8 text-center border-2 border-dashed border-slate-100 dark:border-slate-700 rounded-xl">
+                            <p className="text-slate-400 dark:text-slate-500 text-xs font-medium">Walang miscellaneous cost na idinagdag. I-click ang button sa itaas para mag-add.</p>
                           </div>
                         ) : miscLines.map((line, index) => (
                           <div key={line.id} className="flex gap-3 items-start animate-in slide-in-from-top-2">
-                            <div className="w-8 h-9 mt-1 bg-teal-50/50 border border-teal-100 rounded flex items-center justify-center text-xs font-bold text-teal-300 shrink-0">
+                            <div className="w-8 h-9 mt-1 bg-teal-50/50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800/50 rounded flex items-center justify-center text-xs font-bold text-teal-600 dark:text-teal-400 shrink-0 transition-colors">
                               {index + 1}
                             </div>
                             <div className="flex-1">
@@ -1175,13 +1175,13 @@ export default function DisbursementScreen({ projects, categories, disbursements
                                   />
                               </div>
                             <div className="w-40 relative mt-1">
-                              <span className="absolute left-3 top-2 text-slate-400 text-sm font-medium">₱</span>
+                              <span className="absolute left-3 top-2 text-slate-400 dark:text-slate-500 text-sm font-medium">₱</span>
                               <input type="number" step="0.01" placeholder="0.00" 
-                                className="w-full pl-7 p-2 border border-slate-300 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none text-right"
+                                className="w-full pl-7 p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-right text-slate-800 dark:text-white transition-colors"
                                 value={line.amount} onChange={(e) => handleLineChange(line.id, 'amount', e.target.value, 'misc')} />
                             </div>
                             <button type="button" onClick={() => removeLine(line.id, 'misc')}
-                              className="p-2 mt-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors">
+                              className="p-2 mt-1 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors">
                               <Trash2 size={18} />
                             </button>
                           </div>
@@ -1190,46 +1190,46 @@ export default function DisbursementScreen({ projects, categories, disbursements
                     </div>
                   </div>
 
-                  <div className="bg-slate-800 text-white p-6 rounded-xl shadow-md flex flex-col justify-between h-fit lg:sticky lg:top-0">
+                  <div className="bg-slate-800 dark:bg-slate-950 text-white p-6 rounded-xl shadow-md flex flex-col justify-between h-fit lg:sticky lg:top-0 transition-colors duration-300 border border-transparent dark:border-slate-800">
                     <div>
-                      <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4 pb-2 border-b border-slate-700">4. Accounting Summary</h3>
+                      <h3 className="text-sm font-bold text-slate-300 dark:text-slate-400 uppercase tracking-wider mb-4 pb-2 border-b border-slate-700 dark:border-slate-800">4. Accounting Summary</h3>
                       <div className="space-y-3">
-                        <div className="flex justify-between items-center text-slate-300 text-sm">
+                        <div className="flex justify-between items-center text-slate-300 dark:text-slate-400 text-sm">
                           <span>Total of Debit (Gross Exp.)</span>
-                          <span className="font-mono">₱ {totals.totalDebit.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                          <span className="font-mono text-white">₱ {totals.totalDebit.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
                         </div>
-                        <div className="flex justify-between items-center text-rose-300 text-sm">
+                        <div className="flex justify-between items-center text-rose-300 dark:text-rose-400 text-sm">
                           <span>Less: EWT Payable</span>
                           <span className="font-mono">- ₱ {totals.ewtPayable.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
                         </div>
                         {headerData.input_tax && (
-                          <div className="flex justify-between items-center text-slate-400 text-xs">
+                          <div className="flex justify-between items-center text-slate-400 dark:text-slate-500 text-xs">
                             <span>Input Tax</span>
-                            <span className="font-mono">₱ {parseFloat(headerData.input_tax).toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                            <span className="font-mono text-slate-300">₱ {parseFloat(headerData.input_tax).toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
                           </div>
                         )}
                       </div>
                     </div>
 
-                    <div className="mt-6 pt-4 border-t border-slate-700">
+                    <div className="mt-6 pt-4 border-t border-slate-700 dark:border-slate-800">
                       <div className="flex justify-between items-end mb-3">
                         <div>
-                          <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1">Target CIB (Mula Resibo)</div>
-                          <div className="text-lg font-bold text-slate-300">₱ {targetCib.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                          <div className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider mb-1">Target CIB (Mula Resibo)</div>
+                          <div className="text-lg font-bold text-slate-300 dark:text-white">₱ {targetCib.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
                         </div>
                         <div className="text-right">
-                          <div className="text-[10px] text-blue-300 font-semibold uppercase tracking-wider mb-1">Computed CIB/COH</div>
-                          <div className="text-2xl font-black text-blue-400 tracking-tight">
+                          <div className="text-[10px] text-blue-300 dark:text-blue-400 font-semibold uppercase tracking-wider mb-1">Computed CIB/COH</div>
+                          <div className="text-2xl font-black text-blue-400 dark:text-blue-500 tracking-tight">
                             ₱ {totals.cib_coh.toLocaleString(undefined, {minimumFractionDigits: 2})}
                           </div>
                         </div>
                       </div>
 
-                      <div className={`p-3 rounded-lg flex items-center justify-between mb-4 border transition-colors ${isVarianceZero ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
-                         <span className={`text-xs font-bold uppercase ${isVarianceZero ? 'text-emerald-400' : 'text-red-400'}`}>
+                      <div className={`p-3 rounded-lg flex items-center justify-between mb-4 border transition-colors ${isVarianceZero ? 'bg-emerald-500/10 border-emerald-500/30 dark:bg-emerald-900/20 dark:border-emerald-800' : 'bg-red-500/10 border-red-500/30 dark:bg-red-900/20 dark:border-red-800'}`}>
+                         <span className={`text-xs font-bold uppercase ${isVarianceZero ? 'text-emerald-400 dark:text-emerald-500' : 'text-red-400 dark:text-red-500'}`}>
                             {isVarianceZero ? '✓ Balanse' : '⚠️ Variance (Kulang/Sobra)'}
                          </span>
-                         <span className={`font-mono font-bold ${isVarianceZero ? 'text-emerald-400' : 'text-red-400'}`}>
+                         <span className={`font-mono font-bold ${isVarianceZero ? 'text-emerald-400 dark:text-emerald-500' : 'text-red-400 dark:text-red-500'}`}>
                             {(targetCib - totals.cib_coh) > 0 ? '+' : ''}{(targetCib - totals.cib_coh).toLocaleString(undefined, {minimumFractionDigits: 2})}
                          </span>
                       </div>
@@ -1241,14 +1241,14 @@ export default function DisbursementScreen({ projects, categories, disbursements
                           disabled={isDuplicateCV || !isVarianceZero || targetCib === 0 || isSaving}
                           className={`w-full text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all shadow-lg ${
                             (isDuplicateCV || !isVarianceZero || targetCib === 0 || isSaving) 
-                              ? 'bg-slate-500 cursor-not-allowed opacity-50 shadow-none' 
-                              : 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/20'
+                              ? 'bg-slate-500 dark:bg-slate-700 cursor-not-allowed opacity-50 shadow-none' 
+                              : 'bg-blue-600 hover:bg-blue-500 dark:bg-blue-700 dark:hover:bg-blue-600 shadow-blue-900/20 dark:shadow-none'
                           }`}
                         >
                           <Save size={18} /> {isSaving ? 'Nagsa-save...' : (editingId ? 'Update Disbursement' : 'Post Disbursement')}
                         </button>
-                        <span className="text-center text-[10px] text-slate-400 font-bold uppercase tracking-widest hidden md:block">
-                          Maaari ring gamitin ang <kbd className="px-1.5 py-0.5 bg-slate-700 rounded text-slate-300 border border-slate-600">CTRL + Enter</kbd>
+                        <span className="text-center text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest hidden md:block">
+                          Maaari ring gamitin ang <kbd className="px-1.5 py-0.5 bg-slate-700 dark:bg-slate-800 rounded text-slate-300 dark:text-slate-400 border border-slate-600 dark:border-slate-700">CTRL + Enter</kbd>
                         </span>
                       </div>
                     </div>
