@@ -147,16 +147,21 @@ export default function App() {
       if (e.key === 'Escape' && showLogoutModal) {
         setShowLogoutModal(false);
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
         if (!isAnyModalOpen && !showLogoutModal) {
-          e.preventDefault();
-          setIsSearchOpen(true);
+          if (isProjectDirty) {
+            setPendingNavigation('search');
+            setShowSaveConfirmModal(true);
+          } else {
+            setIsSearchOpen(true);
+          }
         }
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showLogoutModal, isAnyModalOpen]);
+  }, [showLogoutModal, isAnyModalOpen, isProjectDirty]);
 
   useEffect(() => {
     if (showLogoutModal || isSearchOpen || isAnyModalOpen || showSaveConfirmModal || passwordModal.isOpen) {
@@ -236,6 +241,8 @@ export default function App() {
 
     if (pendingNavigation === 'logout') {
       executeLogout();
+    } else if (pendingNavigation === 'search') {
+      setIsSearchOpen(true);
     } else if (pendingNavigation) {
       navigate(pendingNavigation);
     }
@@ -391,7 +398,7 @@ export default function App() {
             </div>
             <h3 className="text-xl font-black text-slate-800 dark:text-white mb-2 tracking-tight">Unsaved Changes</h3>
             <p className="text-slate-500 dark:text-slate-400 mb-6 font-medium text-sm">
-              May mga binago ka sa project details. I-save muna bago {pendingNavigation === 'logout' ? 'mag log out' : 'lumipat'}?
+              May mga binago ka sa project details. I-save muna bago {pendingNavigation === 'logout' ? 'mag log out' : pendingNavigation === 'search' ? 'maghanap' : 'lumipat'}?
             </p>
             <div className="flex flex-col gap-3">
               <button 
@@ -409,6 +416,8 @@ export default function App() {
                   setShowSaveConfirmModal(false); 
                   if (pendingNavigation === 'logout') { 
                     executeLogout(); 
+                  } else if (pendingNavigation === 'search') {
+                    setIsSearchOpen(true);
                   } else { 
                     navigate(pendingNavigation); 
                   } 

@@ -129,9 +129,9 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
 
   useEffect(() => {
     if (onModalStateChange) {
-      onModalStateChange(passwordModal.isOpen || isSaving || isSwitching || isAddAdditionalModalOpen || isAdditionalsModalOpen || showProjectUnsavedModal || isProjectDirty);
+      onModalStateChange(passwordModal.isOpen || isSaving || isSwitching || isAddAdditionalModalOpen || isAdditionalsModalOpen || showProjectUnsavedModal);
     }
-  }, [passwordModal.isOpen, isSaving, isSwitching, isAddAdditionalModalOpen, isAdditionalsModalOpen, showProjectUnsavedModal, isProjectDirty, onModalStateChange]);
+  }, [passwordModal.isOpen, isSaving, isSwitching, isAddAdditionalModalOpen, isAdditionalsModalOpen, showProjectUnsavedModal, onModalStateChange]);
 
   // PREVENT CLOSING THE TAB IF THERE ARE UNSAVED PROJECT CHANGES
   useEffect(() => {
@@ -717,9 +717,9 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
                               <td className="p-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300 border-r border-slate-800">{item.or_inv_no || '-'}</td>
                               <td className="p-3 font-bold text-slate-800 dark:text-slate-200 text-left border-r border-slate-800 truncate max-w-[150px]" title={item.payee}>{item.payee}</td>
                               <td className="p-3 font-medium text-slate-600 dark:text-slate-400 text-left border-r border-slate-800 truncate max-w-[150px]" title={item.particulars}>{item.particulars}</td>
-                              <td className="p-3 text-center font-mono font-medium text-slate-600 border-r border-slate-800 bg-slate-50/50">{formatMoney(item.laborLess)}</td>
-                              <td className="p-3 text-center font-mono font-medium text-slate-600 border-r border-slate-800 bg-slate-50/50">{formatMoney(item.laborEwt)}</td>
-                              <td className="p-3 text-center font-mono font-medium text-slate-600 border-r border-slate-800 bg-slate-50/50">{formatMoney(item.laborTotal)}</td>
+                              <td className="p-3 text-center font-mono font-medium text-slate-600 dark:text-slate-400 border-r border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">{formatMoney(item.laborLess)}</td>
+                              <td className="p-3 text-center font-mono font-medium text-slate-600 dark:text-slate-400 border-r border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">{formatMoney(item.laborEwt)}</td>
+                              <td className="p-3 text-center font-mono font-medium text-slate-600 dark:text-slate-400 border-r border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">{formatMoney(item.laborTotal)}</td>
                               <td className="p-3 text-center font-mono font-medium text-slate-600 border-r border-slate-800">{formatMoney(item.matlQty)}</td>
                               <td className="p-3 text-center font-mono font-medium text-slate-600 border-r border-slate-800">{formatMoney(item.matlUnitCost)}</td>
                               <td className="p-3 text-center font-mono font-medium text-slate-600 border-r border-slate-800">{formatMoney(item.matlTotal)}</td>
