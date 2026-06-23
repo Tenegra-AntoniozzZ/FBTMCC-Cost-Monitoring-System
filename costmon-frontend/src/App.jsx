@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback} from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { LayoutDashboard, Receipt, BarChart3, Settings, Wallet, UserCircle2, LogOut, PanelLeftClose, PanelLeftOpen, Sun, Moon, Save, Trash2, AlertCircle } from 'lucide-react';
 
@@ -9,6 +9,7 @@ import CostMonitoringScreen from './components/CostMonitoringScreen';
 import ProjectsSetupScreen from './components/ProjectsSetupScreen';
 import GlobalSearchModal from './components/GlobalSearchModal';
 import PasswordConfirmModal from './components/PasswordConfirmModal';
+import DashboardScreen from './components/DashboardScreen';
 import { API_URL } from './utils/Constants';
 
 export default function App() {
@@ -212,7 +213,7 @@ export default function App() {
     localStorage.setItem('fbtmcc_username', username);
     setUserRole(role);
     setActiveUsername(username);
-    navigate(role === 'encoder' ? '/disbursements' : '/cost-monitoring');
+    navigate(role === 'encoder' ? '/disbursements' : '/dashboard'); // Updated to go to dashboard
   };
 
   const executeLogout = () => {
@@ -329,7 +330,19 @@ export default function App() {
 
       <main className="flex-1 overflow-hidden relative w-full bg-[#f8fafc] dark:bg-slate-950 flex flex-col transition-colors duration-300">
         <Routes>
-          <Route path="/" element={<Navigate to="/disbursements" />} />
+          <Route path="/" element={<Navigate to="/dashboard" />} />
+          
+          {/* DASHBOARD ROUTE (Idinagdag) */}
+          <Route 
+            path="/dashboard" 
+            element={
+              <DashboardScreen 
+                projects={projects} 
+                disbursements={disbursements} 
+              />
+            } 
+          />
+
           <Route 
             path="/disbursements" 
             element={
@@ -362,7 +375,7 @@ export default function App() {
                 refreshData={fetchAllData} 
                 onNavigateToDisbursement={navigateToDisbursement}
                 onModalStateChange={setIsAnyModalOpen}
-                onDirtyChange={handleDirtyChange} // BAGO: Nagpapadala ng isDirty info pataas
+                onDirtyChange={handleDirtyChange}
               />
             } 
           />
