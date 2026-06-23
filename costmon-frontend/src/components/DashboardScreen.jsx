@@ -1,8 +1,15 @@
-import { useState, useMemo } from 'react';
-import { LayoutDashboard, Briefcase, Building2, ArrowLeft, TrendingUp, FileText, ZoomIn, ZoomOut, RotateCcw, Wallet, Receipt } from 'lucide-react';
+import { useState, useMemo, Fragment } from 'react';
+import { LayoutDashboard, Briefcase, Building2, ArrowLeft, TrendingUp, FileText, ZoomIn, ZoomOut, RotateCcw, Wallet, Receipt, Eye, EyeOff, Calendar, X } from 'lucide-react';
 
 export default function DashboardScreen({ projects = [], disbursements = [] }) {
   const [activeView, setActiveView] = useState('selection');
+  
+  // State para i-toggle ang Additional Works breakdown columns
+  const [showAdditionalWorks, setShowAdditionalWorks] = useState(true);
+
+  // Date Filter States
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // --- ZOOM LOGIC ---
   const [zoomLevel, setZoomLevel] = useState(() => {
@@ -32,10 +39,22 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
   };
 
   const formatMoney = (val) => {
-    if (val === 0) return '-';
-    if (!val) return '0.00';
+    if (val === 0 || val === null || val === undefined) return '-';
     return Number(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
+
+  // ==========================================
+  // DATE LABEL FORMATTER
+  // ==========================================
+  const dateFilterLabel = useMemo(() => {
+    if (!startDate && !endDate) return null;
+    
+    const formatOpts = { month: 'short', day: 'numeric', year: 'numeric' };
+    const s = startDate ? new Date(startDate).toLocaleDateString('en-US', formatOpts) : 'Start';
+    const e = endDate ? new Date(endDate).toLocaleDateString('en-US', formatOpts) : 'Present';
+    
+    return `${s} to ${e}`;
+  }, [startDate, endDate]);
 
   // ==========================================
   // CALCULATIONS BASED ON YOUR TABLE IMAGES
@@ -48,14 +67,32 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
     let totalExp = 0;
 
     projects.forEach(p => {
-      // 1. Get All Project Expenses
-      const projExpenses = disbursements.filter(d => 
+      // 1. Salain ang disbursement base sa petsa bago iproseso
+      const relevantDisbursements = disbursements.filter(d => {
+        if (!d.date) return false;
+        const dDate = new Date(d.date);
+        dDate.setHours(0, 0, 0, 0);
+        
+        if (startDate) {
+          const sDate = new Date(startDate);
+          sDate.setHours(0, 0, 0, 0);
+          if (dDate < sDate) return false;
+        }
+        if (endDate) {
+          const eDate = new Date(endDate);
+          eDate.setHours(0, 0, 0, 0);
+          if (dDate > eDate) return false;
+        }
+        return true;
+      });
+
+      const projDisbursements = relevantDisbursements.filter(d => 
         d.project_code && d.project_code.toUpperCase() === p.project_code.toUpperCase()
       );
 
-      // Helper para kunin ang total ng isang specific category
+      // Helper para kunin ang total ng isang specific category sa mga napiling petsa
       const getCategoryTotal = (keyword) => {
-        return projExpenses.reduce((total, d) => {
+        return projDisbursements.reduce((total, d) => {
           const lineTotal = (d.expenses || [])
             .filter(e => e.category && e.category.toLowerCase().includes(keyword.toLowerCase()))
             .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
@@ -63,17 +100,27 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
         }, 0);
       };
 
-      // 2. Calculate Total Additional Works (TAW) & ADLM
-      const TAW = projExpenses
-        .filter(d => d.costing_type === 'additional')
-        .reduce((sum, d) => sum + (d.expenses || []).reduce((s, exp) => s + (parseFloat(exp.amount) || 0), 0), 0);
+      // 2. Kunin ang bawat Additional Works at ang Total mula sa filtered disbursements
+      const additionalExpensesList = [];
+      let TAW = 0;
+      
+      projDisbursements.filter(d => d.costing_type === 'additional').forEach(d => {
+        (d.expenses || []).forEach(exp => {
+          const amt = parseFloat(exp.amount) || 0;
+          TAW += amt;
+          additionalExpensesList.push({
+            particulars: exp.particulars || exp.category || 'Additional Work',
+            amount: amt
+          });
+        });
+      });
 
-      const ADLM = projExpenses
+      const ADLM = projDisbursements
         .filter(d => d.costing_type === 'normal' || !d.costing_type)
         .reduce((sum, d) => sum + (d.expenses || []).reduce((s, exp) => s + (parseFloat(exp.amount) || 0), 0), 0);
 
       const totalExpense = TAW + ADLM;
-      totalExp += totalExpense; // Idagdag sa overall company expenses
+      totalExp += totalExpense; 
 
       // --- FORMULAS FOR PROJECTS TABLE ---
       const CC = parseFloat(p.contract_cost) || 0;
@@ -95,8 +142,8 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
 
       // --- FORMULAS FOR OFFICE TABLE ---
       const RETENTION_10 = TCC * 0.10;
-      const CC_WO_VAT_OH_PM = CC_WITHOUT_VAT - OH_30; // Equivalent to CC without VAT & Overhead & PM
-      const EFFECTIVE_OVERHEAD = OH_30; // Based on standard assumption
+      const CC_WO_VAT_OH_PM = CC_WITHOUT_VAT - OH_30; 
+      const EFFECTIVE_OVERHEAD = OH_30; 
 
       // SPECIFIC OFFICE EXPENSES
       const exp_payroll = getCategoryTotal('payroll') + getCategoryTotal('labor');
@@ -109,18 +156,16 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
       const exp_car_reg = getCategoryTotal('car registration');
       const exp_contribution = getCategoryTotal('contribution');
 
-      // Total Specific Expenses for Office
       const total_specific_expenses = exp_payroll + exp_electrical + exp_water + exp_comms + exp_retainer + exp_supplies + exp_car_repair + exp_car_reg + exp_contribution;
       const NET_PROFIT = TCC - total_specific_expenses; 
 
       const computedData = {
         ...p,
-        CC, TAW, TCC, VAT_12, CC_WITHOUT_VAT,
+        CC, TAW, additionalExpensesList, TCC, VAT_12, CC_WITHOUT_VAT,
         OH_30, OH_20, OH_12,
         TARGET_DLM_30, TARGET_DLM_20, TARGET_DLM_12,
         ADLM, SAVING_30, SAVING_20, SAVING_12,
         
-        // Office Specific Data
         NET_PROFIT, RETENTION_10, CC_WO_VAT_OH_PM, EFFECTIVE_OVERHEAD,
         total_specific_expenses, exp_payroll,
         exp_electrical, exp_water, exp_comms, exp_retainer, 
@@ -128,7 +173,6 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
       };
 
       const code = p.project_code.toUpperCase();
-      // If code implies office/admin, put it in Office Data
       if (code.includes('ADMIN') || code.includes('OFFICE') || code.includes('SHOP')) {
         office.push(computedData);
         oBudget += CC;
@@ -145,21 +189,20 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
       projectTotalBudget: pBudget,
       totalCompanyExpenses: totalExp
     };
-  }, [projects, disbursements]);
+  }, [projects, disbursements, startDate, endDate]);
 
-  // Data mapping for top summary cards
   const summaryCards = [
     { title: "Active Projects", value: `${projectData.length} Sites`, icon: <Briefcase size={28} />, colorClass: "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800" },
     { title: "Office Departments", value: `${officeData.length} Records`, icon: <Building2 size={28} />, colorClass: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800" },
     { title: "Overall Allocated Budget", value: `₱ ${formatMoney(projectTotalBudget + officeTotalBudget)}`, icon: <Wallet size={28} />, colorClass: "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800" },
-    { title: "Total Company Expenses", value: `₱ ${formatMoney(totalCompanyExpenses)}`, icon: <Receipt size={28} />, colorClass: "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 border-rose-100 dark:border-rose-800" }
+    { title: "Total Expenses (Filtered)", value: `₱ ${formatMoney(totalCompanyExpenses)}`, icon: <Receipt size={28} />, colorClass: "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 border-rose-100 dark:border-rose-800" }
   ];
 
   return (
     <div className="flex flex-col h-full bg-[#f8fafc] dark:bg-slate-950 overflow-hidden transition-colors duration-300">
       
-      {/* HEADER */}
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-8 py-6 flex items-center justify-between shrink-0 shadow-sm z-10">
+      {/* HEADER WITH DATE FILTER */}
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-8 py-6 flex flex-col xl:flex-row xl:items-center justify-between shrink-0 shadow-sm z-10 gap-4">
         <div>
           <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-3">
             <div className="bg-indigo-600 dark:bg-indigo-700 p-2 rounded-xl text-white shadow-lg shadow-indigo-200 dark:shadow-none">
@@ -168,6 +211,45 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
             FINANCIAL DASHBOARD
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1 font-medium">Company Health & Projects Analytics</p>
+        </div>
+
+        {/* DATE FILTER */}
+        <div className="flex items-center bg-slate-50 dark:bg-[#0a0a0a] border border-slate-200 dark:border-slate-800 rounded-2xl p-2 shadow-sm gap-2 w-fit">
+          <div className="p-2 bg-white dark:bg-slate-900 rounded-xl shadow-sm text-indigo-600 dark:text-indigo-400 border border-slate-100 dark:border-slate-800">
+            <Calendar size={20} />
+          </div>
+          <div className="flex items-center gap-3 px-2">
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Date From</span>
+              <input 
+                type="date" 
+                value={startDate} 
+                max={endDate}
+                onChange={e => setStartDate(e.target.value)}
+                className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer dark:[color-scheme:dark]"
+              />
+            </div>
+            <span className="text-slate-300 dark:text-slate-600 font-black mt-2">-</span>
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Date To</span>
+              <input 
+                type="date" 
+                value={endDate} 
+                min={startDate}
+                onChange={e => setEndDate(e.target.value)}
+                className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer dark:[color-scheme:dark]"
+              />
+            </div>
+          </div>
+          {(startDate || endDate) && (
+            <button 
+              onClick={() => { setStartDate(''); setEndDate(''); }}
+              className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl transition-colors ml-1"
+              title="Clear Filter"
+            >
+              <X size={18} />
+            </button>
+          )}
         </div>
       </header>
 
@@ -182,11 +264,13 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-black text-slate-800 dark:text-white">At a Glance</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Quick summary of FBTMCC's overall financial data.</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Quick summary of FBTMCC's overall financial data 
+                  {startDate || endDate ? <span className="font-bold text-indigo-600 dark:text-indigo-400 ml-1">(Filtered)</span> : ''}.
+                </p>
               </div>
             </div>
 
-            {/* SUMMARY CARDS (Para hindi masyadong bakante ang itaas) */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-12">
               {summaryCards.map((card, idx) => (
                 <div key={idx} className="bg-white dark:bg-[#0a0a0a] p-6 rounded-[1.5rem] shadow-sm border border-slate-200 dark:border-slate-800 flex items-center gap-4 transition-colors">
@@ -220,14 +304,14 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
                 <div className="absolute top-0 right-0 w-32 h-32 bg-amber-50 dark:bg-amber-900/10 rounded-bl-[100px] -mr-16 -mt-16 group-hover:bg-amber-100 dark:group-hover:bg-amber-900/30 transition-colors"></div>
                 <div className="bg-slate-100 dark:bg-slate-900 p-5 rounded-2xl text-amber-600 dark:text-amber-400 mb-6 group-hover:bg-amber-600 group-hover:text-white transition-all shadow-inner relative z-10"><Building2 size={36} strokeWidth={2.5} /></div>
                 <h3 className="font-black text-2xl text-slate-800 dark:text-slate-100 relative z-10">Office & Admin</h3>
-                <p className="text-slate-500 mt-3 font-medium text-sm relative z-10">Master ledger for office operations, utilities, overheads, and miscellaneous maintenance.</p>
+                <p className="text-slate-500 mt-3 font-medium text-sm relative z-10">Internal operations, payroll, and maintenance tracking for the main office.</p>
               </button>
             </div>
           </div>
         )}
 
         {/* ==============================================
-            VIEW 2: PROJECTS TABLE
+            VIEW 2: PROJECTS TABLE (WITH SUB-ROWS & TOGGLE)
         ============================================== */}
         {activeView === 'projects' && (
           <div className="animate-in slide-in-from-right-8 duration-500 space-y-6">
@@ -236,15 +320,21 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
             </button>
 
             <section className="bg-white dark:bg-[#0a0a0a] rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col transition-colors duration-300">
-              <div className="px-8 py-4 bg-indigo-600 text-white flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              <div className="px-8 py-4 bg-indigo-600 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4 flex-wrap">
                   <TrendingUp size={24} />
-                  <h2 className="text-xl font-black uppercase tracking-widest">Project Master Spreadsheet</h2>
+                  <h2 className="text-xl font-black uppercase tracking-widest leading-tight">Project Master Spreadsheet</h2>
+                  
+                  {dateFilterLabel && (
+                    <div className="hidden sm:flex items-center px-3 py-1 bg-white/10 rounded-full border border-white/20 shadow-sm gap-2">
+                      <Calendar size={12} className="opacity-80" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest">{dateFilterLabel}</span>
+                    </div>
+                  )}
                 </div>
                 
-                {/* ZOOM CONTROLS (PROJECTS) */}
-                <div className="flex flex-col items-end gap-2">
-                  <div className="text-[10px] font-bold opacity-80 uppercase tracking-[0.2em] hidden sm:block">Confidential Financial Data</div>
+                <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+
                   <div className="flex items-center bg-black/20 rounded-xl px-2 py-1 gap-1 backdrop-blur-sm border border-white/10">
                     <button onClick={handleZoomOut} className="p-1 hover:bg-white/20 rounded-lg transition-colors disabled:opacity-30" disabled={zoomLevel <= 0.6}>
                       <ZoomOut size={16} />
@@ -263,6 +353,13 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
                 </div>
               </div>
               
+              {dateFilterLabel && (
+                <div className="sm:hidden px-8 py-2 bg-indigo-700 text-white flex items-center gap-2 border-b border-indigo-500/50">
+                  <Calendar size={12} className="opacity-80" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">{dateFilterLabel}</span>
+                </div>
+              )}
+              
               <div className="overflow-x-auto custom-scrollbar">
                 <table className="w-full text-left border-collapse min-w-[2800px]" style={{ zoom: zoomLevel }}>
                   <thead>
@@ -270,26 +367,52 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
                       <th className="p-4 sticky left-0 z-20 bg-slate-100 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700">Code</th>
                       <th className="p-4 sticky left-[80px] z-20 bg-slate-100 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 w-[200px]">Store Name</th>
                       <th className="p-4 text-center bg-blue-50 dark:bg-blue-900/10">Contract cost (CC)</th>
-                      <th className="p-4 text-center">Empty</th>
-                      <th className="p-4 text-center">Empty</th>
-                      <th className="p-4 text-center bg-purple-50 dark:bg-purple-900/10 text-purple-700 dark:text-purple-400">Total Additional (TAW)</th>
+                      
+                      {showAdditionalWorks && (
+                        <>
+                          <th className="p-4 text-center border-r border-slate-200 dark:border-slate-700 w-[200px] relative">
+                            <div className="absolute top-2 right-2 flex items-center justify-center group z-30">
+                              <button onClick={() => setShowAdditionalWorks(false)} className="p-1.5 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                                <EyeOff size={14} />
+                              </button>
+                              <div className="absolute bottom-full mb-2 right-0 bg-slate-800 text-white text-[10px] font-bold py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg border border-slate-700">
+                                Hide Add'l Works
+                              </div>
+                            </div>
+                            Additional Works
+                          </th>
+                          <th className="p-4 text-center border-r border-slate-200 dark:border-slate-700 w-[120px]">Amount</th>
+                        </>
+                      )}
+                      
+                      <th className="p-4 text-center bg-purple-50 dark:bg-purple-900/10 text-purple-700 dark:text-purple-400 relative">
+                        {!showAdditionalWorks && (
+                          <div className="absolute top-2 left-2 flex items-center justify-center group z-30">
+                            <button onClick={() => setShowAdditionalWorks(true)} className="p-1.5 rounded-md hover:bg-purple-200 dark:hover:bg-purple-900/40 text-purple-400 hover:text-purple-600 transition-colors">
+                              <Eye size={14} />
+                            </button>
+                            <div className="absolute bottom-full mb-2 left-0 bg-slate-800 text-white text-[10px] font-bold py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg border border-slate-700">
+                              Show Add'l Works
+                            </div>
+                          </div>
+                        )}
+                        Total Additional (TAW)
+                      </th>
+
                       <th className="p-4 text-center bg-indigo-50 dark:bg-indigo-900/10 text-indigo-700 dark:text-indigo-400">Total Contract (TCC)</th>
                       <th className="p-4 text-center text-rose-600">12% VAT of TCC</th>
-                      <th className="p-4 text-center font-bold">CC without VAT</th>
+                      <th className="p-4 text-center font-bold border-r border-slate-200 dark:border-slate-700">CC without VAT</th>
                       
-                      {/* OVERHEADS */}
                       <th className="p-4 text-center bg-slate-200/50 dark:bg-slate-800">Overhead 30%</th>
                       <th className="p-4 text-center bg-slate-200/50 dark:bg-slate-800">Overhead 20%</th>
                       <th className="p-4 text-center bg-slate-200/50 dark:bg-slate-800 border-r border-slate-300 dark:border-slate-700">Overhead 12%</th>
                       
-                      {/* TARGET DLMs */}
                       <th className="p-4 text-center bg-emerald-50 dark:bg-emerald-900/10">Target DLM @ 30%</th>
                       <th className="p-4 text-center bg-emerald-50 dark:bg-emerald-900/10">Target DLM @ 20%</th>
                       <th className="p-4 text-center bg-emerald-50 dark:bg-emerald-900/10 border-r border-slate-300 dark:border-slate-700">Target DLM @ 12%</th>
                       
                       <th className="p-4 text-center bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 font-black">Actual ADLM</th>
                       
-                      {/* SAVINGS */}
                       <th className="p-4 text-center bg-blue-50 dark:bg-blue-900/10">Saving @ 30%</th>
                       <th className="p-4 text-center bg-blue-50 dark:bg-blue-900/10">Saving @ 20%</th>
                       <th className="p-4 text-center bg-blue-50 dark:bg-blue-900/10">Saving @ 12%</th>
@@ -297,40 +420,78 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-[12px]">
-                    {projectData.map(p => (
-                      <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
-                        <td className="p-4 font-black text-indigo-600 dark:text-indigo-400 sticky left-0 z-10 bg-white dark:bg-[#0a0a0a] border-r dark:border-slate-800">{p.project_code}</td>
-                        <td className="p-4 font-bold text-slate-800 dark:text-slate-200 sticky left-[80px] z-10 bg-white dark:bg-[#0a0a0a] border-r dark:border-slate-800">{p.project_name}</td>
-                        <td className="p-4 text-right font-mono bg-blue-50/30 dark:bg-blue-900/5">{formatMoney(p.CC)}</td>
-                        <td className="p-4 text-center text-slate-300">-</td>
-                        <td className="p-4 text-center text-slate-300">-</td>
-                        <td className="p-4 text-right font-mono text-purple-600 dark:text-purple-400">{formatMoney(p.TAW)}</td>
-                        <td className="p-4 text-right font-mono font-black text-indigo-600 dark:text-indigo-400">{formatMoney(p.TCC)}</td>
-                        <td className="p-4 text-right font-mono text-rose-500">{formatMoney(p.VAT_12)}</td>
-                        <td className="p-4 text-right font-mono font-bold">{formatMoney(p.CC_WITHOUT_VAT)}</td>
+                    {projectData.map(p => {
+                      const adds = p.additionalExpensesList || [];
+                      
+                      const rowsToRender = showAdditionalWorks 
+                        ? (adds.length > 0 ? [...adds] : [null]) 
+                        : [null]; 
                         
-                        <td className="p-4 text-right font-mono text-slate-500">{formatMoney(p.OH_30)}</td>
-                        <td className="p-4 text-right font-mono text-slate-500">{formatMoney(p.OH_20)}</td>
-                        <td className="p-4 text-right font-mono text-slate-500 border-r dark:border-slate-800">{formatMoney(p.OH_12)}</td>
-                        
-                        <td className="p-4 text-right font-mono text-emerald-600 dark:text-emerald-400">{formatMoney(p.TARGET_DLM_30)}</td>
-                        <td className="p-4 text-right font-mono text-emerald-600 dark:text-emerald-400">{formatMoney(p.TARGET_DLM_20)}</td>
-                        <td className="p-4 text-right font-mono text-emerald-600 dark:text-emerald-400 border-r dark:border-slate-800">{formatMoney(p.TARGET_DLM_12)}</td>
-                        
-                        <td className="p-4 text-right font-mono font-black text-amber-600 bg-amber-50/50 dark:bg-amber-900/10">{formatMoney(p.ADLM)}</td>
-                        
-                        <td className={`p-4 text-right font-mono font-black ${p.SAVING_30 >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`}>
-                          {formatMoney(p.SAVING_30)}
-                        </td>
-                        <td className={`p-4 text-right font-mono font-black ${p.SAVING_20 >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`}>
-                          {formatMoney(p.SAVING_20)}
-                        </td>
-                        <td className={`p-4 text-right font-mono font-black ${p.SAVING_12 >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`}>
-                          {formatMoney(p.SAVING_12)}
-                        </td>
-                        <td className="p-4 italic text-slate-400 text-[10px] uppercase">No Record</td>
-                      </tr>
-                    ))}
+                      if (showAdditionalWorks && adds.length > 1) {
+                        rowsToRender.push({ isTotalRow: true, amount: p.TAW });
+                      }
+
+                      return (
+                        <Fragment key={p.id}>
+                          {rowsToRender.map((addObj, index) => {
+                            const isFirst = index === 0;
+                            const isTotal = addObj && addObj.isTotalRow;
+                            const isLastRow = index === rowsToRender.length - 1;
+
+                            return (
+                              <tr key={`${p.id}-row-${index}`} className={`hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors ${!isLastRow ? 'border-b-0' : 'border-b dark:border-slate-800'}`}>
+                                <td className="p-4 font-black text-indigo-600 dark:text-indigo-400 sticky left-0 z-10 bg-white dark:bg-[#0a0a0a] border-r dark:border-slate-800">
+                                  {isFirst ? p.project_code : ''}
+                                </td>
+                                <td className="p-4 font-bold text-slate-800 dark:text-slate-200 sticky left-[80px] z-10 bg-white dark:bg-[#0a0a0a] border-r dark:border-slate-800">
+                                  {isFirst ? p.project_name : ''}
+                                </td>
+                                <td className="p-4 text-right font-mono bg-blue-50/30 dark:bg-blue-900/5">
+                                  {isFirst ? formatMoney(p.CC) : ''}
+                                </td>
+                                
+                                {showAdditionalWorks && (
+                                  <>
+                                    <td className={`p-4 pl-8 text-[10px] text-left border-r dark:border-slate-800 ${isTotal ? 'font-black text-[12px] text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400 tracking-wide'}`}>
+                                      {isTotal ? 'Total Add\'l Works' : (addObj ? addObj.particulars : '-')}
+                                    </td>
+                                    <td className={`p-4 text-[10px] text-right font-mono border-r dark:border-slate-800 ${isTotal ? 'font-black text-[12px] text-slate-800 dark:text-white border-t border-slate-300 dark:border-slate-600' : 'text-slate-500 dark:text-slate-400'}`}>
+                                      {isTotal ? formatMoney(addObj.amount) : (addObj ? formatMoney(addObj.amount) : '-')}
+                                    </td>
+                                  </>
+                                )}
+
+                                <td className="p-4 text-right font-mono text-purple-600 dark:text-purple-400">{isFirst ? formatMoney(p.TAW) : ''}</td>
+                                <td className="p-4 text-right font-mono font-black text-indigo-600 dark:text-indigo-400">{isFirst ? formatMoney(p.TCC) : ''}</td>
+                                <td className="p-4 text-right font-mono text-rose-500">{isFirst ? formatMoney(p.VAT_12) : ''}</td>
+                                <td className="p-4 text-right font-mono font-bold border-r dark:border-slate-800">{isFirst ? formatMoney(p.CC_WITHOUT_VAT) : ''}</td>
+                                
+                                <td className="p-4 text-right font-mono text-slate-500">{isFirst ? formatMoney(p.OH_30) : ''}</td>
+                                <td className="p-4 text-right font-mono text-slate-500">{isFirst ? formatMoney(p.OH_20) : ''}</td>
+                                <td className="p-4 text-right font-mono text-slate-500 border-r dark:border-slate-800">{isFirst ? formatMoney(p.OH_12) : ''}</td>
+                                
+                                <td className="p-4 text-right font-mono text-emerald-600 dark:text-emerald-400">{isFirst ? formatMoney(p.TARGET_DLM_30) : ''}</td>
+                                <td className="p-4 text-right font-mono text-emerald-600 dark:text-emerald-400">{isFirst ? formatMoney(p.TARGET_DLM_20) : ''}</td>
+                                <td className="p-4 text-right font-mono text-emerald-600 dark:text-emerald-400 border-r dark:border-slate-800">{isFirst ? formatMoney(p.TARGET_DLM_12) : ''}</td>
+                                
+                                <td className="p-4 text-right font-mono font-black text-amber-600 bg-amber-50/50 dark:bg-amber-900/10">{isFirst ? formatMoney(p.ADLM) : ''}</td>
+                                
+                                <td className={`p-4 text-right font-mono font-black ${p.SAVING_30 >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`}>
+                                  {isFirst ? formatMoney(p.SAVING_30) : ''}
+                                </td>
+                                <td className={`p-4 text-right font-mono font-black ${p.SAVING_20 >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`}>
+                                  {isFirst ? formatMoney(p.SAVING_20) : ''}
+                                </td>
+                                <td className={`p-4 text-right font-mono font-black ${p.SAVING_12 >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-600 dark:text-red-400'}`}>
+                                  {isFirst ? formatMoney(p.SAVING_12) : ''}
+                                </td>
+                                <td className="p-4 italic text-slate-400 text-[10px] uppercase">{isFirst ? 'No Record' : ''}</td>
+                              </tr>
+                            );
+                          })}
+                        </Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -348,14 +509,17 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
             </button>
 
             <section className="bg-white dark:bg-[#0a0a0a] rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col transition-colors duration-300">
-              <div className="px-8 py-4 bg-amber-600 text-white flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              <div className="px-8 py-4 bg-amber-600 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4 flex-wrap">
                   <FileText size={24} />
-                  <h2 className="text-xl font-black uppercase tracking-widest">Office Operations Master Ledger</h2>
+                  <div>
+                    <h2 className="text-xl font-black uppercase tracking-widest leading-tight">Office Operations Master Ledger</h2>
+                    {dateFilterLabel && <p className="text-[10px] font-bold text-amber-200 mt-1 uppercase tracking-widest">Active Date Filter</p>}
+                  </div>
                 </div>
                 
                 {/* ZOOM CONTROLS (OFFICE) */}
-                <div className="flex flex-col items-end gap-2">
+                <div className="flex flex-col items-end gap-2 w-full sm:w-auto">
                   <div className="text-[10px] font-bold opacity-80 uppercase tracking-[0.2em] hidden sm:block">Administrative Data</div>
                   <div className="flex items-center bg-black/20 rounded-xl px-2 py-1 gap-1 backdrop-blur-sm border border-white/10">
                     <button onClick={handleZoomOut} className="p-1 hover:bg-white/20 rounded-lg transition-colors disabled:opacity-30" disabled={zoomLevel <= 0.6}>
@@ -374,6 +538,13 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
                   </div>
                 </div>
               </div>
+
+              {dateFilterLabel && (
+                <div className="sm:hidden px-8 py-2 bg-amber-700 text-white flex items-center gap-2 border-b border-amber-500/50">
+                  <Calendar size={12} className="opacity-80" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">{dateFilterLabel}</span>
+                </div>
+              )}
               
               <div className="overflow-x-auto custom-scrollbar">
                 <table className="w-full text-left border-collapse min-w-[2800px]" style={{ zoom: zoomLevel }}>
@@ -422,9 +593,8 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
                         <td className="p-4 text-right font-mono text-purple-600 dark:text-purple-400 bg-purple-50/30 dark:bg-purple-900/5">{formatMoney(o.OH_30)}</td>
                         <td className="p-4 text-right font-mono text-rose-500 bg-rose-50/30 dark:bg-rose-900/5">{formatMoney(o.RETENTION_10)}</td>
                         <td className="p-4 text-right font-mono font-bold border-r dark:border-slate-800">{formatMoney(o.EFFECTIVE_OVERHEAD)}</td>
-                        <td className="p-4 text-right font-mono text-slate-500">-</td> {/* Total EOC per Month */}
+                        <td className="p-4 text-right font-mono text-slate-500">-</td> 
                         
-                        {/* EXPENSES BREAKDOWN */}
                         <td className="p-4 text-right font-mono text-slate-500">{formatMoney(o.exp_payroll)}</td>
                         <td className="p-4 text-right font-mono text-slate-500">{formatMoney(o.exp_electrical)}</td>
                         <td className="p-4 text-right font-mono text-slate-500">{formatMoney(o.exp_water)}</td>
