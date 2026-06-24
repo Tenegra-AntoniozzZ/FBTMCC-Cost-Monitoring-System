@@ -11,7 +11,12 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   
+  // BAGO: Loading states at Ref para sa Office Exports
+  const [isExportingOfficePDF, setIsExportingOfficePDF] = useState(false);
+  const [isExportingOfficeExcel, setIsExportingOfficeExcel] = useState(false);
+
   const projectTableRef = useRef(null);
+  const officeTableRef = useRef(null); // Ref para sa Office Table
 
   // Date Filter States
   const [startDate, setStartDate] = useState('');
@@ -50,25 +55,20 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
   };
 
   // ==========================================
-  // EXPORT TO EXCEL FUNCTION
+  // EXPORT TO EXCEL FUNCTION (PROJECTS)
   // ==========================================
   const downloadProjectExcel = async () => {
     try {
       setIsExportingExcel(true);
       const XLSX = (await import('xlsx')).default;
 
-      // 1. Gumawa ng bagong workbook
       const wb = XLSX.utils.book_new();
-      
-      // 2. Ihanda ang mga Rows (Headers at Data)
       const excelRows = [];
       
-      // Main Spreadsheet Header Title Block
       excelRows.push(["FBTMCC - PROJECT MASTER SPREADSHEET"]);
       excelRows.push([dateFilterLabel ? `Filter Period: ${dateFilterLabel}` : "Period: All-Time Records"]);
-      excelRows.push([]); // Empty spacer row
+      excelRows.push([]);
 
-      // Table Column Headers
       excelRows.push([
         "Code", "Store Name", "Contract Cost (CC)", 
         "Additional Works Particulars", "Amount", "Total Additional (TAW)", 
@@ -78,12 +78,10 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
         "Actual ADLM", "Saving @ 30%", "Saving @ 20%", "Saving @ 12%", "Remarks"
       ]);
 
-      // 3. I-map ang projectData pormang akma sa Excel Sheet
       projectData.forEach(p => {
         const adds = p.additionalExpensesList || [];
         
         if (adds.length === 0) {
-          // Kung walang additional works, isang simpleng hilera lang
           excelRows.push([
             p.project_code, p.project_name, p.CC,
             "-", 0, p.TAW, p.TCC, p.VAT_12, p.CC_WITHOUT_VAT,
@@ -92,7 +90,6 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
             p.ADLM, p.SAVING_30, p.SAVING_20, p.SAVING_12, "No Record"
           ]);
         } else {
-          // Kung may additional works, ibalat ito na parang sub-table sa excel
           adds.forEach((add, idx) => {
             if (idx === 0) {
               excelRows.push([
@@ -103,7 +100,6 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
                 p.ADLM, p.SAVING_30, p.SAVING_20, p.SAVING_12, "Active Works"
               ]);
             } else {
-              // Para sa susunod na additional rows, iwanang blangko ang pangunahing detalye
               excelRows.push([
                 "", "", "",
                 add.particulars, add.amount, "", "", "", "",
@@ -111,7 +107,6 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
               ]);
             }
           });
-          // Maglagay ng total ng additional sa dulo ng project block kung lampas sa isa ang item
           if (adds.length > 1) {
             excelRows.push([
               "", "", "",
@@ -122,10 +117,7 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
         }
       });
 
-      // 4. I-convert ang raw arrays para maging worksheet
       const ws = XLSX.utils.aoa_to_sheet(excelRows);
-      
-      // 5. I-kabit sa workbook at i-download
       XLSX.utils.book_append_sheet(wb, ws, "Projects Master Ledger");
       
       const dateStr = new Date().toISOString().split('T')[0];
@@ -138,7 +130,7 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
   };
 
   // ==========================================
-  // EXPORT TO PDF FUNCTION
+  // EXPORT TO PDF FUNCTION (PROJECTS)
   // ==========================================
   const downloadProjectPDF = async () => {
     if (!projectTableRef.current) return;
@@ -180,6 +172,92 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
   };
 
   // ==========================================
+  // EXPORT TO EXCEL FUNCTION (OFFICE)
+  // ==========================================
+  const downloadOfficeExcel = async () => {
+    try {
+      setIsExportingOfficeExcel(true);
+      const XLSX = (await import('xlsx')).default;
+
+      const wb = XLSX.utils.book_new();
+      const excelRows = [];
+      
+      excelRows.push(["FBTMCC - OFFICE OPERATIONS MASTER LEDGER"]);
+      excelRows.push([dateFilterLabel ? `Filter Period: ${dateFilterLabel}` : "Period: All-Time Records"]);
+      excelRows.push([]); 
+
+      excelRows.push([
+        "Date", "Code", "Total", "Net Profit", "Contract plus Add'l w/VAT", "Empty", 
+        "Contract w/o Vat", "Contract w/o Vat & Overhead & PM", "Equivalent 30% Overhead, Contingency & PM", 
+        "Equivalent 10% Retention base on Contract w/ Vat", "Effective Overhead", "Total EOC per Month",
+        "Payroll", "Electrical Office/Payatas", "Water/office/Payatas", "Comunication/Telephone", 
+        "Retainer", "Office supplies/Outing", "Car Repair & Maintenance", "Car Registration", "Contribution"
+      ]);
+
+      officeData.forEach(o => {
+        excelRows.push([
+          o.project_start || '-', o.project_code, o.total_specific_expenses, o.NET_PROFIT, o.TCC, "-", 
+          o.CC_WITHOUT_VAT, o.CC_WO_VAT_OH_PM, o.OH_30, o.RETENTION_10, o.EFFECTIVE_OVERHEAD, "-",
+          o.exp_payroll, o.exp_electrical, o.exp_water, o.exp_comms, o.exp_retainer, 
+          o.exp_supplies, o.exp_car_repair, o.exp_car_reg, o.exp_contribution
+        ]);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(excelRows);
+      XLSX.utils.book_append_sheet(wb, ws, "Office Master Ledger");
+      
+      const dateStr = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(wb, `OFFICE_MASTER_LEDGER_${dateStr}.xlsx`);
+    } catch (error) {
+      console.error("Failed to export Excel file:", error);
+    } finally {
+      setIsExportingOfficeExcel(false);
+    }
+  };
+
+  // ==========================================
+  // EXPORT TO PDF FUNCTION (OFFICE)
+  // ==========================================
+  const downloadOfficePDF = async () => {
+    if (!officeTableRef.current) return;
+    
+    try {
+      setIsExportingOfficePDF(true);
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
+
+      const element = officeTableRef.current;
+      
+      const canvas = await html2canvas(element, {
+        scale: 2, 
+        useCORS: true,
+        logging: false,
+        backgroundColor: document.documentElement.classList.contains('dark') ? '#0a0a0a' : '#ffffff',
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: 2900 
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'px',
+        format: [canvas.width, canvas.height]
+      });
+
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      
+      const dateStr = new Date().toISOString().split('T')[0];
+      pdf.save(`OFFICE_MASTER_LEDGER_${dateStr}.pdf`);
+    } catch (error) {
+      console.error("Failed to export PDF:", error);
+    } finally { 
+      setIsExportingOfficePDF(false);
+    }
+  };
+
+  // ==========================================
   // DATE LABEL FORMATTER (Tinanggal ang useMemo)
   // ==========================================
   let dateFilterLabel = null;
@@ -214,7 +292,6 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
       return true;
     });
   }, [disbursements, startDate, endDate]);
-
 
   // ==========================================
   // CALCULATIONS BASED ON YOUR TABLE IMAGES
@@ -285,10 +362,10 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
       const exp_payroll = getCategoryTotal('payroll') + getCategoryTotal('labor');
       const exp_electrical = getCategoryTotal('electrical');
       const exp_water = getCategoryTotal('water');
-      const exp_comms = getCategoryTotal('comunication');
+      const exp_comms = getCategoryTotal('comunication') + getCategoryTotal('telephone') + getCategoryTotal('internet');
       const exp_retainer = getCategoryTotal('retainer');
       const exp_supplies = getCategoryTotal('office supplies') + getCategoryTotal('outing');
-      const exp_car_repair = getCategoryTotal('car repair');
+      const exp_car_repair = getCategoryTotal('car repair') + getCategoryTotal('maintenance');
       const exp_car_reg = getCategoryTotal('car registration');
       const exp_contribution = getCategoryTotal('contribution');
 
@@ -308,7 +385,8 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
         exp_supplies, exp_car_repair, exp_car_reg, exp_contribution
       };
 
-      if (p.project_type === 'Office') {
+      const code = p.project_code.toUpperCase();
+      if (code.includes('ADMIN') || code.includes('OFFICE') || code.includes('SHOP')) {
         office.push(computedData);
         oBudget += CC;
       } else {
@@ -633,11 +711,11 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
                                 
                                 <td className="p-4 text-right font-mono text-slate-500">{isFirst ? formatMoney(p.OH_30) : ''}</td>
                                 <td className="p-4 text-right font-mono text-slate-500">{isFirst ? formatMoney(p.OH_20) : ''}</td>
-                                <td className="p-4 text-right font-mono text-slate-500 border-r dark:border-slate-800">{isFirst ? formatMoney(p.OH_12) : ''}</td>
+                                <td className="p-4 text-right font-mono text-slate-500 border-r border-slate-300 dark:border-slate-700">{isFirst ? formatMoney(p.OH_12) : ''}</td>
                                 
                                 <td className="p-4 text-right font-mono text-emerald-600 dark:text-emerald-400">{isFirst ? formatMoney(p.TARGET_DLM_30) : ''}</td>
                                 <td className="p-4 text-right font-mono text-emerald-600 dark:text-emerald-400">{isFirst ? formatMoney(p.TARGET_DLM_20) : ''}</td>
-                                <td className="p-4 text-right font-mono text-emerald-600 dark:text-emerald-400 border-r dark:border-slate-800">{isFirst ? formatMoney(p.TARGET_DLM_12) : ''}</td>
+                                <td className="p-4 text-right font-mono text-emerald-600 dark:text-emerald-400 border-r dark:border-slate-300 dark:border-slate-700">{isFirst ? formatMoney(p.TARGET_DLM_12) : ''}</td>
                                 
                                 <td className="p-4 text-right font-mono font-black text-amber-600 bg-amber-50/50 dark:bg-amber-900/10">{isFirst ? formatMoney(p.ADLM) : ''}</td>
                                 
@@ -673,18 +751,52 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
               <ArrowLeft size={16} /> Back to Selection
             </button>
 
-            <section className="bg-white dark:bg-[#0a0a0a] rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col transition-colors duration-300">
+            <section ref={officeTableRef} className="bg-white dark:bg-[#0a0a0a] rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col transition-colors duration-300">
               <div className="px-8 py-4 bg-amber-600 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4 flex-wrap">
                   <FileText size={24} />
                   <div>
                     <h2 className="text-xl font-black uppercase tracking-widest leading-tight">Office Operations Master Ledger</h2>
-                    {dateFilterLabel && <p className="text-[10px] font-bold text-amber-200 mt-1 uppercase tracking-widest">Active Date Filter</p>}
+                    {dateFilterLabel && (
+                      <div className="hidden sm:flex items-center px-3 py-1 bg-white/10 rounded-full border border-white/20 shadow-sm gap-2">
+                        <Calendar size={12} className="opacity-80" />
+                        <span className="text-[10px] font-bold uppercase tracking-widest">{dateFilterLabel}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 
-                <div className="flex flex-col items-end gap-2 w-full sm:w-auto">
-                  <div className="text-[10px] font-bold opacity-80 uppercase tracking-[0.2em] hidden sm:block">Administrative Data</div>
+                {/* CONTROLS (OFFICE) */}
+                <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                  
+                  {/* EXCEL EXPORT BUTTON (OFFICE) */}
+                  <div className="relative group flex items-center justify-center">
+                    <button 
+                      onClick={downloadOfficeExcel}
+                      disabled={isExportingOfficeExcel}
+                      className="flex items-center justify-center p-2 bg-white/10 hover:bg-white/20 disabled:opacity-50 border border-white/20 rounded-xl font-bold transition-all shadow-sm cursor-pointer"
+                    >
+                      <FileSpreadsheet size={16} className={`${isExportingOfficeExcel ? 'animate-pulse' : ''}`} />
+                    </button>
+                    <div className="absolute bottom-full mb-2 bg-slate-800 text-white text-[10px] font-bold py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg border border-slate-700">
+                      {isExportingOfficeExcel ? 'Exporting Excel...' : 'Download as Excel (.xlsx)'}
+                    </div>
+                  </div>
+
+                  {/* PDF EXPORT BUTTON (OFFICE) */}
+                  <div className="relative group flex items-center justify-center">
+                    <button 
+                      onClick={downloadOfficePDF}
+                      disabled={isExportingOfficePDF}
+                      className="flex items-center justify-center p-2 bg-white/10 hover:bg-white/20 disabled:opacity-50 border border-white/20 rounded-xl font-bold transition-all shadow-sm cursor-pointer"
+                    >
+                      <Download size={16} className={`${isExportingOfficePDF ? 'animate-bounce' : ''}`} />
+                    </button>
+                    <div className="absolute bottom-full mb-2 bg-slate-800 text-white text-[10px] font-bold py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg border border-slate-700">
+                      {isExportingOfficePDF ? 'Generating PDF...' : 'Download as PDF'}
+                    </div>
+                  </div>
+
                   <div className="flex items-center bg-black/20 rounded-xl px-2 py-1 gap-1 backdrop-blur-sm border border-white/10">
                     <button onClick={handleZoomOut} className="p-1 hover:bg-white/20 rounded-lg transition-colors disabled:opacity-30" disabled={zoomLevel <= 0.6}>
                       <ZoomOut size={16} />
@@ -727,6 +839,7 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
                       <th className="p-4 text-center font-bold border-r border-slate-300 dark:border-slate-700">Effective Overhead</th>
                       <th className="p-4 text-center">Total EOC per Month</th>
                       
+                      {/* SPECIFIC EXPENSES */}
                       <th className="p-4 text-center bg-slate-50 dark:bg-slate-800">Payroll</th>
                       <th className="p-4 text-center bg-slate-50 dark:bg-slate-800">Electrical Office/Payatas</th>
                       <th className="p-4 text-center bg-slate-50 dark:bg-slate-800">Water/office/Payatas</th>
@@ -741,7 +854,7 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-[12px]">
                     {officeData.length === 0 ? (
                       <tr>
-                        <td colSpan="21" className="p-8 text-center text-slate-400 dark:text-slate-500 italic">Walang naka-record na admin/office department.</td>
+                        <td colSpan="21" className="p-8 text-center text-slate-400 dark:text-slate-500 italic">Walang naka-record na admin/office department para sa napiling petsa.</td>
                       </tr>
                     ) : officeData.map(o => (
                       <tr key={o.id} className="hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
