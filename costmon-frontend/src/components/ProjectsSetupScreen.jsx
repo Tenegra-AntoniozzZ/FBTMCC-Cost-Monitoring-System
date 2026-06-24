@@ -10,7 +10,8 @@ import {
   FileCode,
   CheckCircle2,
   BarChart3,
-  Layers
+  Layers,
+  ChevronDown
 } from 'lucide-react';
 import SearchableDropdown from './SearchableDropdown';
 import PasswordConfirmModal from './PasswordConfirmModal';
@@ -27,6 +28,9 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
   });
   const [newCategory, setNewCategory] = useState('');
   const [newSubCategory, setNewSubCategory] = useState('');
+  const [newCategoryType, setNewCategoryType] = useState('Construction');
+  const [newSubCategoryType, setNewSubCategoryType] = useState('Construction');
+  
   
   const [editingProject, setEditingProject] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -215,9 +219,13 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
     if (e) e.preventDefault();
     
     const valueToAdd = isMisc ? newSubCategory.trim() : newCategory.trim();
-    if (!valueToAdd) return;
+    if (!valueToAdd) {
+      showMessage('Please enter a category name.', 'error');
+      return;
+    }
     
     const finalName = isMisc ? `[MISC] ${valueToAdd}` : `[MAIN] ${valueToAdd}`;
+    const categoryType = isMisc ? newSubCategoryType : newCategoryType;
     
     setIsSaving(true);
     try {
@@ -227,7 +235,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
         },
-        body: JSON.stringify({ name: finalName })
+        body: JSON.stringify({ name: finalName, category_type: categoryType })
       });
       
       if (response.ok) {
@@ -470,28 +478,53 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
             </div>
 
             <div className="p-5 border-b border-slate-400 dark:border-slate-600 bg-amber-50/20 dark:bg-amber-900/10 transition-colors duration-300">
-              <form onSubmit={(e) => handleAddCategory(e, false)} className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase">Add Main Category</label>
-                <div className="flex gap-2">
+              <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase block mb-1.5">Add Main Category</label>
+              <div className="flex gap-2 items-end">
+                <div className="flex-[2] space-y-1.5">
                   <input 
-                    className="flex-1 px-4 py-2.5 rounded-xl border-2 border-slate-400 dark:border-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm text-sm transition-colors duration-300"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-400 dark:border-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm text-sm transition-colors duration-300"
                     placeholder="Enter category name..."
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value)}
-                    required
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddCategory(null, false); }}
                   />
-                  <button type="submit" className="p-2.5 bg-amber-500 hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500 text-white rounded-xl shadow-lg shadow-amber-100 dark:shadow-none transition-all">
-                    <Plus size={18} />
-                  </button>
                 </div>
-              </form>
+                <div className="flex-1 space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase block">Type</label>
+                  <SearchableDropdown 
+                    options={['Construction', 'Office', 'Both']}
+                    value={newCategoryType}
+                    onChange={setNewCategoryType}
+                    placeholder="Select Type"
+                    size="large"
+                  />
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => handleAddCategory(null, false)}
+                  className="flex items-center justify-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl shadow-lg shadow-indigo-100 dark:shadow-none transition-all text-sm whitespace-nowrap"
+                >
+                  <Plus size={16} /> Add
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
               <div className="space-y-2">
                 {mainCategories.map((cat) => (
-                  <div key={cat.id} className="group flex items-center justify-between p-3 rounded-xl border border-slate-300 dark:border-slate-600 hover:border-amber-200 dark:hover:border-amber-500/50 hover:bg-amber-50/30 dark:hover:bg-amber-900/20 transition-all duration-300">
-                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{cat.displayName}</span>
+                  <div key={cat.id} className="group flex items-start justify-between p-3 rounded-xl border border-slate-300 dark:border-slate-600 hover:border-amber-200 dark:hover:border-amber-500/50 hover:bg-amber-50/30 dark:hover:bg-amber-900/20 transition-all duration-300">
+                    <div className="flex flex-col gap-1">
+                       <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{cat.displayName}</span>
+                       <span className={`text-[10px] font-black w-fit px-2 py-0.5 rounded-md border ${
+                          cat.category_type === 'Office' 
+                            ? 'text-amber-700 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800' 
+                            : cat.category_type === 'Both'
+                            ? 'text-indigo-700 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800'
+                            : 'text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800'
+                       }`}>
+                          {cat.category_type || 'Construction'}
+                       </span>
+                    </div>
                     
                     {!cat.isHardcoded && (
                       <button 
@@ -521,28 +554,53 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
             </div>
 
             <div className="p-5 border-b border-slate-400 dark:border-slate-600 bg-teal-50/30 dark:bg-teal-900/10 transition-colors duration-300">
-              <form onSubmit={(e) => handleAddCategory(e, true)} className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase">Add Misc Sub-Category</label>
-                <div className="flex gap-2">
+              <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase block mb-1.5">Add Misc Sub-Category</label>
+              <div className="flex gap-2 items-end">
+                <div className="flex-[2] space-y-1.5">
                   <input 
-                    className="flex-1 px-4 py-2.5 rounded-xl border-2 border-slate-400 dark:border-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-teal-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm text-sm transition-colors duration-300"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-400 dark:border-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-teal-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm text-sm transition-colors duration-300"
                     placeholder="e.g. EXTRA LABOR..."
                     value={newSubCategory}
                     onChange={(e) => setNewSubCategory(e.target.value)}
-                    required
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddCategory(null, true); }}
                   />
-                  <button type="submit" className="p-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl shadow-lg shadow-teal-200 dark:shadow-none transition-all">
-                    <Plus size={18} />
-                  </button>
                 </div>
-              </form>
+                <div className="flex-1 space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase block">Type</label>
+                  <SearchableDropdown 
+                    options={['Construction', 'Office', 'Both']}
+                    value={newSubCategoryType}
+                    onChange={setNewSubCategoryType}
+                    placeholder="Select Type"
+                    size="large"
+                  />
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => handleAddCategory(null, true)}
+                  className="flex items-center justify-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl shadow-lg shadow-indigo-100 dark:shadow-none transition-all text-sm whitespace-nowrap"
+                >
+                  <Plus size={16} /> Add
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
               <div className="space-y-2">
                 {subCategories.map((cat) => (
-                  <div key={cat.id} className="group flex items-center justify-between p-3 rounded-xl border border-slate-300 dark:border-slate-600 hover:border-teal-200 dark:hover:border-teal-500/50 hover:bg-teal-50/30 dark:hover:bg-teal-900/20 transition-all duration-300">
-                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{cat.displayName}</span>
+                  <div key={cat.id} className="group flex items-start justify-between p-3 rounded-xl border border-slate-300 dark:border-slate-600 hover:border-teal-200 dark:hover:border-teal-500/50 hover:bg-teal-50/30 dark:hover:bg-teal-900/20 transition-all duration-300">
+                    <div className="flex flex-col gap-1">
+                       <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{cat.displayName}</span>
+                       <span className={`text-[10px] font-black w-fit px-2 py-0.5 rounded-md border ${
+                          cat.category_type === 'Office' 
+                            ? 'text-amber-700 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800' 
+                            : cat.category_type === 'Both'
+                            ? 'text-indigo-700 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800'
+                            : 'text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800'
+                       }`}>
+                          {cat.category_type || 'Construction'}
+                       </span>
+                    </div>
                     <button 
                       onClick={() => setPasswordModal({ isOpen: true, action: 'delete_category', payload: cat })}
                       className="p-1.5 text-slate-300 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all"

@@ -8,7 +8,7 @@ import UnsavedChangesModal from './UnsavedChangesModal';
 import DraftFoundModal from './DraftFoundModal';
 import { API_URL } from '../utils/Constants';
 
-export default function DisbursementScreen({ projects, categories, disbursements, refreshData, isLoading, userRole, initialSearchQuery, initialDisbursementId, onClearInitialDisbursement, onModalStateChange }) {
+export default function DisbursementScreen({ projects, categories, categoryObjects, disbursements, refreshData, isLoading, userRole, initialSearchQuery, initialDisbursementId, onClearInitialDisbursement, onModalStateChange }) {
   const canEdit = userRole === 'encoder';
   
   // ==========================================
@@ -182,7 +182,15 @@ export default function DisbursementScreen({ projects, categories, disbursements
       { raw: "ZAM-546", clean: "ZAM-546" }
     ];
 
-    categories.forEach(rawName => {
+    const selectedProject = projects.find(p => p.project_code === headerData.project_code);
+    const pType = selectedProject ? selectedProject.project_type : 'Construction';
+
+    (categoryObjects || []).forEach(catObj => {
+      if (catObj.category_type && catObj.category_type !== 'Both' && catObj.category_type !== pType) {
+        return; 
+      }
+      
+      const rawName = catObj.name;
       const upperName = rawName.toUpperCase();
       const cleanUpper = upperName.replace(/\(-+PHP\)/gi, '').trim();
 
@@ -201,17 +209,19 @@ export default function DisbursementScreen({ projects, categories, disbursements
       }
     });
 
-    DEFAULT_MAIN_VALS.forEach(m => {
-      if (!foundMains.has(m.raw) && !main.includes(m.raw)) {
-        main.push(m.raw);
-      }
-    });
+    if (pType === 'Construction' || !pType) {
+      DEFAULT_MAIN_VALS.forEach(m => {
+        if (!foundMains.has(m.raw) && !main.includes(m.raw)) {
+          main.push(m.raw);
+        }
+      });
+    }
 
     return { 
       mainCategoriesList: [...new Set(main)].sort((a, b) => a.localeCompare(b)), 
       miscCategoriesList: [...new Set(misc)].sort((a, b) => a.localeCompare(b)) 
     };
-  }, [categories]);
+  }, [categoryObjects, headerData.project_code, projects]);
 
   const totals = useMemo(() => {
     let totalDebit = 0;
@@ -418,9 +428,33 @@ export default function DisbursementScreen({ projects, categories, disbursements
     const loadedExpenses = d.expenses && d.expenses.length > 0 ? d.expenses : [];
     const cLines = [];
     const mLines = [];
-    
+
+    // Compute classification inline — can't use mainCategoriesList useMemo here since
+    // setHeaderData(newHeader) is async and the memo hasn't recomputed yet.
+    const selectedProject = projects.find(p => p.project_code === d.project_code);
+    const pType = selectedProject ? selectedProject.project_type : 'Construction';
+
+    const DEFAULT_MAIN_KEYWORDS = [
+      "PERMITS & CONSTRUCTION PLANS", "DOWN PAYMENT", "CARPENTRY", "PAINTING",
+      "ELECTRICAL", "PLUMBING", "TEMPERED GLASS", "SSS/PAG-IBIG / PHILHEALTH",
+      "LABOR/PAYROLL", "ABB 1196 FORWARD", "ZAM-546"
+    ];
+
+    // Build the correct main list for this project, same logic as the useMemo
+    const inlineMain = new Set();
+    (categoryObjects || []).forEach(catObj => {
+      if (catObj.category_type && catObj.category_type !== 'Both' && catObj.category_type !== pType) return;
+      const rawName = catObj.name;
+      if (rawName.startsWith('[MAIN] ')) {
+        inlineMain.add(rawName.replace('[MAIN] ', ''));
+      }
+    });
+    if (pType === 'Construction' || !pType) {
+      DEFAULT_MAIN_KEYWORDS.forEach(k => inlineMain.add(k));
+    }
+
     loadedExpenses.forEach(exp => {
-      if (mainCategoriesList.includes(exp.category)) {
+      if (inlineMain.has(exp.category)) {
         cLines.push(exp);
       } else {
         mLines.push(exp);

@@ -80,7 +80,16 @@ db.serialize(() => {
       db.run("UPDATE projects SET project_type = 'Office' WHERE project_code LIKE '%ADMIN%' OR project_code LIKE '%OFFICE%' OR project_code LIKE '%SHOP%'");
     }
   });
-  db.run(`CREATE TABLE IF NOT EXISTS expense_categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE)`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS expense_categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, category_type TEXT DEFAULT 'Construction')`);
+  db.run("ALTER TABLE expense_categories ADD COLUMN category_type TEXT DEFAULT 'Construction'", (err) => {
+    if (!err) {
+      const officeCats = ["[MAIN] Payroll", "[MAIN] Electrical Office/Payatas", "[MAIN] Water/office/Payatas", "[MAIN] Comunication/Telephone", "[MAIN] Retainer", "[MISC] Office supplies/Outing", "[MISC] Car Repair & Maintenance", "[MISC] Car Registration", "[MISC] Contribution"];
+      const stmt = db.prepare("INSERT OR IGNORE INTO expense_categories (name, category_type) VALUES (?, 'Office')");
+      officeCats.forEach(c => stmt.run(c));
+      stmt.finalize();
+    }
+  });
 
   db.run(`CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -123,9 +132,14 @@ db.serialize(() => {
   db.get("SELECT count(*) as count FROM expense_categories", (err, row) => {
     if (row && row.count === 0) {
       const initialCats = [ 'Materials/Purchases', 'Labor /SUBCONTRACTOR', 'Gas & Oil', 'Office Supplies', 'Tools & Equipment', 'Office Furniture', 'Shop Supplies', 'Food/Meals', 'Transpo/Travel', 'Repair & Maint.', 'Parking', 'Toll Fee', 'Handling Fee', 'Communication', 'Miscellaneous / Sending Fee / Schematic', 'Light & Power', 'Water', 'Rental/Hotel Accom.', 'Representation', 'Salaries & Wages', 'Cash Advance/Payroll', 'Cash Advance/Project', 'Permit/Licenses', 'Insurance Expense/CONST', 'Insurance Expenses/CAR', 'SOP/Retainer Fee', 'Incentives Fee', 'Service Fee', 'Entrance' ];
-      const stmt = db.prepare("INSERT INTO expense_categories (name) VALUES (?)");
+      const stmt = db.prepare("INSERT INTO expense_categories (name, category_type) VALUES (?, 'Construction')");
       initialCats.forEach(c => stmt.run(c));
       stmt.finalize();
+
+      const officeCats = ["[MAIN] Payroll", "[MAIN] Electrical Office/Payatas", "[MAIN] Water/office/Payatas", "[MAIN] Comunication/Telephone", "[MAIN] Retainer", "[MISC] Office supplies/Outing", "[MISC] Car Repair & Maintenance", "[MISC] Car Registration", "[MISC] Contribution"];
+      const stmt2 = db.prepare("INSERT INTO expense_categories (name, category_type) VALUES (?, 'Office')");
+      officeCats.forEach(c => stmt2.run(c));
+      stmt2.finalize();
     }
   });
 });
@@ -198,7 +212,7 @@ app.put('/api/projects/:id', authenticateToken, (req, res) => { const { project_
 app.delete('/api/projects/:id', authenticateToken, (req, res) => { db.run("DELETE FROM projects WHERE id=?", req.params.id, function(err) { if (err) return res.status(500).json({ error: err.message }); res.json({ success: true }); }); });
 
 app.get('/api/categories', authenticateToken, (req, res) => { db.all("SELECT * FROM expense_categories ORDER BY name ASC", [], (err, rows) => { if (err) return res.status(500).json({ error: err.message }); res.json(rows); }); });
-app.post('/api/categories', authenticateToken, (req, res) => { db.run("INSERT INTO expense_categories (name) VALUES (?)", [req.body.name], function(err) { if (err) return res.status(500).json({ error: err.message }); res.json({ success: true, id: this.lastID }); }); });
+app.post('/api/categories', authenticateToken, (req, res) => { db.run("INSERT INTO expense_categories (name, category_type) VALUES (?, ?)", [req.body.name, req.body.category_type || 'Construction'], function(err) { if (err) return res.status(500).json({ error: err.message }); res.json({ success: true, id: this.lastID }); }); });
 app.delete('/api/categories/:id', authenticateToken, (req, res) => { db.run("DELETE FROM expense_categories WHERE id=?", req.params.id, function(err) { if (err) return res.status(500).json({ error: err.message }); res.json({ success: true }); }); });
 
 app.get('/api/disbursements', authenticateToken, (req, res) => { db.all("SELECT * FROM disbursements ORDER BY created_at DESC", [], (err, rows) => { if (err) return res.status(500).json({ error: err.message }); const formattedRows = rows.map(row => ({ ...row, expenses: row.expenses_json ? JSON.parse(row.expenses_json) : [] })); res.json(formattedRows); }); });

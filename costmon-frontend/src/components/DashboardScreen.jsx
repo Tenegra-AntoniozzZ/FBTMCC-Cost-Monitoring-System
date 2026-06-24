@@ -285,10 +285,10 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
       const exp_payroll = getCategoryTotal('payroll') + getCategoryTotal('labor');
       const exp_electrical = getCategoryTotal('electrical');
       const exp_water = getCategoryTotal('water');
-      const exp_comms = getCategoryTotal('comunication') + getCategoryTotal('telephone') + getCategoryTotal('internet');
+      const exp_comms = getCategoryTotal('comunication');
       const exp_retainer = getCategoryTotal('retainer');
       const exp_supplies = getCategoryTotal('office supplies') + getCategoryTotal('outing');
-      const exp_car_repair = getCategoryTotal('car repair') + getCategoryTotal('maintenance');
+      const exp_car_repair = getCategoryTotal('car repair');
       const exp_car_reg = getCategoryTotal('car registration');
       const exp_contribution = getCategoryTotal('contribution');
 

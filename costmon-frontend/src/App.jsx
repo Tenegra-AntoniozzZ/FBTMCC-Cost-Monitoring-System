@@ -349,6 +349,7 @@ export default function App() {
               <DisbursementScreen 
                 projects={projects} 
                 categories={categories.map(c => c.name)} 
+                categoryObjects={categories}
                 disbursements={disbursements} 
                 refreshData={fetchAllData} 
                 isLoading={isLoading} 
