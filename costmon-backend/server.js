@@ -72,7 +72,14 @@ db.serialize(() => {
     // Expected to fail if column already exists
   });
 
-  db.run(`CREATE TABLE IF NOT EXISTS projects (id TEXT PRIMARY KEY, project_code TEXT UNIQUE, project_name TEXT, contract_cost REAL DEFAULT 0, profit_percentage REAL DEFAULT 0.20)`);
+  db.run(`CREATE TABLE IF NOT EXISTS projects (id TEXT PRIMARY KEY, project_code TEXT UNIQUE, project_name TEXT, contract_cost REAL DEFAULT 0, profit_percentage REAL DEFAULT 0.20, project_type TEXT DEFAULT 'Construction')`);
+  db.run("ALTER TABLE projects ADD COLUMN project_type TEXT DEFAULT 'Construction'", (err) => {
+    // Expected to fail if column already exists
+    if (!err) {
+      // If column was just added, migrate existing data based on code
+      db.run("UPDATE projects SET project_type = 'Office' WHERE project_code LIKE '%ADMIN%' OR project_code LIKE '%OFFICE%' OR project_code LIKE '%SHOP%'");
+    }
+  });
   db.run(`CREATE TABLE IF NOT EXISTS expense_categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE)`);
 
   db.run(`CREATE TABLE IF NOT EXISTS users (
@@ -106,8 +113,8 @@ db.serialize(() => {
 
   db.get("SELECT count(*) as count FROM projects", (err, row) => {
     if (row && row.count === 0) {
-      const initialProjects = [ ['1', 'RF-105', 'Unitop Dasma', 800000, 0.15], ['2', 'W-308', 'Amazing Place QC', 1600000, 0.20], ['3', 'RF-126', 'WM Tanauan', 990000, 0.15], ['4', 'ADMIN', 'Shop/Admin 2026', 0, 0] ];
-      const stmt = db.prepare("INSERT INTO projects (id, project_code, project_name, contract_cost, profit_percentage) VALUES (?, ?, ?, ?, ?)");
+      const initialProjects = [ ['1', 'RF-105', 'Unitop Dasma', 800000, 0.15, 'Construction'], ['2', 'W-308', 'Amazing Place QC', 1600000, 0.20, 'Construction'], ['3', 'RF-126', 'WM Tanauan', 990000, 0.15, 'Construction'], ['4', 'ADMIN', 'Shop/Admin 2026', 0, 0, 'Office'] ];
+      const stmt = db.prepare("INSERT INTO projects (id, project_code, project_name, contract_cost, profit_percentage, project_type) VALUES (?, ?, ?, ?, ?, ?)");
       initialProjects.forEach(p => stmt.run(p));
       stmt.finalize();
     }
@@ -186,8 +193,8 @@ app.post('/api/verify-password', authenticateToken, (req, res) => {
 
 // Ginamit ang authenticateToken sa lahat ng GET, POST, PUT, DELETE
 app.get('/api/projects', authenticateToken, (req, res) => { db.all("SELECT * FROM projects ORDER BY project_code ASC", [], (err, rows) => { if (err) return res.status(500).json({ error: err.message }); res.json(rows); }); });
-app.post('/api/projects', authenticateToken, (req, res) => { const { id, project_code, project_name, contract_cost, profit_percentage } = req.body; const newId = id || Math.random().toString(36).substr(2, 9); db.run("INSERT INTO projects (id, project_code, project_name, contract_cost, profit_percentage) VALUES (?, ?, ?, ?, ?)", [newId, project_code, project_name, contract_cost || 0, profit_percentage || 0.20], function(err) { if (err) return res.status(500).json({ error: err.message }); res.json({ success: true, id: newId }); }); });
-app.put('/api/projects/:id', authenticateToken, (req, res) => { const { project_code, project_name, contract_cost, profit_percentage } = req.body; let query = "UPDATE projects SET "; let params = []; const fields = []; if (project_code !== undefined) { fields.push("project_code=?"); params.push(project_code); } if (project_name !== undefined) { fields.push("project_name=?"); params.push(project_name); } if (contract_cost !== undefined) { fields.push("contract_cost=?"); params.push(contract_cost); } if (profit_percentage !== undefined) { fields.push("profit_percentage=?"); params.push(profit_percentage); } if (fields.length === 0) return res.json({ success: true, message: "No changes" }); query += fields.join(", ") + " WHERE id=?"; params.push(req.params.id); db.run(query, params, function(err) { if (err) return res.status(500).json({ error: err.message }); res.json({ success: true }); }); });
+app.post('/api/projects', authenticateToken, (req, res) => { const { id, project_code, project_name, contract_cost, profit_percentage, project_type } = req.body; const newId = id || Math.random().toString(36).substr(2, 9); db.run("INSERT INTO projects (id, project_code, project_name, contract_cost, profit_percentage, project_type) VALUES (?, ?, ?, ?, ?, ?)", [newId, project_code, project_name, contract_cost || 0, profit_percentage || 0.20, project_type || 'Construction'], function(err) { if (err) return res.status(500).json({ error: err.message }); res.json({ success: true, id: newId }); }); });
+app.put('/api/projects/:id', authenticateToken, (req, res) => { const { project_code, project_name, contract_cost, profit_percentage, project_type } = req.body; let query = "UPDATE projects SET "; let params = []; const fields = []; if (project_code !== undefined) { fields.push("project_code=?"); params.push(project_code); } if (project_name !== undefined) { fields.push("project_name=?"); params.push(project_name); } if (contract_cost !== undefined) { fields.push("contract_cost=?"); params.push(contract_cost); } if (profit_percentage !== undefined) { fields.push("profit_percentage=?"); params.push(profit_percentage); } if (project_type !== undefined) { fields.push("project_type=?"); params.push(project_type); } if (fields.length === 0) return res.json({ success: true, message: "No changes" }); query += fields.join(", ") + " WHERE id=?"; params.push(req.params.id); db.run(query, params, function(err) { if (err) return res.status(500).json({ error: err.message }); res.json({ success: true }); }); });
 app.delete('/api/projects/:id', authenticateToken, (req, res) => { db.run("DELETE FROM projects WHERE id=?", req.params.id, function(err) { if (err) return res.status(500).json({ error: err.message }); res.json({ success: true }); }); });
 
 app.get('/api/categories', authenticateToken, (req, res) => { db.all("SELECT * FROM expense_categories ORDER BY name ASC", [], (err, rows) => { if (err) return res.status(500).json({ error: err.message }); res.json(rows); }); });

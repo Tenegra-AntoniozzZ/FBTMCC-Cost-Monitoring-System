@@ -308,8 +308,7 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
         exp_supplies, exp_car_repair, exp_car_reg, exp_contribution
       };
 
-      const code = p.project_code.toUpperCase();
-      if (code.includes('ADMIN') || code.includes('OFFICE') || code.includes('SHOP')) {
+      if (p.project_type === 'Office') {
         office.push(computedData);
         oBudget += CC;
       } else {

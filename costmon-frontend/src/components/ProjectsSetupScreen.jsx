@@ -12,12 +12,19 @@ import {
   BarChart3,
   Layers
 } from 'lucide-react';
+import SearchableDropdown from './SearchableDropdown';
 import PasswordConfirmModal from './PasswordConfirmModal';
 import LoadingOverlay from './LoadingOverlay';
 import { API_URL } from '../utils/Constants';
 
 export default function ProjectsSetupScreen({ projects, categories, refreshData, onNavigateToCostMonitoring, onModalStateChange }) {
-  const [newProject, setNewProject] = useState({ project_code: '', project_name: '', contract_cost: '', profit_percentage: '20' });
+  const [newProject, setNewProject] = useState({ 
+    project_code: '', 
+    project_name: '', 
+    contract_cost: '', 
+    profit_percentage: '20', 
+    project_type: 'Construction' 
+  });
   const [newCategory, setNewCategory] = useState('');
   const [newSubCategory, setNewSubCategory] = useState('');
   
@@ -147,7 +154,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
         const data = await response.json();
         setRecentlyAddedProject({ id: data.id, code: newProject.project_code });
         setShowSuccessModal(true);
-        setNewProject({ project_code: '', project_name: '', contract_cost: '', profit_percentage: '20' });
+        setNewProject({ project_code: '', project_name: '', contract_cost: '', profit_percentage: '20', project_type: 'Construction' });
         refreshData();
       }
     } catch {
@@ -316,7 +323,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
 
             {/* ADD / EDIT FORM */}
             <div className="p-8 border-b border-slate-100 dark:border-slate-700 bg-indigo-50/30 dark:bg-indigo-900/10 transition-colors duration-300">
-              <form onSubmit={(e) => { e.preventDefault(); if (editingProject) { setPasswordModal({ isOpen: true, action: 'update_project', payload: null }); } else { handleAddProject(e); } }} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+              <form onSubmit={(e) => { e.preventDefault(); if (editingProject) { setPasswordModal({ isOpen: true, action: 'update_project', payload: null }); } else { handleAddProject(e); } }} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                 <div className="md:col-span-1 space-y-1.5 relative">
                   <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase">Code</label>
                   <input 
@@ -358,6 +365,16 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                     required
                   />
                 </div>
+                <div className="md:col-span-1 space-y-1.5 relative">
+                  <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase">Type</label>
+                  <SearchableDropdown 
+                    options={['Construction', 'Office']}
+                    value={editingProject ? (editingProject.project_type || 'Construction') : (newProject.project_type || 'Construction')}
+                    onChange={(val) => editingProject ? setEditingProject({...editingProject, project_type: val}) : setNewProject({...newProject, project_type: val})}
+                    placeholder="Select Type"
+                    size="large"
+                  />
+                </div>
                 <div className="flex gap-2">
                   <button 
                     type="submit" 
@@ -389,6 +406,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                 <thead>
                   <tr className="bg-slate-100 dark:bg-slate-700 transition-colors duration-300">
                     <th className="px-6 py-4 text-[10px] font-black text-slate-600 dark:text-slate-300 tracking-widest border-b-2 border-r border-slate-400 dark:border-slate-600 uppercase w-[140px]">Code</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-600 dark:text-slate-300 tracking-widest border-b-2 border-r border-slate-400 dark:border-slate-600 uppercase w-[140px]">Type</th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-600 dark:text-slate-300 tracking-widest border-b-2 border-r border-slate-400 dark:border-slate-600 uppercase">Project Name</th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-600 dark:text-slate-300 tracking-widest border-b-2 border-slate-400 dark:border-slate-600 uppercase text-center sticky right-0 z-10 bg-slate-100 dark:bg-slate-700 w-[140px]">Actions</th>
                   </tr>
@@ -398,6 +416,11 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                     <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
                       <td className="px-6 py-4 border-r border-slate-400 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50 w-[140px] transition-colors duration-300">
                         <span className="font-black text-indigo-700 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-800 shadow-sm group-hover:bg-white dark:group-hover:bg-slate-800 transition-colors block text-center truncate">{p.project_code}</span>
+                      </td>
+                      <td className="px-6 py-4 border-r border-slate-400 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50 w-[140px] transition-colors duration-300">
+                        <span className={`font-black px-3 py-1.5 rounded-lg border shadow-sm transition-colors block text-center text-xs truncate ${p.project_type === 'Office' ? 'text-amber-700 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800' : 'text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800'}`}>
+                          {p.project_type || 'Construction'}
+                        </span>
                       </td>
                       <td className="px-6 py-4 border-r border-slate-400 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50 transition-colors duration-300">
                         <div className="font-bold text-slate-800 dark:text-slate-200">{p.project_name}</div>

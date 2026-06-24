@@ -1,5 +1,5 @@
 // src/utils/constants.js
-export const SERVER_IP = '192.168.2.125'; // Palitan ng inyong IPv4 address
+export const SERVER_IP = '192.168.2.117'; // Palitan ng inyong IPv4 address
 export const API_URL = `http://${SERVER_IP}:3001/api`;
 
 export const INITIAL_PROJECTS = [
@@ -10,12 +10,12 @@ export const INITIAL_PROJECTS = [
 ];
 
 export const EXPENSE_CATEGORIES = [
-  'Materials/Purchases', 'Labor /SUBCONTRACTOR', 'Gas & Oil', 'Office Supplies', 
-  'Tools & Equipment', 'Office Furniture', 'Shop Supplies', 'Food/Meals', 
-  'Transpo/Travel', 'Repair & Maint.', 'Parking', 'Toll Fee', 'Handling Fee', 
-  'Communication', 'Miscellaneous / Sending Fee / Schematic', 'Light & Power', 
-  'Water', 'Rental/Hotel Accom.', 'Representation', 'Salaries & Wages', 
-  'Cash Advance/Payroll', 'Cash Advance/Project', 'Permit/Licenses', 
-  'Insurance Expense/CONST', 'Insurance Expenses/CAR', 'SOP/Retainer Fee', 
+  'Materials/Purchases', 'Labor /SUBCONTRACTOR', 'Gas & Oil', 'Office Supplies',
+  'Tools & Equipment', 'Office Furniture', 'Shop Supplies', 'Food/Meals',
+  'Transpo/Travel', 'Repair & Maint.', 'Parking', 'Toll Fee', 'Handling Fee',
+  'Communication', 'Miscellaneous / Sending Fee / Schematic', 'Light & Power',
+  'Water', 'Rental/Hotel Accom.', 'Representation', 'Salaries & Wages',
+  'Cash Advance/Payroll', 'Cash Advance/Project', 'Permit/Licenses',
+  'Insurance Expense/CONST', 'Insurance Expenses/CAR', 'SOP/Retainer Fee',
   'Incentives Fee', 'Service Fee', 'Entrance'
 ];

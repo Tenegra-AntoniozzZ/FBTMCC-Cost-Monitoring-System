@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, ChevronDown } from 'lucide-react';
 
-export default function SearchableDropdown({ options, value, onChange, placeholder, hasError }) {
+export default function SearchableDropdown({ options, value, onChange, placeholder, hasError, size = 'default' }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandUp, setExpandUp] = useState(false);
@@ -139,10 +139,10 @@ export default function SearchableDropdown({ options, value, onChange, placehold
       <input type="text" required value={value} readOnly className="absolute w-0 h-0 opacity-0 pointer-events-none" />
       
       <div
-        className={`w-full p-2 border rounded-md text-sm flex justify-between items-center cursor-pointer transition-colors ${borderClass} ${hasError ? '' : 'bg-white dark:bg-slate-800'}`}
+        className={`w-full flex justify-between items-center cursor-pointer transition-colors ${borderClass} ${hasError ? '' : 'bg-white dark:bg-slate-800'} ${size === 'large' ? 'px-4 py-3 rounded-xl border-2 font-bold' : 'p-2 border rounded-md text-sm'}`}
         onClick={handleToggle}
       >
-        <span className={value ? (hasError ? 'font-bold' : 'text-slate-800 dark:text-slate-200 font-medium') : (hasError ? 'text-red-500 dark:text-red-400 font-medium' : 'text-slate-500 dark:text-slate-400')}>
+        <span className={value ? (hasError ? 'font-bold' : (size === 'large' ? 'text-slate-800 dark:text-slate-200' : 'text-slate-800 dark:text-slate-200 font-medium')) : (hasError ? 'text-red-500 dark:text-red-400 font-medium' : 'text-slate-500 dark:text-slate-400')}>
           {value || placeholder}
         </span>
         <ChevronDown size={16} className={`${hasError ? 'text-red-500 dark:text-red-400' : 'text-slate-400 dark:text-slate-500'} transition-transform ${isOpen ? 'rotate-180' : ''}`} />
