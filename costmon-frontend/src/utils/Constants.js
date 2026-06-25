@@ -1,5 +1,5 @@
 // src/utils/constants.js
-export const SERVER_IP = '192.168.2.125'; // Palitan ng inyong IPv4 address
+export const SERVER_IP = '192.168.100.158'; // Palitan ng inyong IPv4 address
 export const API_URL = `http://${SERVER_IP}:3001/api`;
 
 export const INITIAL_PROJECTS = [

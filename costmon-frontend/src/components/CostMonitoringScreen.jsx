@@ -104,7 +104,7 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
   if (project?.id !== prevProject?.id) {
     setPrevProject(project);
     if (project) {
-      setEditingValues({ contract_cost: project.contract_cost || 0, profit_percentage: project.profit_percentage || 0.15, project_area: project.project_area || '', project_start: project.project_start || '', days_end: project.days_end || '' });
+      setEditingValues({ contract_cost: project.contract_cost ? project.contract_cost.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '0', profit_percentage: project.profit_percentage || 0.15, project_area: project.project_area || '', project_start: project.project_start || '', days_end: project.days_end || '' });
       setPulsingCategory(null);
     }
   }
@@ -113,7 +113,7 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
   const isProjectDirty = useMemo(() => {
     if (!project) return false;
     return (
-      parseFloat(editingValues.contract_cost || 0) !== parseFloat(project.contract_cost || 0) ||
+      parseFloat(String(editingValues.contract_cost || 0).replace(/,/g, '')) !== parseFloat(project.contract_cost || 0) ||
       parseFloat(editingValues.profit_percentage || 0) !== parseFloat(project.profit_percentage || 0.15) ||
       (editingValues.project_area || '') !== (project.project_area || '') ||
       (editingValues.project_start || '') !== (project.project_start || '') ||
@@ -158,7 +158,7 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
   };
 
   const handleInputChange = (field, value) => setEditingValues(prev => ({ ...prev, [field]: value }));
-  const handleSaveClick = () => { if (!canEdit) return; setPasswordModal({ isOpen: true, action: 'update_project', payload: editingValues }); };
+  const handleSaveClick = () => { if (!canEdit) return; setPasswordModal({ isOpen: true, action: 'update_project', payload: { ...editingValues, contract_cost: String(editingValues.contract_cost).replace(/,/g, '') } }); };
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -221,7 +221,7 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
   };
 
   const financials = useMemo(() => {
-    const contractCost = parseFloat(editingValues.contract_cost) || 0;
+    const contractCost = parseFloat(String(editingValues.contract_cost).replace(/,/g, '')) || 0;
     const profitPercent = parseFloat(editingValues.profit_percentage) || 0;
 
     const projectExpenses = (disbursements || []).filter(d => d.project_code && d.project_code.toUpperCase() === project?.project_code?.toUpperCase());
@@ -409,8 +409,18 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
                   <span className="uppercase tracking-wider text-slate-500 dark:text-slate-400">Contract Cost:</span>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-700 dark:text-amber-500">₱</span>
-                    <input type="number" className="w-full bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-400 rounded-lg pl-8 pr-3 py-2 focus:ring-2 focus:ring-amber-500 outline-none shadow-sm text-right font-black text-sm" 
-                      value={editingValues.contract_cost} onChange={e => handleInputChange('contract_cost', e.target.value)} />
+                    <input type="text" className="w-full bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-400 rounded-lg pl-8 pr-3 py-2 focus:ring-2 focus:ring-amber-500 outline-none shadow-sm text-right font-black text-sm" 
+                      value={editingValues.contract_cost} onChange={e => {
+                        let val = e.target.value.replace(/[^0-9.]/g, '');
+                        const parts = val.split('.');
+                        if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                        if (val) {
+                          const p2 = val.split('.');
+                          p2[0] = p2[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                          val = p2.join('.');
+                        }
+                        handleInputChange('contract_cost', val);
+                      }} />
                   </div>
                 </div>
                 <div className="grid grid-cols-[140px_1fr] items-center py-2">
@@ -1030,10 +1040,10 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
           accts_pay: editingData.accts_pay || '',
           input_tax: editingData.input_tax || '',
           output_tax: editingData.output_tax || '',
-          target_cib: editingData.target_cib || '',
+          target_cib: (editingData.target_cib || '').toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','),
           costing_type: 'additional'
         };
-        const newLines = editingData.expenses?.length > 0 ? editingData.expenses : [{ id: Date.now(), category: '', amount: '' }];
+        const newLines = editingData.expenses?.length > 0 ? editingData.expenses.map(line => ({...line, amount: line.amount ? String(line.amount).replace(/\B(?=(\d{3})+(?!\d))/g, ',') : ''})) : [{ id: Date.now(), category: '', amount: '' }];
         
         setHeaderData(newHeader);
         setLines(newLines);
@@ -1141,21 +1151,35 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
   };
 
   const handleHeaderChange = (e) => setHeaderData({ ...headerData, [e.target.name]: e.target.value });
-  const handleLineChange = (id, field, value) => setLines(prev => prev.map(line => line.id === id ? { ...line, [field]: value } : line));
+  const handleLineChange = (id, field, value) => {
+    let finalValue = value;
+    if (field === 'amount') {
+      let val = value.replace(/[^0-9.]/g, '');
+      const parts = val.split('.');
+      if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+      if (val) {
+        const p2 = val.split('.');
+        p2[0] = p2[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        val = p2.join('.');
+      }
+      finalValue = val;
+    }
+    setLines(prev => prev.map(line => line.id === id ? { ...line, [field]: finalValue } : line));
+  };
   const addLine = () => setLines(prev => [...prev, { id: Date.now() + Math.random(), category: '', amount: '' }]);
   const removeLine = (id) => { if (lines.length > 1) setLines(prev => prev.filter(line => line.id !== id)); };
 
   const totals = useMemo(() => {
     let totalDebit = 0; let ewtPayable = 0;
     lines.forEach(line => { 
-      const amt = parseFloat(line.amount) || 0;
+      const amt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
       totalDebit += amt;
       if (line.category === 'Labor /SUBCONTRACTOR') ewtPayable += (amt * 0.02);
     });
     return { totalDebit, ewtPayable, cib_coh: totalDebit - ewtPayable };
   }, [lines]);
 
-  const targetCib = parseFloat(headerData.target_cib) || 0;
+  const targetCib = parseFloat(String(headerData.target_cib).replace(/,/g, '')) || 0;
   const isVarianceZero = Math.abs(targetCib - totals.cib_coh) < 0.01;
 
   const executeSave = async (dataToSave) => {
@@ -1193,13 +1217,14 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
     if (!headerData.project_code || totals.totalDebit === 0) return;
     if (!isVarianceZero) { setErrorMessage("Paki-check ang Variance. Kailangang pantay ang Target CIB sa Computed CIB."); return; }
 
-    const validLines = lines.filter(line => line.category && line.amount);
+    const validLines = lines.filter(line => line.category && line.amount).map(line => ({ ...line, amount: line.amount ? String(line.amount).replace(/,/g, '') : '' }));
     if (validLines.length === 0) { setErrorMessage("Kailangan maglagay ng valid na item name at amount."); return; }
 
     const isEditing = !!editingData;
     const newDisbursement = {
       id: isEditing ? editingData.id : Date.now().toString(36) + Math.floor(Math.random()*1000).toString(),
       ...headerData,
+      target_cib: String(headerData.target_cib).replace(/,/g, ''),
       cv_no: isEditing ? (editingData.cv_no || '') : '', 
       expenses: validLines,
       gross_amount: totals.totalDebit,
@@ -1323,8 +1348,18 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
                   
                   <div className="space-y-1 bg-red-50 dark:bg-red-900/20 p-2 -mt-2 -mb-2 rounded-md border border-red-200 dark:border-red-800 flex flex-col justify-center">
                     <label className="text-xs font-bold text-red-800 dark:text-red-300 uppercase">Target CIB/COH (₱) <span className="text-red-500">*</span></label>
-                    <input type="number" step="0.01" name="target_cib" className="w-full p-1.5 bg-white dark:bg-slate-800 border border-red-200 dark:border-red-700 rounded-md text-sm font-black text-red-900 dark:text-red-100 outline-none focus:ring-2 focus:ring-red-500"
-                      value={headerData.target_cib} onChange={handleHeaderChange} required />
+                    <input type="text" name="target_cib" className="w-full p-1.5 bg-white dark:bg-slate-800 border border-red-200 dark:border-red-700 rounded-md text-sm font-black text-red-900 dark:text-red-100 outline-none focus:ring-2 focus:ring-red-500"
+                      value={headerData.target_cib} onChange={(e) => {
+                        let val = e.target.value.replace(/[^0-9.]/g, '');
+                        const parts = val.split('.');
+                        if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                        if (val) {
+                          const p2 = val.split('.');
+                          p2[0] = p2[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                          val = p2.join('.');
+                        }
+                        handleHeaderChange({ target: { name: 'target_cib', value: val } });
+                      }} required />
                   </div>
 
                   <div className="space-y-1 md:col-span-4 flex items-end">
@@ -1386,7 +1421,7 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
 
                           <div className="w-40 relative mt-1">
                             <span className="absolute left-3 top-2 text-slate-400">₱</span>
-                            <input type="number" step="0.01" placeholder="0.00" 
+                            <input type="text" placeholder="0.00" 
                               className="w-full pl-7 p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-bold text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 text-right"
                               value={line.amount} onChange={(e) => handleLineChange(line.id, 'amount', e.target.value)} />
                           </div>

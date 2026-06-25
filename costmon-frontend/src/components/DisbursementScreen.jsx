@@ -229,7 +229,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     const allLines = [...constructionLines, ...miscLines];
 
     allLines.forEach(line => {
-      const amt = parseFloat(line.amount) || 0;
+      const amt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
       totalDebit += amt;
       if (line.category === 'Labor /SUBCONTRACTOR') ewtPayable += (amt * 0.02); 
     });
@@ -238,7 +238,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     return { totalDebit, ewtPayable, cib_coh };
   }, [constructionLines, miscLines]);
 
-  const targetCib = parseFloat(headerData.target_cib) || 0;
+  const targetCib = parseFloat(String(headerData.target_cib).replace(/,/g, '')) || 0;
   const isVarianceZero = Math.abs(targetCib - totals.cib_coh) < 0.01; 
 
   const isDuplicateCV = useMemo(() => {
@@ -302,9 +302,21 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   const handleHeaderChange = (e) => setHeaderData({ ...headerData, [e.target.name]: e.target.value });
   
   const handleLineChange = (id, field, value, type = 'construction') => {
+    let finalValue = value;
+    if (field === 'amount') {
+      let val = value.replace(/[^0-9.]/g, '');
+      const parts = val.split('.');
+      if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+      if (val) {
+        const p2 = val.split('.');
+        p2[0] = p2[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        val = p2.join('.');
+      }
+      finalValue = val;
+    }
     const setter = type === 'construction' ? setConstructionLines : setMiscLines;
-    setter(lines => lines.map(line => line.id === id ? { ...line, [field]: value } : line));
-    if (field === 'category' && value.trim() !== '') {
+    setter(lines => lines.map(line => line.id === id ? { ...line, [field]: finalValue } : line));
+    if (field === 'category' && finalValue.trim() !== '') {
       setLineErrors(errors => errors.filter(errId => errId !== id));
     }
   };
@@ -420,7 +432,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       accts_pay: d.accts_pay || '',
       input_tax: d.input_tax || '',
       output_tax: d.output_tax || '',
-      target_cib: d.target_cib || d.net_amount || '',
+      target_cib: (d.target_cib || d.net_amount || '').toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','),
       costing_type: d.costing_type || 'normal' 
     };
     setHeaderData(newHeader);
@@ -453,7 +465,8 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       DEFAULT_MAIN_KEYWORDS.forEach(k => inlineMain.add(k));
     }
 
-    loadedExpenses.forEach(exp => {
+    const expensesWithCommas = loadedExpenses.map(e => ({ ...e, amount: e.amount ? String(e.amount).replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '' }));
+    expensesWithCommas.forEach(exp => {
       if (inlineMain.has(exp.category)) {
         cLines.push(exp);
       } else {
@@ -475,7 +488,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     
     setInitialFormState({
       headerData: JSON.stringify(newHeader),
-      expenseLines: JSON.stringify(loadedExpenses)
+      expenseLines: JSON.stringify(expensesWithCommas)
     });
     
     setErrorMessage('');
@@ -526,6 +539,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       line => (line.category && line.category.trim() !== '') || (line.amount && line.amount !== '')
     ).map(line => ({
       ...line,
+      amount: line.amount ? String(line.amount).replace(/,/g, '') : '',
       id: line.id || Date.now() + Math.random()
     }));
 
@@ -545,6 +559,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     const newDisbursement = {
       id: editingId || Date.now().toString(36) + Math.floor(Math.random()*1000).toString(), 
       ...headerData,
+      target_cib: String(headerData.target_cib).replace(/,/g, ''),
       expenses: combinedLines,
       gross_amount: totals.totalDebit,
       ewt_amount: totals.ewtPayable,
@@ -1071,9 +1086,19 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                       <label className="text-xs font-bold text-blue-800 dark:text-blue-300 uppercase flex items-center justify-between">
                         <span>Target CIB/COH (₱) <span className="text-red-500">*</span></span>
                       </label>
-                      <input type="number" step="0.01" name="target_cib" placeholder="0.00" 
+                      <input type="text" name="target_cib" placeholder="0.00" 
                         className="w-full p-1.5 border border-blue-200 dark:border-blue-700 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none font-black text-blue-900 dark:text-blue-100 bg-white dark:bg-slate-800 transition-colors"
-                        value={headerData.target_cib} onChange={handleHeaderChange} required />
+                        value={headerData.target_cib} onChange={(e) => {
+                          let val = e.target.value.replace(/[^0-9.]/g, '');
+                          const parts = val.split('.');
+                          if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                          if (val) {
+                            const p2 = val.split('.');
+                            p2[0] = p2[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                            val = p2.join('.');
+                          }
+                          handleHeaderChange({ target: { name: 'target_cib', value: val } });
+                        }} required />
                     </div>
 
                     <div className="space-y-1 md:col-span-2 flex items-end pb-1">
@@ -1137,7 +1162,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                               </div>
                             <div className="w-40 relative mt-1">
                               <span className="absolute left-3 top-2 text-slate-400 dark:text-slate-500 text-sm font-medium">₱</span>
-                              <input type="number" step="0.01" placeholder="0.00" 
+                              <input type="text" placeholder="0.00" 
                                 className="w-full pl-7 p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-right text-slate-800 dark:text-white transition-colors"
                                 value={line.amount} onChange={(e) => handleLineChange(line.id, 'amount', e.target.value, 'construction')} />
                             </div>
@@ -1187,7 +1212,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                               </div>
                             <div className="w-40 relative mt-1">
                               <span className="absolute left-3 top-2 text-slate-400 dark:text-slate-500 text-sm font-medium">₱</span>
-                              <input type="number" step="0.01" placeholder="0.00" 
+                              <input type="text" placeholder="0.00" 
                                 className="w-full pl-7 p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-right text-slate-800 dark:text-white transition-colors"
                                 value={line.amount} onChange={(e) => handleLineChange(line.id, 'amount', e.target.value, 'misc')} />
                             </div>
