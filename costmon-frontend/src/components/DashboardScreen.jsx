@@ -1,5 +1,6 @@
 import { useState, useMemo, Fragment, useRef } from 'react';
-import { LayoutDashboard, Briefcase, Building2, ArrowLeft, TrendingUp, FileText, ZoomIn, ZoomOut, RotateCcw, Wallet, Receipt, Eye, EyeOff, Calendar, X, Download, FileSpreadsheet } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Building2, ArrowLeft, TrendingUp, FileText, ZoomIn, ZoomOut, RotateCcw, Wallet, Receipt, Eye, EyeOff, Calendar, X, Download, FileSpreadsheet, BarChart2, PieChart as PieChartIcon } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line } from 'recharts';
 
 export default function DashboardScreen({ projects = [], disbursements = [] }) {
   const [activeView, setActiveView] = useState('selection');
@@ -505,7 +506,7 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
               <p className="text-slate-500 dark:text-slate-400 mt-2">Pumili sa ibaba kung anong master spreadsheet ang gusto mong silipin.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-5xl mx-auto">
               <button onClick={() => setActiveView('projects')} className="group bg-white dark:bg-[#0a0a0a] p-8 rounded-[2.5rem] shadow-xl border border-slate-100 dark:border-slate-800 hover:border-indigo-500 dark:hover:border-indigo-500/50 hover:bg-indigo-50/30 dark:hover:bg-[#0f0f15] transition-all duration-300 flex flex-col items-center text-center relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 dark:bg-indigo-900/10 rounded-bl-[100px] -mr-16 -mt-16 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/30 transition-colors"></div>
                 <div className="bg-slate-100 dark:bg-slate-900 p-5 rounded-2xl text-indigo-600 dark:text-indigo-400 mb-6 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner relative z-10"><Briefcase size={36} strokeWidth={2.5} /></div>
@@ -519,9 +520,152 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
                 <h3 className="font-black text-2xl text-slate-800 dark:text-slate-100 relative z-10">Office & Admin</h3>
                 <p className="text-slate-500 dark:text-slate-400 mt-3 font-medium text-sm relative z-10">Internal operations, payroll, and maintenance tracking for the main office.</p>
               </button>
+
+              <button onClick={() => setActiveView('charts')} className="group bg-white dark:bg-[#0a0a0a] p-8 rounded-[2.5rem] shadow-xl border border-slate-100 dark:border-slate-800 hover:border-violet-500 dark:hover:border-violet-500/50 hover:bg-violet-50/30 dark:hover:bg-[#0f0f1a] transition-all duration-300 flex flex-col items-center text-center relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-violet-50 dark:bg-violet-900/10 rounded-bl-[100px] -mr-16 -mt-16 group-hover:bg-violet-100 dark:group-hover:bg-violet-900/30 transition-colors"></div>
+                <div className="bg-slate-100 dark:bg-slate-900 p-5 rounded-2xl text-violet-600 dark:text-violet-400 mb-6 group-hover:bg-violet-600 group-hover:text-white transition-all shadow-inner relative z-10"><BarChart2 size={36} strokeWidth={2.5} /></div>
+                <h3 className="font-black text-2xl text-slate-800 dark:text-slate-100 relative z-10">Charts & Trends</h3>
+                <p className="text-slate-500 dark:text-slate-400 mt-3 font-medium text-sm relative z-10">Visual analytics: spending trends, category breakdown, and budget vs actual.</p>
+              </button>
             </div>
           </div>
         )}
+
+        {/* ==============================================
+            VIEW: CHARTS & TRENDS
+        ============================================== */}
+        {activeView === 'charts' && (() => {
+          // Monthly Spending Trend
+          const monthlyMap = {};
+          filteredDisbursements.forEach(d => {
+            if (!d.date) return;
+            const key = d.date.slice(0, 7);
+            monthlyMap[key] = (monthlyMap[key] || 0) + (d.gross_amount || 0);
+          });
+          const monthlyData = Object.entries(monthlyMap).sort(([a], [b]) => a.localeCompare(b)).slice(-12).map(([month, total]) => ({
+            month: new Date(month + '-01').toLocaleString('en-US', { month: 'short', year: '2-digit' }),
+            total: Math.round(total)
+          }));
+
+          // Category Distribution
+          const catMap = {};
+          filteredDisbursements.forEach(d => {
+            const expenses = d.expenses || [];
+            expenses.forEach(e => {
+              if (e.amount > 0) catMap[e.category] = (catMap[e.category] || 0) + Number(e.amount);
+            });
+          });
+          const catData = Object.entries(catMap).sort(([, a], [, b]) => b - a).slice(0, 10).map(([name, value]) => ({ name: name.length > 20 ? name.slice(0, 18) + '…' : name, value: Math.round(value) }));
+          const PIE_COLORS = ['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd', '#0ea5e9', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#f97316'];
+
+          // Budget vs Actual
+          const budgetData = projects.filter(p => p.project_type !== 'Office').map(p => {
+            const actual = filteredDisbursements.filter(d => d.project_code === p.project_code).reduce((s, d) => s + (d.gross_amount || 0), 0);
+            return { name: p.project_code, Budget: Math.round(p.contract_cost || 0), Actual: Math.round(actual) };
+          }).filter(d => d.Budget > 0 || d.Actual > 0);
+
+          const fmtPeso = (v) => v >= 1000000 ? '₱' + (v / 1000000).toFixed(1) + 'M' : '₱' + (v / 1000).toFixed(0) + 'K';
+          const CustomTooltip = ({ active, payload, label }) => {
+            if (!active || !payload?.length) return null;
+            return (<div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl p-3">
+              <p className="font-black text-slate-800 dark:text-white text-sm mb-1">{label}</p>
+              {payload.map((p, i) => <p key={i} style={{ color: p.color }} className="text-xs font-bold">{'₱' + Number(p.value).toLocaleString()}</p>)}
+            </div>);
+          };
+          const PieTooltip = ({ active, payload }) => {
+            if (!active || !payload?.length) return null;
+            return (<div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl p-3">
+              <p className="font-black text-slate-800 dark:text-white text-xs">{payload[0].name}</p>
+              <p className="text-xs font-bold text-violet-600 dark:text-violet-400">₱{Number(payload[0].value).toLocaleString()}</p>
+              <p className="text-xs text-slate-400">{(payload[0].percent * 100).toFixed(1)}% of total</p>
+            </div>);
+          };
+
+          return (
+            <div className="animate-in slide-in-from-right-8 duration-500 space-y-6">
+              <button onClick={() => setActiveView('selection')} className="flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400 hover:text-violet-600 transition-colors bg-white dark:bg-slate-900 px-4 py-2 rounded-xl shadow-sm border dark:border-slate-800">
+                <ArrowLeft size={16} /> Back to Selection
+              </button>
+
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-xl bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400"><BarChart2 size={22} /></div>
+                <div>
+                  <h2 className="text-xl font-black text-slate-800 dark:text-white">Charts & Trends</h2>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">{filteredDisbursements.length} disbursements in view {dateFilterLabel ? '· ' + dateFilterLabel : '(all-time)'}</p>
+                </div>
+              </div>
+
+              {/* Chart 1: Monthly Spending Trend */}
+              <div className="bg-white dark:bg-[#0a0a0a] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
+                <h3 className="font-black text-slate-800 dark:text-white mb-4 flex items-center gap-2"><TrendingUp size={18} className="text-violet-500" /> Monthly Spending Trend</h3>
+                {monthlyData.length === 0 ? (
+                  <div className="flex items-center justify-center h-48 text-slate-400 dark:text-slate-600 italic text-sm">No spending data available for the selected period.</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={monthlyData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" className="dark:stroke-slate-700" />
+                      <XAxis dataKey="month" tick={{ fontSize: 11, fontWeight: 700, fill: '#94a3b8' }} />
+                      <YAxis tickFormatter={fmtPeso} tick={{ fontSize: 11, fontWeight: 700, fill: '#94a3b8' }} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Bar dataKey="total" fill="#6366f1" radius={[6, 6, 0, 0]} name="Total Spent" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+
+              {/* Charts 2+3 side by side */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+
+                {/* Chart 2: Category Pie */}
+                <div className="bg-white dark:bg-[#0a0a0a] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
+                  <h3 className="font-black text-slate-800 dark:text-white mb-4 flex items-center gap-2"><PieChartIcon size={18} className="text-violet-500" /> Expense Category Breakdown (Top 10)</h3>
+                  {catData.length === 0 ? (
+                    <div className="flex items-center justify-center h-64 text-slate-400 dark:text-slate-600 italic text-sm">No category data available.</div>
+                  ) : (
+                    <div className="flex flex-col items-center">
+                      <ResponsiveContainer width="100%" height={220}>
+                        <PieChart>
+                          <Pie data={catData} cx="50%" cy="50%" innerRadius={55} outerRadius={90} dataKey="value" paddingAngle={2} nameKey="name">
+                            {catData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                          </Pie>
+                          <Tooltip content={<PieTooltip />} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 w-full">
+                        {catData.map((d, i) => (
+                          <div key={i} className="flex items-center gap-2 text-xs">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}></span>
+                            <span className="text-slate-600 dark:text-slate-400 truncate font-medium" title={d.name}>{d.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Chart 3: Budget vs Actual */}
+                <div className="bg-white dark:bg-[#0a0a0a] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
+                  <h3 className="font-black text-slate-800 dark:text-white mb-4 flex items-center gap-2"><Wallet size={18} className="text-violet-500" /> Budget vs Actual per Project</h3>
+                  {budgetData.length === 0 ? (
+                    <div className="flex items-center justify-center h-64 text-slate-400 dark:text-slate-600 italic text-sm">No project data available.</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={260}>
+                      <BarChart data={budgetData} margin={{ top: 5, right: 10, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" className="dark:stroke-slate-700" />
+                        <XAxis dataKey="name" tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} />
+                        <YAxis tickFormatter={fmtPeso} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend wrapperStyle={{ fontSize: 11, fontWeight: 700 }} />
+                        <Bar dataKey="Budget" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="Actual" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ==============================================
             VIEW 2: PROJECTS TABLE

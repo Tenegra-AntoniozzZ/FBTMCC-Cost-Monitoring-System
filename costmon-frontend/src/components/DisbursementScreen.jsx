@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, Plus, Trash2, FileText, ChevronDown, Filter, X, Lock, Save, Receipt, Edit2, ZoomIn, ZoomOut, RotateCcw, CheckCircle2 } from 'lucide-react';
+import { Search, Plus, Trash2, FileText, ChevronDown, Filter, X, Lock, Save, Receipt, Edit2, ZoomIn, ZoomOut, RotateCcw, CheckCircle2, Paperclip, Camera, FileImage, FileType, Loader2, ExternalLink } from 'lucide-react';
 import SearchableDropdown from './SearchableDropdown';
 import HealthCard from './HealthCard';
 import PasswordConfirmModal from './PasswordConfirmModal';
@@ -23,6 +23,11 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   const [lineErrors, setLineErrors] = useState([]);
   
   const [initialFormState, setInitialFormState] = useState(null);
+  const [modalAttachments, setModalAttachments] = useState([]);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const [showDraftModal, setShowDraftModal] = useState(false);
 
@@ -479,6 +484,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     
     setConstructionLines(cLines);
     setMiscLines(mLines);
+    setModalAttachments(d.attachments || []);
 
     if (d.accts_pay || d.input_tax || d.output_tax) {
       setShowTaxFields(true);
@@ -561,6 +567,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       ...headerData,
       target_cib: String(headerData.target_cib).replace(/,/g, ''),
       expenses: combinedLines,
+      attachments: modalAttachments,
       gross_amount: totals.totalDebit,
       ewt_amount: totals.ewtPayable,
       net_amount: totals.cib_coh,
@@ -1223,6 +1230,155 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                           </div>
                         ))}
                       </div>
+                    </div>
+
+                    {/* ==========================================
+                        ATTACHMENTS SECTION
+                    ========================================== */}
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors duration-300">
+                      <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2">
+                        <Paperclip size={16} className="text-blue-500" /> Attachments <span className="text-slate-400 font-medium normal-case tracking-normal text-xs">(OR, Invoice, Photos)</span>
+                      </h3>
+
+                      {uploadError && (
+                        <div className="mb-3 p-2.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 rounded-lg text-xs font-bold flex items-center gap-2">
+                          <X size={13} /> {uploadError}
+                        </div>
+                      )}
+
+                      {/* Upload Buttons */}
+                      <div className="flex flex-wrap gap-3 mb-4">
+                        {/* Hidden inputs */}
+                        <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files[0];
+                            if (!file) return;
+                            setUploadError('');
+                            if (file.size > 20 * 1024 * 1024) { setUploadError('File too large. Max 20MB.'); return; }
+                            if (!editingId) {
+                              // For new records, we queue the file locally and upload after save
+                              const objectUrl = URL.createObjectURL(file);
+                              setModalAttachments(prev => [...prev, { filename: objectUrl, originalname: file.name, mimetype: file.type, size: file.size, uploadedAt: new Date().toISOString(), pendingFile: file }]);
+                            } else {
+                              setIsUploadingFile(true);
+                              try {
+                                const formData = new FormData();
+                                formData.append('receipt', file);
+                                const token = localStorage.getItem('fbtmcc_token');
+                                const res = await fetch(`${API_URL}/disbursements/${editingId}/upload`, {
+                                  method: 'POST',
+                                  headers: { Authorization: `Bearer ${token}` },
+                                  body: formData
+                                });
+                                const data = await res.json();
+                                if (res.ok) {
+                                  setModalAttachments(prev => [...prev, data.file]);
+                                } else {
+                                  setUploadError(data.error || 'Upload failed.');
+                                }
+                              } catch { setUploadError('Upload failed. Check server connection.'); }
+                              finally { setIsUploadingFile(false); }
+                            }
+                            e.target.value = '';
+                          }}
+                        />
+                        <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files[0];
+                            if (!file) return;
+                            setUploadError('');
+                            if (!editingId) {
+                              const objectUrl = URL.createObjectURL(file);
+                              setModalAttachments(prev => [...prev, { filename: objectUrl, originalname: file.name, mimetype: file.type, size: file.size, uploadedAt: new Date().toISOString(), pendingFile: file }]);
+                            } else {
+                              setIsUploadingFile(true);
+                              try {
+                                const formData = new FormData();
+                                formData.append('receipt', file);
+                                const token = localStorage.getItem('fbtmcc_token');
+                                const res = await fetch(`${API_URL}/disbursements/${editingId}/upload`, {
+                                  method: 'POST',
+                                  headers: { Authorization: `Bearer ${token}` },
+                                  body: formData
+                                });
+                                const data = await res.json();
+                                if (res.ok) {
+                                  setModalAttachments(prev => [...prev, data.file]);
+                                } else {
+                                  setUploadError(data.error || 'Upload failed.');
+                                }
+                              } catch { setUploadError('Upload failed.'); }
+                              finally { setIsUploadingFile(false); }
+                            }
+                            e.target.value = '';
+                          }}
+                        />
+
+                        <button type="button" onClick={() => cameraInputRef.current?.click()}
+                          disabled={isUploadingFile}
+                          className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 rounded-xl font-bold text-sm transition-colors disabled:opacity-50">
+                          <Camera size={16} /> Take Photo
+                        </button>
+                        <button type="button" onClick={() => fileInputRef.current?.click()}
+                          disabled={isUploadingFile}
+                          className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 rounded-xl font-bold text-sm transition-colors disabled:opacity-50">
+                          {isUploadingFile ? <Loader2 size={16} className="animate-spin" /> : <Paperclip size={16} />}
+                          {isUploadingFile ? 'Uploading...' : 'Upload File'}
+                        </button>
+                      </div>
+
+                      {/* Attachment List */}
+                      {modalAttachments.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-6 text-slate-300 dark:text-slate-600 gap-2">
+                          <Paperclip size={28} />
+                          <p className="text-xs font-bold text-slate-400 dark:text-slate-500">No attachments yet. Use the buttons above.</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                          {modalAttachments.map((att, idx) => {
+                            const isImage = att.mimetype && att.mimetype.startsWith('image/');
+                            const isPending = !!att.pendingFile;
+                            const fileUrl = isPending ? att.filename : `${API_URL.replace('/api', '')}/uploads/${att.filename}`;
+                            return (
+                              <div key={idx} className="relative group bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl overflow-hidden shadow-sm">
+                                {isImage ? (
+                                  <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="block">
+                                    <img src={fileUrl} alt={att.originalname} className="w-full h-24 object-cover" />
+                                  </a>
+                                ) : (
+                                  <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center justify-center h-24 text-slate-400 dark:text-slate-300 hover:text-blue-500 transition-colors">
+                                    <FileType size={32} className="mb-1" />
+                                    <span className="text-[10px] font-bold">PDF</span>
+                                  </a>
+                                )}
+                                <div className="px-2 py-1.5 flex items-center justify-between gap-1">
+                                  <p className="text-[10px] font-bold text-slate-600 dark:text-slate-300 truncate flex-1" title={att.originalname}>{att.originalname}</p>
+                                  <button type="button"
+                                    onClick={async () => {
+                                      if (isPending) {
+                                        setModalAttachments(prev => prev.filter((_, i) => i !== idx));
+                                        return;
+                                      }
+                                      if (!editingId) { setModalAttachments(prev => prev.filter((_, i) => i !== idx)); return; }
+                                      try {
+                                        const token = localStorage.getItem('fbtmcc_token');
+                                        await fetch(`${API_URL}/disbursements/${editingId}/attachments/${att.filename}`, {
+                                          method: 'DELETE',
+                                          headers: { Authorization: `Bearer ${token}` }
+                                        });
+                                        setModalAttachments(prev => prev.filter(a => a.filename !== att.filename));
+                                      } catch { setUploadError('Failed to delete attachment.'); }
+                                    }}
+                                    className="p-0.5 text-slate-300 hover:text-red-500 dark:hover:text-red-400 transition-colors shrink-0">
+                                    <X size={13} />
+                                  </button>
+                                </div>
+                                {isPending && <div className="absolute top-1 left-1 bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">PENDING</div>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
 
