@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback} from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { LayoutDashboard, Receipt, BarChart3, Settings, Wallet, UserCircle2, LogOut, PanelLeftClose, PanelLeftOpen, Sun, Moon, Save, Trash2, AlertCircle, ClipboardList, Users } from 'lucide-react';
+import FBTlogo from './assets/FBTlogo.png';
 
 import LoginScreen from './components/LoginScreen';
 import NavItem from './components/NavItem';
@@ -263,7 +264,7 @@ export default function App() {
     handleNavigation('/disbursements');
   };
 
-  if (!userRole) return <LoginScreen onLogin={handleLogin} />;
+  if (!userRole) return <LoginScreen onLogin={handleLogin} isDarkMode={isDarkMode} toggleTheme={toggleTheme} />;
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-800 dark:text-slate-300 transition-colors duration-300">
@@ -274,12 +275,12 @@ export default function App() {
           {isSidebarOpen ? (
             <div>
               <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-                <Wallet className="text-blue-500 shrink-0" /> CostMon.
+                <img src={FBTlogo} alt="FBTMCC Logo" className="w-8 h-auto object-contain shrink-0" /> CostMon.
               </h1>
               <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-widest">Financial System</p>
             </div>
           ) : (
-            <Wallet className="text-blue-500 shrink-0" size={28} />
+            <img src={FBTlogo} alt="FBTMCC Logo" className="w-8 h-auto object-contain shrink-0" />
           )}
           <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-slate-400 hover:text-white p-1.5 hover:bg-slate-800 dark:hover:bg-slate-900 rounded-md">
             {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
