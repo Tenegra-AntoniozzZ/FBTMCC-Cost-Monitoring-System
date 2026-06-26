@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
@@ -13,19 +14,11 @@ const app = express();
 // ==========================================
 // 1. SECURITY: CORS
 // ==========================================
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['http://localhost:5173'];
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://localhost:5174',
-    'http://127.0.0.1:5174',
-    'http://192.168.2.124:5173',
-    'http://192.168.2.117:5173',
-    'http://192.168.2.117:5174',
-    'http://192.168.2.103:5173',
-    'http://192.168.2.125:5173',
-    'http://192.168.100.158:5173'
-  ],
+  origin: allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 }));
@@ -61,7 +54,8 @@ const upload = multer({
   }
 });
 
-const JWT_SECRET = 'FBTMCC_SUPER_SECRET_KEY_2026';
+const JWT_SECRET = process.env.JWT_SECRET || 'isang_temporary_fallback_secret';
+
 
 // ==========================================
 // 2. SECURITY: RATE LIMITING
@@ -97,7 +91,10 @@ const requireCEO = (req, res, next) => {
 const dbPath = path.resolve(__dirname, 'costmon_local.db');
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) console.error('Error connecting to database:', err.message);
-  else console.log('Connected to the local SQLite database.');
+  else {
+    console.log('Connected to the local SQLite database.');
+    db.run("PRAGMA foreign_keys = ON;");
+  }
 });
 
 // ==========================================
@@ -117,10 +114,11 @@ db.serialize(() => {
     id TEXT PRIMARY KEY, project_code TEXT, date TEXT, payee TEXT, particulars TEXT,
     tin TEXT, cv_no TEXT, check_no TEXT, or_inv_no TEXT, accts_pay REAL, input_tax REAL,
     output_tax REAL, target_cib REAL, gross_amount REAL, ewt_amount REAL, net_amount REAL,
-    expenses_json TEXT, created_at TEXT, costing_type TEXT DEFAULT 'normal', attachments_json TEXT DEFAULT '[]'
+    expenses_json TEXT, created_at TEXT, costing_type TEXT DEFAULT 'normal', attachments_json TEXT DEFAULT '[]',
+    FOREIGN KEY (project_code) REFERENCES projects(project_code) ON DELETE CASCADE
   )`);
-  db.run("ALTER TABLE disbursements ADD COLUMN costing_type TEXT DEFAULT 'normal'", () => {});
-  db.run("ALTER TABLE disbursements ADD COLUMN attachments_json TEXT DEFAULT '[]'", () => {});
+  db.run("ALTER TABLE disbursements ADD COLUMN costing_type TEXT DEFAULT 'normal'", () => { });
+  db.run("ALTER TABLE disbursements ADD COLUMN attachments_json TEXT DEFAULT '[]'", () => { });
 
   db.run(`CREATE TABLE IF NOT EXISTS projects (
     id TEXT PRIMARY KEY, project_code TEXT UNIQUE, project_name TEXT,
@@ -154,7 +152,7 @@ db.serialize(() => {
     security_answer TEXT,
     is_active INTEGER DEFAULT 1
   )`);
-  db.run("ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1", () => {});
+  db.run("ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1", () => { });
 
   db.run(`CREATE TABLE IF NOT EXISTS audit_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -416,6 +414,13 @@ app.get('/api/disbursements', authenticateToken, (req, res) => {
 
 app.post('/api/disbursements', authenticateToken, (req, res) => {
   const data = req.body;
+
+  // Backend validation: Compute expected net amount (Gross - EWT)
+  const computed_net_amount = Number(data.gross_amount || 0) - Number(data.ewt_amount || 0);
+  if (Math.abs(computed_net_amount - Number(data.net_amount || 0)) > 0.01) {
+    return res.status(400).json({ error: "Data integrity check failed: Net amount mismatch." });
+  }
+
   const stmt = db.prepare('INSERT INTO disbursements (id, project_code, date, payee, particulars, tin, cv_no, check_no, or_inv_no, accts_pay, input_tax, output_tax, target_cib, gross_amount, ewt_amount, net_amount, expenses_json, created_at, costing_type, attachments_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
   stmt.run(data.id, data.project_code, data.date, data.payee, data.particulars, data.tin, data.cv_no, data.check_no, data.or_inv_no, data.accts_pay || 0, data.input_tax || 0, data.output_tax || 0, data.target_cib || 0, data.gross_amount || 0, data.ewt_amount || 0, data.net_amount || 0, JSON.stringify(data.expenses), data.created_at, data.costing_type || 'normal', JSON.stringify(data.attachments || []), function (err) {
     if (err) return res.status(500).json({ error: err.message });
@@ -427,6 +432,13 @@ app.post('/api/disbursements', authenticateToken, (req, res) => {
 
 app.put('/api/disbursements/:id', authenticateToken, (req, res) => {
   const data = req.body; const id = req.params.id;
+
+  // Backend validation: Compute expected net amount (Gross - EWT)
+  const computed_net_amount = Number(data.gross_amount || 0) - Number(data.ewt_amount || 0);
+  if (Math.abs(computed_net_amount - Number(data.net_amount || 0)) > 0.01) {
+    return res.status(400).json({ error: "Data integrity check failed: Net amount mismatch." });
+  }
+
   const stmt = db.prepare('UPDATE disbursements SET project_code=?, date=?, payee=?, particulars=?, tin=?, cv_no=?, check_no=?, or_inv_no=?, accts_pay=?, input_tax=?, output_tax=?, target_cib=?, gross_amount=?, ewt_amount=?, net_amount=?, expenses_json=?, costing_type=?, attachments_json=? WHERE id=?');
   stmt.run(data.project_code, data.date, data.payee, data.particulars, data.tin, data.cv_no, data.check_no, data.or_inv_no, data.accts_pay || 0, data.input_tax || 0, data.output_tax || 0, data.target_cib || 0, data.gross_amount || 0, data.ewt_amount || 0, data.net_amount || 0, JSON.stringify(data.expenses), data.costing_type || 'normal', JSON.stringify(data.attachments || []), id, function (err) {
     if (err) return res.status(500).json({ error: err.message });

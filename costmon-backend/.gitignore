@@ -11,3 +11,5 @@ costmon_local.db
 .env
 dist/
 .DS_Store
+.env
+.env.local
