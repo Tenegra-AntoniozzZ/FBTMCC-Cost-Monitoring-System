@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback} from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { LayoutDashboard, Receipt, BarChart3, Settings, Wallet, UserCircle2, LogOut, PanelLeftClose, PanelLeftOpen, Sun, Moon, Save, Trash2, AlertCircle } from 'lucide-react';
+import { LayoutDashboard, Receipt, BarChart3, Settings, Wallet, UserCircle2, LogOut, PanelLeftClose, PanelLeftOpen, Sun, Moon, Save, Trash2, AlertCircle, ClipboardList, Users } from 'lucide-react';
 
 import LoginScreen from './components/LoginScreen';
 import NavItem from './components/NavItem';
@@ -10,6 +10,8 @@ import ProjectsSetupScreen from './components/ProjectsSetupScreen';
 import GlobalSearchModal from './components/GlobalSearchModal';
 import PasswordConfirmModal from './components/PasswordConfirmModal';
 import DashboardScreen from './components/DashboardScreen';
+import AuditLogScreen from './components/AuditLogScreen';
+import AdminScreen from './components/AdminScreen';
 import { API_URL } from './utils/Constants';
 
 export default function App() {
@@ -290,7 +292,11 @@ export default function App() {
           <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/cost-monitoring'} icon={<BarChart3 size={20} />} label="Cost Monitoring" onClick={() => handleNavigation('/cost-monitoring')} />
           
           {userRole === 'ceo' && (
-            <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/projects'} icon={<Settings size={20} />} label="Projects Setup" onClick={() => handleNavigation('/projects')} />
+            <>
+              <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/projects'} icon={<Settings size={20} />} label="Projects Setup" onClick={() => handleNavigation('/projects')} />
+              <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/admin'} icon={<Users size={20} />} label="User Management" onClick={() => handleNavigation('/admin')} />
+              <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/audit-logs'} icon={<ClipboardList size={20} />} label="Audit Logs" onClick={() => handleNavigation('/audit-logs')} />
+            </>
           )}
         </nav>
 
@@ -387,6 +393,26 @@ export default function App() {
                 <ProjectsSetupScreen projects={projects} categories={categories} refreshData={fetchAllData} onNavigateToCostMonitoring={navigateToCostMonitoring} onModalStateChange={setIsAnyModalOpen} />
               ) : (
                 <Navigate to="/cost-monitoring" replace />
+              )
+            } 
+          />
+          <Route 
+            path="/admin" 
+            element={
+              userRole === 'ceo' ? (
+                <AdminScreen currentUser={{ id: localStorage.getItem('fbtmcc_user_id'), username: activeUsername }} isDark={isDarkMode} />
+              ) : (
+                <Navigate to="/dashboard" replace />
+              )
+            } 
+          />
+          <Route 
+            path="/audit-logs" 
+            element={
+              userRole === 'ceo' ? (
+                <AuditLogScreen isDark={isDarkMode} />
+              ) : (
+                <Navigate to="/dashboard" replace />
               )
             } 
           />
