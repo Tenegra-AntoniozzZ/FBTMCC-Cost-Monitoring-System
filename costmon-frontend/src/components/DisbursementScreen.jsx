@@ -55,6 +55,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     particulars: '',
     tin: '',
     cv_no: '',
+    bank: '',
     check_no: '',
     or_inv_no: '',
     accts_pay: '',
@@ -257,7 +258,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   // 4. HANDLERS
   // ==========================================
   const resetForm = () => {
-    setHeaderData({ date: new Date().toISOString().split('T')[0], project_code: '', payee: '', particulars: '', tin: '', cv_no: '', check_no: '', or_inv_no: '', accts_pay: '', input_tax: '', output_tax: '', target_cib: '', costing_type: 'normal' });
+    setHeaderData({ date: new Date().toISOString().split('T')[0], project_code: '', payee: '', particulars: '', tin: '', cv_no: '', bank: '', check_no: '', or_inv_no: '', accts_pay: '', input_tax: '', output_tax: '', target_cib: '', costing_type: 'normal' });
     const now = Date.now();
     setConstructionLines([{ id: now, category: '', amount: '' }]);
     setMiscLines([{ id: now + 1, category: '', amount: '' }]);
@@ -290,7 +291,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   const handleStayInModal = () => {
     setPostSavePrompt(false);
     resetForm(); 
-    const initHeader = { date: new Date().toISOString().split('T')[0], project_code: '', payee: '', particulars: '', tin: '', cv_no: '', check_no: '', or_inv_no: '', accts_pay: '', input_tax: '', output_tax: '', target_cib: '', costing_type: 'normal' };
+    const initHeader = { date: new Date().toISOString().split('T')[0], project_code: '', payee: '', particulars: '', tin: '', cv_no: '', bank: '', check_no: '', or_inv_no: '', accts_pay: '', input_tax: '', output_tax: '', target_cib: '', costing_type: 'normal' };
     const initC = [{ id: Date.now(), category: '', amount: '' }];
     const initM = [{ id: Date.now() + 1, category: '', amount: '' }];
     setInitialFormState({
@@ -388,7 +389,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     setShowDraftModal(false);
     resetForm();
     
-    const initHeader = { date: new Date().toISOString().split('T')[0], project_code: '', payee: '', particulars: '', tin: '', cv_no: '', check_no: '', or_inv_no: '', accts_pay: '', input_tax: '', output_tax: '', target_cib: '', costing_type: 'normal' };
+    const initHeader = { date: new Date().toISOString().split('T')[0], project_code: '', payee: '', particulars: '', tin: '', cv_no: '', bank: '', check_no: '', or_inv_no: '', accts_pay: '', input_tax: '', output_tax: '', target_cib: '', costing_type: 'normal' };
     const initC = [{ id: Date.now(), category: '', amount: '' }];
     const initM = [{ id: Date.now() + 1, category: '', amount: '' }];
     setHeaderData(initHeader);
@@ -408,7 +409,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       setShowDraftModal(true);
     } else {
       resetForm();
-      const initHeader = { date: new Date().toISOString().split('T')[0], project_code: '', payee: '', particulars: '', tin: '', cv_no: '', check_no: '', or_inv_no: '', accts_pay: '', input_tax: '', output_tax: '', target_cib: '', costing_type: 'normal' };
+      const initHeader = { date: new Date().toISOString().split('T')[0], project_code: '', payee: '', particulars: '', tin: '', cv_no: '', bank: '', check_no: '', or_inv_no: '', accts_pay: '', input_tax: '', output_tax: '', target_cib: '', costing_type: 'normal' };
       const initC = [{ id: Date.now(), category: '', amount: '' }];
       const initM = [{ id: Date.now() + 1, category: '', amount: '' }];
       setHeaderData(initHeader);
@@ -432,6 +433,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       particulars: d.particulars || '',
       tin: d.tin || '',
       cv_no: d.cv_no || '',
+      bank: d.bank || '',
       check_no: d.check_no || '',
       or_inv_no: d.or_inv_no || '',
       accts_pay: d.accts_pay || '',
@@ -1084,6 +1086,12 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                     </div>
 
                     <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Bank</label>
+                      <input type="text" name="bank" placeholder="Optional" className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors"
+                        value={headerData.bank} onChange={handleHeaderChange} />
+                    </div>
+
+                    <div className="space-y-1">
                       <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Check No.</label>
                       <input type="text" name="check_no" placeholder="Optional" className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors"
                         value={headerData.check_no} onChange={handleHeaderChange} />
@@ -1108,8 +1116,8 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                         }} required />
                     </div>
 
-                    <div className="space-y-1 md:col-span-2 flex items-end pb-1">
-                      <button type="button" onClick={() => setShowTaxFields(!showTaxFields)} className="text-blue-600 dark:text-blue-400 text-xs font-medium hover:underline flex items-center gap-1">
+                    <div className="space-y-1 md:col-span-1 flex items-end pb-1">
+                      <button type="button" onClick={() => setShowTaxFields(!showTaxFields)} className="text-blue-600 dark:text-blue-400 text-xs font-medium hover:underline flex items-center gap-1 whitespace-nowrap">
                         {showTaxFields ? 'Hide Tax/Payables Fields' : 'Show Advanced Fields (Accts Pay, BIR-VAT, etc.)'} <ChevronDown size={14}/>
                       </button>
                     </div>

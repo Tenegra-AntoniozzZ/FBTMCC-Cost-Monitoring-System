@@ -112,13 +112,14 @@ const logActivity = (username, action, entityType, entityId, details) => {
 db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS disbursements (
     id TEXT PRIMARY KEY, project_code TEXT, date TEXT, payee TEXT, particulars TEXT,
-    tin TEXT, cv_no TEXT, check_no TEXT, or_inv_no TEXT, accts_pay REAL, input_tax REAL,
+    tin TEXT, cv_no TEXT, bank TEXT, check_no TEXT, or_inv_no TEXT, accts_pay REAL, input_tax REAL,
     output_tax REAL, target_cib REAL, gross_amount REAL, ewt_amount REAL, net_amount REAL,
     expenses_json TEXT, created_at TEXT, costing_type TEXT DEFAULT 'normal', attachments_json TEXT DEFAULT '[]',
     FOREIGN KEY (project_code) REFERENCES projects(project_code) ON DELETE CASCADE
   )`);
   db.run("ALTER TABLE disbursements ADD COLUMN costing_type TEXT DEFAULT 'normal'", () => { });
   db.run("ALTER TABLE disbursements ADD COLUMN attachments_json TEXT DEFAULT '[]'", () => { });
+  db.run("ALTER TABLE disbursements ADD COLUMN bank TEXT", () => { });
 
   db.run(`CREATE TABLE IF NOT EXISTS projects (
     id TEXT PRIMARY KEY, project_code TEXT UNIQUE, project_name TEXT,
@@ -408,8 +409,8 @@ app.post('/api/disbursements', authenticateToken, (req, res) => {
     return res.status(400).json({ error: "Data integrity check failed: Net amount mismatch." });
   }
 
-  const stmt = db.prepare('INSERT INTO disbursements (id, project_code, date, payee, particulars, tin, cv_no, check_no, or_inv_no, accts_pay, input_tax, output_tax, target_cib, gross_amount, ewt_amount, net_amount, expenses_json, created_at, costing_type, attachments_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-  stmt.run(data.id, data.project_code, data.date, data.payee, data.particulars, data.tin, data.cv_no, data.check_no, data.or_inv_no, data.accts_pay || 0, data.input_tax || 0, data.output_tax || 0, data.target_cib || 0, data.gross_amount || 0, data.ewt_amount || 0, data.net_amount || 0, JSON.stringify(data.expenses), data.created_at, data.costing_type || 'normal', JSON.stringify(data.attachments || []), function (err) {
+  const stmt = db.prepare('INSERT INTO disbursements (id, project_code, date, payee, particulars, tin, cv_no, bank, check_no, or_inv_no, accts_pay, input_tax, output_tax, target_cib, gross_amount, ewt_amount, net_amount, expenses_json, created_at, costing_type, attachments_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  stmt.run(data.id, data.project_code, data.date, data.payee, data.particulars, data.tin, data.cv_no, data.bank, data.check_no, data.or_inv_no, data.accts_pay || 0, data.input_tax || 0, data.output_tax || 0, data.target_cib || 0, data.gross_amount || 0, data.ewt_amount || 0, data.net_amount || 0, JSON.stringify(data.expenses), data.created_at, data.costing_type || 'normal', JSON.stringify(data.attachments || []), function (err) {
     if (err) return res.status(500).json({ error: err.message });
     logActivity(req.user.username, 'CREATE_DISBURSEMENT', 'disbursement', data.id, 'CV# ' + data.cv_no + ' | Project: ' + data.project_code + ' | Amount: ' + data.gross_amount);
     res.json({ success: true, message: 'Record saved successfully.' });
@@ -426,8 +427,8 @@ app.put('/api/disbursements/:id', authenticateToken, (req, res) => {
     return res.status(400).json({ error: "Data integrity check failed: Net amount mismatch." });
   }
 
-  const stmt = db.prepare('UPDATE disbursements SET project_code=?, date=?, payee=?, particulars=?, tin=?, cv_no=?, check_no=?, or_inv_no=?, accts_pay=?, input_tax=?, output_tax=?, target_cib=?, gross_amount=?, ewt_amount=?, net_amount=?, expenses_json=?, costing_type=?, attachments_json=? WHERE id=?');
-  stmt.run(data.project_code, data.date, data.payee, data.particulars, data.tin, data.cv_no, data.check_no, data.or_inv_no, data.accts_pay || 0, data.input_tax || 0, data.output_tax || 0, data.target_cib || 0, data.gross_amount || 0, data.ewt_amount || 0, data.net_amount || 0, JSON.stringify(data.expenses), data.costing_type || 'normal', JSON.stringify(data.attachments || []), id, function (err) {
+  const stmt = db.prepare('UPDATE disbursements SET project_code=?, date=?, payee=?, particulars=?, tin=?, cv_no=?, bank=?, check_no=?, or_inv_no=?, accts_pay=?, input_tax=?, output_tax=?, target_cib=?, gross_amount=?, ewt_amount=?, net_amount=?, expenses_json=?, costing_type=?, attachments_json=? WHERE id=?');
+  stmt.run(data.project_code, data.date, data.payee, data.particulars, data.tin, data.cv_no, data.bank, data.check_no, data.or_inv_no, data.accts_pay || 0, data.input_tax || 0, data.output_tax || 0, data.target_cib || 0, data.gross_amount || 0, data.ewt_amount || 0, data.net_amount || 0, JSON.stringify(data.expenses), data.costing_type || 'normal', JSON.stringify(data.attachments || []), id, function (err) {
     if (err) return res.status(500).json({ error: err.message });
     logActivity(req.user.username, 'UPDATE_DISBURSEMENT', 'disbursement', id, 'CV# ' + data.cv_no + ' | Project: ' + data.project_code);
     res.json({ success: true, message: 'Record updated successfully.' });
