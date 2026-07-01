@@ -216,7 +216,7 @@ export default function App() {
     localStorage.setItem('fbtmcc_username', username);
     setUserRole(role);
     setActiveUsername(username);
-    navigate(role === 'encoder' ? '/disbursements' : '/dashboard'); // Updated to go to dashboard
+    navigate('/dashboard');
   };
 
   const executeLogout = () => {
@@ -292,9 +292,11 @@ export default function App() {
           <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/disbursements'} icon={<Receipt size={20} />} label="Disbursements" onClick={() => handleNavigation('/disbursements')} />
           <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/cost-monitoring'} icon={<BarChart3 size={20} />} label="Cost Monitoring" onClick={() => handleNavigation('/cost-monitoring')} />
           
+          {['ceo', 'encoder'].includes(userRole) && (
+            <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/projects'} icon={<Settings size={20} />} label="Projects Setup" onClick={() => handleNavigation('/projects')} />
+          )}
           {userRole === 'ceo' && (
             <>
-              <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/projects'} icon={<Settings size={20} />} label="Projects Setup" onClick={() => handleNavigation('/projects')} />
               <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/admin'} icon={<Users size={20} />} label="User Management" onClick={() => handleNavigation('/admin')} />
               <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/audit-logs'} icon={<ClipboardList size={20} />} label="Audit Logs" onClick={() => handleNavigation('/audit-logs')} />
             </>
@@ -390,7 +392,7 @@ export default function App() {
           <Route 
             path="/projects" 
             element={
-              userRole === 'ceo' ? (
+              ['ceo', 'encoder'].includes(userRole) ? (
                 <ProjectsSetupScreen projects={projects} categories={categories} refreshData={fetchAllData} onNavigateToCostMonitoring={navigateToCostMonitoring} onModalStateChange={setIsAnyModalOpen} />
               ) : (
                 <Navigate to="/cost-monitoring" replace />
