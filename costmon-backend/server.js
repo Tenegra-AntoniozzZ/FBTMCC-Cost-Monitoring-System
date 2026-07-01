@@ -183,19 +183,6 @@ db.serialize(() => {
     }
   });
 
-  db.get("SELECT count(*) as count FROM projects", (err, row) => {
-    if (row && row.count === 0) {
-      const initialProjects = [
-        ['1', 'RF-105', 'Unitop Dasma', 800000, 0.15, 'Construction'],
-        ['2', 'W-308', 'Amazing Place QC', 1600000, 0.20, 'Construction'],
-        ['3', 'RF-126', 'WM Tanauan', 990000, 0.15, 'Construction'],
-        ['4', 'ADMIN', 'Shop/Admin 2026', 0, 0, 'Office']
-      ];
-      const stmt = db.prepare("INSERT INTO projects (id, project_code, project_name, contract_cost, profit_percentage, project_type) VALUES (?, ?, ?, ?, ?, ?)");
-      initialProjects.forEach(p => stmt.run(p));
-      stmt.finalize();
-    }
-  });
 
   db.get("SELECT count(*) as count FROM expense_categories", (err, row) => {
     if (row && row.count === 0) {
@@ -493,6 +480,18 @@ app.delete('/api/disbursements/:id/attachments/:filename', authenticateToken, (r
       res.json({ success: true });
     });
   });
+});
+
+// ==========================================
+// SERVE THE BUILD FRONTEND
+// ==========================================
+
+// I-serve ang files mula sa root directory (kung saan nakalapag ang index.html)
+app.use(express.static(path.join(__dirname)));
+
+// Modern catch-all route para sa client-side routing ng React
+app.get(/^(?!\/api).*/, (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // ==========================================
