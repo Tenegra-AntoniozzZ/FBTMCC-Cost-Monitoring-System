@@ -8,6 +8,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const multer = require('multer');
+const ExcelJS = require('exceljs');
 
 const app = express();
 
@@ -371,6 +372,138 @@ app.get('/api/audit-logs', authenticateToken, requireCEO, (req, res) => {
 });
 
 // ==========================================
+// AUDIT LOG EXCEL EXPORT (CEO ONLY)
+// ==========================================
+// GET /api/audit-logs/export
+// Accepts the same filter params as the paginated endpoint but fetches ALL
+// matching rows, then builds and streams a styled .xlsx file via ExcelJS.
+app.get('/api/audit-logs/export', authenticateToken, requireCEO, async (req, res) => {
+  const { username, action, entity_type, startDate, endDate } = req.query;
+  let conditions = []; let params = [];
+  if (username)    { conditions.push("username LIKE ?");      params.push('%' + username + '%'); }
+  if (action)      { conditions.push("action = ?");           params.push(action); }
+  if (entity_type) { conditions.push("entity_type = ?");      params.push(entity_type); }
+  if (startDate)   { conditions.push("timestamp >= ?");       params.push(startDate); }
+  if (endDate)     { conditions.push("timestamp <= ?");       params.push(endDate + 'T23:59:59Z'); }
+  const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+
+  try {
+    const rows = await new Promise((resolve, reject) => {
+      db.all(
+        'SELECT * FROM audit_logs ' + whereClause + ' ORDER BY id DESC',
+        params,
+        (err, data) => { if (err) reject(err); else resolve(data); }
+      );
+    });
+
+    // ── Build styled workbook ──────────────────────────────────
+    const workbook  = new ExcelJS.Workbook();
+    workbook.creator = 'FBTMCC Cost Monitoring System';
+    workbook.created = new Date();
+
+    const sheet = workbook.addWorksheet('Audit Trail', {
+      // Freeze the header row so it stays pinned while scrolling
+      views: [{ state: 'frozen', ySplit: 1 }],
+      pageSetup: { paperSize: 9, orientation: 'landscape' }
+    });
+
+    // ── Column definitions with widths ────────────────────────
+    sheet.columns = [
+      { header: 'Timestamp',   key: 'timestamp',   width: 24 },
+      { header: 'Username',    key: 'username',     width: 18 },
+      { header: 'Action',      key: 'action',       width: 30 },
+      { header: 'Entity Type', key: 'entity_type',  width: 18 },
+      { header: 'Entity ID',   key: 'entity_id',    width: 22 },
+      { header: 'Details',     key: 'details',      width: 55 },
+    ];
+
+    // ── Shared border style for every data cell ───────────────
+    const thinBorder = {
+      top:    { style: 'thin', color: { argb: 'FFD1D5DB' } }, // gray-300
+      left:   { style: 'thin', color: { argb: 'FFD1D5DB' } },
+      bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+      right:  { style: 'thin', color: { argb: 'FFD1D5DB' } },
+    };
+
+    // ── Style the header row (row 1) ──────────────────────────
+    const headerRow = sheet.getRow(1);
+    headerRow.eachCell((cell) => {
+      // Deep indigo fill (#3730a3 = indigo-800)
+      cell.fill = {
+        type: 'pattern', pattern: 'solid',
+        fgColor: { argb: 'FF3730A3' }
+      };
+      cell.font = {
+        bold: true, color: { argb: 'FFFFFFFF' }, size: 11,
+        name: 'Calibri'
+      };
+      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: false };
+      cell.border = {
+        top:    { style: 'medium', color: { argb: 'FF3730A3' } },
+        left:   { style: 'medium', color: { argb: 'FF3730A3' } },
+        bottom: { style: 'medium', color: { argb: 'FF3730A3' } },
+        right:  { style: 'medium', color: { argb: 'FF3730A3' } },
+      };
+    });
+    headerRow.height = 28;
+    headerRow.commit();
+
+    // ── Add data rows with formatting ─────────────────────────
+    rows.forEach((log, idx) => {
+      // Format timestamp nicely
+      const ts = log.timestamp
+        ? new Date(log.timestamp).toLocaleString('en-PH', {
+            year: 'numeric', month: 'short', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
+          })
+        : '—';
+
+      const dataRow = sheet.addRow({
+        timestamp:   ts,
+        username:    log.username    || '—',
+        action:      log.action      || '—',
+        entity_type: log.entity_type || '—',
+        entity_id:   log.entity_id   || '—',
+        details:     log.details     || '—',
+      });
+
+      // Alternating row background: white / very light indigo tint
+      const rowFill = idx % 2 === 0
+        ? { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }   // white
+        : { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F3FF' } };  // indigo-50
+
+      dataRow.eachCell({ includeEmpty: true }, (cell) => {
+        cell.fill      = rowFill;
+        cell.border    = thinBorder;
+        cell.font      = { name: 'Calibri', size: 10, color: { argb: 'FF1E293B' } }; // slate-800
+        cell.alignment = { vertical: 'middle', wrapText: true };
+      });
+
+      dataRow.height = 18;
+      dataRow.commit();
+    });
+
+    // ── Stream to response ────────────────────────────────────
+    const timestamp  = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const filename   = `audit_log_${timestamp}.xlsx`;
+
+    res.setHeader('Content-Type',        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+
+    logActivity(req.user.username, 'EXPORT_AUDIT_LOG', 'audit_log', 'excel', `Exported ${rows.length} log entries`);
+
+  } catch (err) {
+    console.error('Audit log Excel export error:', err.message);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to generate Excel file.' });
+    }
+  }
+});
+
+// ==========================================
 // PROJECTS ENDPOINTS
 // ==========================================
 app.get('/api/projects', authenticateToken, (req, res) => { db.all("SELECT * FROM projects ORDER BY project_code ASC", [], (err, rows) => { if (err) return res.status(500).json({ error: err.message }); res.json(rows); }); });
@@ -481,6 +614,152 @@ app.delete('/api/disbursements/:id/attachments/:filename', authenticateToken, (r
       res.json({ success: true });
     });
   });
+});
+
+// ==========================================
+// DATABASE EXPORT / IMPORT ENDPOINTS
+// ==========================================
+
+// Helper: verify the calling user's own login password via bcrypt
+const verifyUserPassword = (username, password) => new Promise((resolve, reject) => {
+  db.get('SELECT password FROM users WHERE username = ?', [username], async (err, user) => {
+    if (err || !user) return reject(new Error('User not found.'));
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) return reject(new Error('Incorrect password.'));
+    resolve(true);
+  });
+});
+
+// Dedicated multer instance for .db file uploads only
+const dbUploadDir = path.resolve(__dirname, 'db_uploads_temp');
+if (!fs.existsSync(dbUploadDir)) {
+  fs.mkdirSync(dbUploadDir, { recursive: true });
+}
+const dbUploadStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, dbUploadDir),
+  filename: (req, file, cb) => cb(null, `imported_${Date.now()}.db`)
+});
+const dbUpload = multer({
+  storage: dbUploadStorage,
+  limits: { fileSize: 200 * 1024 * 1024 }, // 200 MB max
+  fileFilter: (req, file, cb) => {
+    const extOk = path.extname(file.originalname).toLowerCase() === '.db';
+    if (extOk) cb(null, true);
+    else cb(new Error('Only .db files are allowed for database import.'));
+  }
+});
+
+// POST /api/db/export
+// Accepts { password } in the body. Verifies the calling CEO's own login password,
+// then streams costmon_local.db back to the client as a downloadable attachment.
+app.post('/api/db/export', authenticateToken, requireCEO, async (req, res) => {
+  const { password } = req.body;
+
+  if (!password) {
+    return res.status(400).json({ error: 'Password is required.' });
+  }
+
+  try {
+    await verifyUserPassword(req.user.username, password);
+  } catch (authErr) {
+    return res.status(401).json({ error: authErr.message || 'Incorrect password. Export denied.' });
+  }
+
+  if (!fs.existsSync(dbPath)) {
+    return res.status(404).json({ error: 'Database file not found on server.' });
+  }
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const exportFilename = `costmon_backup_${timestamp}.db`;
+
+  logActivity(req.user.username, 'EXPORT_DATABASE', 'database', 'costmon_local.db', 'Database exported successfully');
+
+  res.setHeader('Content-Disposition', `attachment; filename="${exportFilename}"`);
+  res.setHeader('Content-Type', 'application/octet-stream');
+
+  const readStream = fs.createReadStream(dbPath);
+  readStream.on('error', (streamErr) => {
+    console.error('Export stream error:', streamErr.message);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to stream database file.' });
+    }
+  });
+  readStream.pipe(res);
+});
+
+// POST /api/db/import
+// Accepts multipart/form-data with { password, dbFile }. Verifies the calling CEO's own
+// login password, then safely replaces the live .db file with the uploaded one.
+app.post('/api/db/import', authenticateToken, requireCEO, dbUpload.single('dbFile'), async (req, res) => {
+  const { password } = req.body;
+
+  // Verify password first; clean up temp file on failure
+  try {
+    await verifyUserPassword(req.user.username, password);
+  } catch (authErr) {
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    return res.status(401).json({ error: authErr.message || 'Incorrect password. Import denied.' });
+  }
+
+  if (!req.file) {
+    return res.status(400).json({ error: 'No database file was uploaded.' });
+  }
+
+  const uploadedPath = req.file.path;
+  const backupPath = dbPath + '.bak';
+
+  try {
+    // Step 1: Close connections gracefully by checkpointing WAL if it exists
+    await new Promise((resolve) => {
+      db.run('PRAGMA wal_checkpoint(FULL);', () => resolve());
+    });
+
+    // Step 2: Create a backup of the current live database
+    if (fs.existsSync(dbPath)) {
+      fs.copyFileSync(dbPath, backupPath);
+    }
+
+    // Step 3: Replace the live database with the uploaded one
+    fs.copyFileSync(uploadedPath, dbPath);
+
+    // Step 4: Remove temp uploaded file
+    fs.unlinkSync(uploadedPath);
+
+    // Step 5: Remove backup after successful swap
+    if (fs.existsSync(backupPath)) {
+      fs.unlinkSync(backupPath);
+    }
+
+    logActivity(req.user.username, 'IMPORT_DATABASE', 'database', 'costmon_local.db', 'Database replaced via import. Server restart may be required.');
+
+    res.json({
+      success: true,
+      message: 'Database imported successfully. Please restart the server for all changes to take full effect.'
+    });
+
+  } catch (err) {
+    console.error('Database import error:', err.message);
+
+    // Attempt to restore from backup on failure
+    if (fs.existsSync(backupPath)) {
+      try {
+        fs.copyFileSync(backupPath, dbPath);
+        fs.unlinkSync(backupPath);
+        console.log('Backup restored after failed import.');
+      } catch (restoreErr) {
+        console.error('CRITICAL: Failed to restore backup:', restoreErr.message);
+      }
+    }
+
+    // Clean up temp upload
+    if (fs.existsSync(uploadedPath)) {
+      try { fs.unlinkSync(uploadedPath); } catch (_) {}
+    }
+
+    res.status(500).json({ error: 'Database import failed. The original database has been restored. Error: ' + err.message });
+  }
 });
 
 // ==========================================

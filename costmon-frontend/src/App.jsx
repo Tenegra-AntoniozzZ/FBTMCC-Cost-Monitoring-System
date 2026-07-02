@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback} from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { LayoutDashboard, Receipt, BarChart3, Settings, Wallet, UserCircle2, LogOut, PanelLeftClose, PanelLeftOpen, Sun, Moon, Save, Trash2, AlertCircle, ClipboardList, Users } from 'lucide-react';
+import { LayoutDashboard, Receipt, BarChart3, Settings, Wallet, UserCircle2, LogOut, PanelLeftClose, PanelLeftOpen, Sun, Moon, Save, Trash2, AlertCircle, ClipboardList, Users, Database } from 'lucide-react';
 import FBTlogo from './assets/FBTlogo.png';
 
 import LoginScreen from './components/LoginScreen';
@@ -13,6 +13,7 @@ import PasswordConfirmModal from './components/PasswordConfirmModal';
 import DashboardScreen from './components/DashboardScreen';
 import AuditLogScreen from './components/AuditLogScreen';
 import AdminScreen from './components/AdminScreen';
+import DatabaseManagement from './components/DatabaseManagement';
 import { API_URL } from './utils/Constants';
 
 export default function App() {
@@ -299,6 +300,7 @@ export default function App() {
             <>
               <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/admin'} icon={<Users size={20} />} label="User Management" onClick={() => handleNavigation('/admin')} />
               <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/audit-logs'} icon={<ClipboardList size={20} />} label="Audit Logs" onClick={() => handleNavigation('/audit-logs')} />
+              <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/database'} icon={<Database size={20} />} label="Database" onClick={() => handleNavigation('/database')} />
             </>
           )}
         </nav>
@@ -418,6 +420,16 @@ export default function App() {
                 <Navigate to="/dashboard" replace />
               )
             } 
+          />
+          <Route
+            path="/database"
+            element={
+              userRole === 'ceo' ? (
+                <DatabaseManagement />
+              ) : (
+                <Navigate to="/dashboard" replace />
+              )
+            }
           />
         </Routes>
       </main>
