@@ -30,6 +30,7 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
   const [passwordModal, setPasswordModal] = useState({ isOpen: false, action: null, payload: null });
   const [redirectionModal, setRedirectionModal] = useState({ isOpen: false, disbursementId: null, cvNo: '' });
   const [isSaving, setIsSaving] = useState(false);
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId || projects[0]?.id || '');
   
@@ -158,7 +159,10 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
   };
 
   const handleInputChange = (field, value) => setEditingValues(prev => ({ ...prev, [field]: value }));
-  const handleSaveClick = () => { if (!canEdit) return; setPasswordModal({ isOpen: true, action: 'update_project', payload: { ...editingValues, contract_cost: String(editingValues.contract_cost).replace(/,/g, '') } }); };
+  const handleSaveClick = () => { 
+    if (!canEdit) return; 
+    executeSaveProject({ ...editingValues, contract_cost: String(editingValues.contract_cost).replace(/,/g, '') });
+  };
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -200,14 +204,16 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
 
   const executeSaveProject = async (values) => {
     setIsSaving(true);
-    if (onUpdateProject && project) await onUpdateProject(project.id, values);
+    if (onUpdateProject && project) {
+      await onUpdateProject(project.id, values);
+      setShowSaveSuccess(true);
+      setTimeout(() => setShowSaveSuccess(false), 3000);
+    }
     setIsSaving(false);
   };
 
   const handlePasswordConfirm = async () => {
-    if (passwordModal.action === 'update_project') {
-      executeSaveProject(passwordModal.payload);
-    } else if (passwordModal.action === 'delete_additional') {
+    if (passwordModal.action === 'delete_additional') {
       setIsSaving(true);
       try {
         const token = localStorage.getItem('fbtmcc_token');
@@ -767,11 +773,19 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
       <div style={{ position: 'relative', zIndex: 9999 }}>
         <PasswordConfirmModal
           isOpen={passwordModal.isOpen}
-          actionType={passwordModal.action === 'update_project' ? 'update' : 'delete'}
+          actionType="delete"
           onClose={() => setPasswordModal({ isOpen: false, action: null, payload: null })}
           onConfirm={handlePasswordConfirm}
         />
       </div>
+
+      {/* SUCCESS TOAST FOR PROJECT SAVE */}
+      {showSaveSuccess && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-500/20 px-6 py-3 rounded-2xl font-bold flex items-center gap-2 animate-in slide-in-from-top-4 shadow-lg">
+          <CheckCircle2 size={18} />
+          Successfully saved changes.
+        </div>
+      )}
 
       {/* PROJECT UNSAVED CHANGES MODAL (KAPAG LUMIPAT NG PROJECT SA DROPDOWN) */}
       {showProjectUnsavedModal && (
@@ -1214,11 +1228,7 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
     e.preventDefault();
     setErrorMessage('');
 
-    if (!headerData.project_code || totals.totalDebit === 0) return;
-    if (!isVarianceZero) { setErrorMessage("Paki-check ang Variance. Kailangang pantay ang Target CIB sa Computed CIB."); return; }
-
-    const validLines = lines.filter(line => line.category && line.amount).map(line => ({ ...line, amount: line.amount ? String(line.amount).replace(/,/g, '') : '' }));
-    if (validLines.length === 0) { setErrorMessage("Kailangan maglagay ng valid na item name at amount."); return; }
+    const validLines = lines.map(line => ({ ...line, amount: line.amount ? String(line.amount).replace(/,/g, '') : '' }));
 
     const isEditing = !!editingData;
     const newDisbursement = {
@@ -1233,11 +1243,7 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
       created_at: isEditing ? editingData.created_at : new Date().toISOString()
     };
 
-    if (isEditing) {
-      setPasswordModal({ isOpen: true, payload: newDisbursement });
-    } else {
-      executeSave(newDisbursement);
-    }
+    executeSave(newDisbursement);
   };
 
   if (!isOpen) return null;
@@ -1320,9 +1326,9 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500">Payee <span className="text-red-500">*</span></label>
+                    <label className="text-xs font-semibold text-slate-500">Payee</label>
                     <input type="text" name="payee" className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
-                      value={headerData.payee} onChange={handleHeaderChange} required />
+                      value={headerData.payee} onChange={handleHeaderChange} />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-500">Project Code (Locked)</label>
@@ -1330,9 +1336,9 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
                       value={headerData.project_code} disabled />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-500">Date <span className="text-red-500">*</span></label>
+                    <label className="text-xs font-semibold text-slate-500">Date</label>
                     <input type="date" name="date" className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
-                      value={headerData.date} onChange={handleHeaderChange} required />
+                      value={headerData.date} onChange={handleHeaderChange} />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-500">OR / INV #</label>
@@ -1341,13 +1347,13 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
                   </div>
 
                   <div className="space-y-1 md:col-span-3">
-                    <label className="text-xs font-semibold text-slate-500">Particulars (Description) <span className="text-red-500">*</span></label>
+                    <label className="text-xs font-semibold text-slate-500">Particulars (Description)</label>
                     <input type="text" name="particulars" className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
-                      value={headerData.particulars} onChange={handleHeaderChange} required />
+                      value={headerData.particulars} onChange={handleHeaderChange} />
                   </div>
                   
                   <div className="space-y-1 bg-red-50 dark:bg-red-900/20 p-2 -mt-2 -mb-2 rounded-md border border-red-200 dark:border-red-800 flex flex-col justify-center">
-                    <label className="text-xs font-bold text-red-800 dark:text-red-300 uppercase">Target CIB/COH (₱) <span className="text-red-500">*</span></label>
+                    <label className="text-xs font-bold text-red-800 dark:text-red-300 uppercase">Target CIB/COH (₱)</label>
                     <input type="text" name="target_cib" className="w-full p-1.5 bg-white dark:bg-slate-800 border border-red-200 dark:border-red-700 rounded-md text-sm font-black text-red-900 dark:text-red-100 outline-none focus:ring-2 focus:ring-red-500"
                       value={headerData.target_cib} onChange={(e) => {
                         let val = e.target.value.replace(/[^0-9.]/g, '');
@@ -1359,7 +1365,7 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
                           val = p2.join('.');
                         }
                         handleHeaderChange({ target: { name: 'target_cib', value: val } });
-                      }} required />
+                      }} />
                   </div>
 
                   <div className="space-y-1 md:col-span-4 flex items-end">
@@ -1391,7 +1397,7 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
                 <div className={`lg:col-span-2 space-y-6 ${targetCib <= 0 ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
                   <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                     <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100 dark:border-slate-700">
-                      <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">2. Cost Breakdown <span className="text-red-500">*</span></h3>
+                      <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">2. Cost Breakdown</h3>
                       <button type="button" onClick={addLine} className="text-xs bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-md font-medium flex items-center gap-1">
                         <Plus size={14} /> Add Line Item
                       </button>
@@ -1410,7 +1416,6 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
                               className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-bold text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
                               value={line.category} 
                               onChange={(e) => handleLineChange(line.id, 'category', e.target.value)} 
-                              required
                             />
                             <datalist id="historical-additional-items">
                               {historicalSuggestions.map(suggestion => (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Tags, 
   Trash2, 
@@ -43,6 +43,46 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
   
   const [recentlyAddedProject, setRecentlyAddedProject] = useState(null);
   const [passwordModal, setPasswordModal] = useState({ isOpen: false, action: null, payload: null });
+
+  // Custom Dropdown states & logic
+  const [sessionTypes, setSessionTypes] = useState([]);
+  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
+  const [customTypeInput, setCustomTypeInput] = useState('');
+  const typeDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (typeDropdownRef.current && !typeDropdownRef.current.contains(event.target)) {
+        setIsTypeDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const allProjectTypes = Array.from(new Set([
+    'Construction',
+    'Office',
+    ...projects.map(p => p.project_type).filter(Boolean),
+    ...sessionTypes
+  ])).sort((a, b) => a.localeCompare(b));
+
+  const handleAddCustomType = (e) => {
+    e.preventDefault();
+    const trimmed = customTypeInput.trim();
+    if (trimmed) {
+      if (!allProjectTypes.includes(trimmed)) {
+        setSessionTypes([...sessionTypes, trimmed]);
+      }
+      if (editingProject) {
+        setEditingProject({...editingProject, project_type: trimmed});
+      } else {
+        setNewProject({...newProject, project_type: trimmed});
+      }
+      setCustomTypeInput('');
+      setIsTypeDropdownOpen(false);
+    }
+  };
 
   // ==============================================================
   // CATEGORY FILTERING & INJECTION LOGIC
@@ -373,15 +413,64 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                     required
                   />
                 </div>
-                <div className="md:col-span-1 space-y-1.5 relative">
+                <div className="md:col-span-1 space-y-1.5 relative" ref={typeDropdownRef}>
                   <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase">Type</label>
-                  <SearchableDropdown 
-                    options={['Construction', 'Office']}
-                    value={editingProject ? (editingProject.project_type || 'Construction') : (newProject.project_type || 'Construction')}
-                    onChange={(val) => editingProject ? setEditingProject({...editingProject, project_type: val}) : setNewProject({...newProject, project_type: val})}
-                    placeholder="Select Type"
-                    size="large"
-                  />
+                  <div 
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-400 dark:border-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm transition-colors duration-300 flex justify-between items-center cursor-pointer"
+                    onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
+                  >
+                    <span className="truncate">{editingProject ? (editingProject.project_type || 'Construction') : (newProject.project_type || 'Construction')}</span>
+                    <ChevronDown size={16} className={`text-slate-400 transition-transform ${isTypeDropdownOpen ? 'rotate-180' : ''}`} />
+                  </div>
+                  
+                  {isTypeDropdownOpen && (
+                    <div className="absolute z-[60] top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 flex flex-col">
+                      <div className="p-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex gap-2">
+                        <input
+                          type="text"
+                          value={customTypeInput}
+                          onChange={(e) => setCustomTypeInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddCustomType(e);
+                            }
+                          }}
+                          placeholder="Type new..."
+                          className="flex-1 px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 transition-colors font-medium"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddCustomType}
+                          className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors flex items-center justify-center shadow-md shadow-indigo-200 dark:shadow-none"
+                        >
+                          <Plus size={16} />
+                        </button>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                        {allProjectTypes.map((type, idx) => (
+                          <div
+                            key={idx}
+                            onClick={() => {
+                              if (editingProject) {
+                                setEditingProject({...editingProject, project_type: type});
+                              } else {
+                                setNewProject({...newProject, project_type: type});
+                              }
+                              setIsTypeDropdownOpen(false);
+                            }}
+                            className={`px-4 py-2.5 text-sm cursor-pointer transition-colors font-medium ${
+                              (editingProject ? editingProject.project_type : newProject.project_type) === type 
+                                ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400' 
+                                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                            }`}
+                          >
+                            {type}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <button 
