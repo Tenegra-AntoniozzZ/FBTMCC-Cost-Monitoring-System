@@ -10,7 +10,7 @@ import { API_URL } from '../utils/Constants';
 
 export default function DisbursementScreen({ projects, categories, categoryObjects, disbursements, refreshData, isLoading, userRole, initialSearchQuery, initialDisbursementId, onClearInitialDisbursement, onModalStateChange }) {
   const canEdit = userRole === 'encoder';
-  
+
   // ==========================================
   // 1. STATES & REFS
   // ==========================================
@@ -21,7 +21,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   const [errorMessage, setErrorMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [lineErrors, setLineErrors] = useState([]);
-  
+
   const [initialFormState, setInitialFormState] = useState(null);
   const [modalAttachments, setModalAttachments] = useState([]);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
@@ -62,7 +62,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     input_tax: '',
     output_tax: '',
     target_cib: '',
-    costing_type: 'normal' 
+    costing_type: 'normal'
   });
 
   const [constructionLines, setConstructionLines] = useState([{ id: 1, category: '', amount: '' }]);
@@ -93,23 +93,48 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   };
 
   const availableMonths = useMemo(() => {
-    const months = disbursements.map(d => d.date && d.date.substring(0, 7)).filter(Boolean); 
-    return [...new Set(months)].sort((a, b) => b.localeCompare(a)); 
+    const months = disbursements.map(d => d.date && d.date.substring(0, 7)).filter(Boolean);
+    return [...new Set(months)].sort((a, b) => b.localeCompare(a));
   }, [disbursements]);
 
   const filteredDisbursements = useMemo(() => {
     // HARD FILTER: Remove anything marked as 'additional' so they NEVER show up here
     let result = disbursements.filter(d => d.costing_type !== 'additional');
-    
+
     if (!selectedMonths.includes('All')) {
       result = result.filter(d => selectedMonths.some(m => d.date && d.date.startsWith(m)));
     }
-    
+
     if (searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase().trim();
       result = result.filter(d => d.cv_no && d.cv_no.toLowerCase().includes(query));
     }
-    
+
+    // Sort by project_code: Z-A for prefix, ascending for number
+    result.sort((a, b) => {
+      const codeA = (a.project_code || '').toUpperCase();
+      const codeB = (b.project_code || '').toUpperCase();
+
+      if (!codeA && !codeB) return 0;
+      if (!codeA) return 1;
+      if (!codeB) return -1;
+
+      const matchA = codeA.match(/^([A-Z]+)-?(\d+)?/);
+      const matchB = codeB.match(/^([A-Z]+)-?(\d+)?/);
+
+      const prefixA = matchA ? matchA[1] : codeA;
+      const prefixB = matchB ? matchB[1] : codeB;
+
+      if (prefixA !== prefixB) {
+        return prefixB.localeCompare(prefixA);
+      }
+
+      const numA = matchA && matchA[2] ? parseInt(matchA[2], 10) : 0;
+      const numB = matchB && matchB[2] ? parseInt(matchB[2], 10) : 0;
+
+      return numA - numB;
+    });
+
     return result;
   }, [disbursements, selectedMonths, searchQuery]);
 
@@ -120,8 +145,8 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     return date.toLocaleString('en-US', { month: 'long', year: 'numeric' }).toUpperCase();
   };
 
-  const activeMonthDisplay = selectedMonths.includes('All') 
-    ? 'FOR ALL MONTHS' 
+  const activeMonthDisplay = selectedMonths.includes('All')
+    ? 'FOR ALL MONTHS'
     : selectedMonths.map(formatMonth).join(', ');
 
   const handleToggleMonth = (month) => {
@@ -130,11 +155,11 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     } else {
       let updated = tempSelectedMonths.filter(m => m !== 'All');
       if (updated.includes(month)) {
-        updated = updated.filter(m => m !== month); 
+        updated = updated.filter(m => m !== month);
       } else {
-        updated.push(month); 
+        updated.push(month);
       }
-      if (updated.length === 0) updated = ['All']; 
+      if (updated.length === 0) updated = ['All'];
       setTempSelectedMonths(updated);
     }
   };
@@ -193,9 +218,9 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
     (categoryObjects || []).forEach(catObj => {
       if (catObj.category_type && catObj.category_type !== 'Both' && catObj.category_type !== pType) {
-        return; 
+        return;
       }
-      
+
       const rawName = catObj.name;
       const upperName = rawName.toUpperCase();
       const cleanUpper = upperName.replace(/\(-+PHP\)/gi, '').trim();
@@ -223,9 +248,9 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       });
     }
 
-    return { 
-      mainCategoriesList: [...new Set(main)].sort((a, b) => a.localeCompare(b)), 
-      miscCategoriesList: [...new Set(misc)].sort((a, b) => a.localeCompare(b)) 
+    return {
+      mainCategoriesList: [...new Set(main)].sort((a, b) => a.localeCompare(b)),
+      miscCategoriesList: [...new Set(misc)].sort((a, b) => a.localeCompare(b))
     };
   }, [categoryObjects, headerData.project_code, projects]);
 
@@ -237,7 +262,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     allLines.forEach(line => {
       const amt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
       totalDebit += amt;
-      if (line.category === 'Labor /SUBCONTRACTOR') ewtPayable += (amt * 0.02); 
+      if (line.category === 'Labor /SUBCONTRACTOR') ewtPayable += (amt * 0.02);
     });
 
     const cib_coh = totalDebit - ewtPayable;
@@ -245,7 +270,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   }, [constructionLines, miscLines]);
 
   const targetCib = parseFloat(String(headerData.target_cib).replace(/,/g, '')) || 0;
-  const isVarianceZero = Math.abs(targetCib - totals.cib_coh) < 0.01; 
+  const isVarianceZero = Math.abs(targetCib - totals.cib_coh) < 0.01;
 
   const isDuplicateCV = useMemo(() => {
     if (!headerData.cv_no) return false;
@@ -264,10 +289,10 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     setMiscLines([{ id: now + 1, category: '', amount: '' }]);
     setShowTaxFields(false);
     setErrorMessage('');
-    setLineErrors([]); 
+    setLineErrors([]);
     setEditingId(null);
   };
-  
+
   const closeAndResetModal = () => {
     setIsModalOpen(false);
     resetForm();
@@ -276,8 +301,8 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   const checkUnsavedChanges = () => {
     if (!initialFormState) return false;
     const currentLines = [...constructionLines, ...miscLines];
-    return JSON.stringify(headerData) !== initialFormState.headerData || 
-           JSON.stringify(currentLines) !== initialFormState.expenseLines;
+    return JSON.stringify(headerData) !== initialFormState.headerData ||
+      JSON.stringify(currentLines) !== initialFormState.expenseLines;
   };
 
   const handleCloseRequest = () => {
@@ -290,7 +315,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
   const handleStayInModal = () => {
     setPostSavePrompt(false);
-    resetForm(); 
+    resetForm();
     const initHeader = { date: new Date().toISOString().split('T')[0], project_code: '', payee: '', particulars: '', tin: '', cv_no: '', bank: '', check_no: '', or_inv_no: '', accts_pay: '', input_tax: '', output_tax: '', target_cib: '', costing_type: 'normal' };
     const initC = [{ id: Date.now(), category: '', amount: '' }];
     const initM = [{ id: Date.now() + 1, category: '', amount: '' }];
@@ -306,7 +331,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   };
 
   const handleHeaderChange = (e) => setHeaderData({ ...headerData, [e.target.name]: e.target.value });
-  
+
   const handleLineChange = (id, field, value, type = 'construction') => {
     let finalValue = value;
     if (field === 'amount') {
@@ -338,7 +363,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     });
     setTimeout(() => setIsAddingLine(false), 300);
   };
-  
+
   const removeLine = (id, type = 'construction') => {
     const setter = type === 'construction' ? setConstructionLines : setMiscLines;
     if (type === 'construction' && constructionLines.length === 1 && miscLines.length === 0) return;
@@ -346,11 +371,11 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   };
 
   const handleSaveDraft = () => {
-    localStorage.setItem('disbursement_draft', JSON.stringify({ 
-      headerData, 
-      constructionLines, 
-      miscLines, 
-      editingId 
+    localStorage.setItem('disbursement_draft', JSON.stringify({
+      headerData,
+      constructionLines,
+      miscLines,
+      editingId
     }));
     setShowUnsavedModal(false);
     closeAndResetModal();
@@ -368,7 +393,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       setHeaderData(draft.headerData);
       setConstructionLines(draft.constructionLines || []);
       setMiscLines(draft.miscLines || []);
-      
+
       if (draft.headerData.accts_pay || draft.headerData.input_tax || draft.headerData.output_tax) {
         setShowTaxFields(true);
       } else {
@@ -388,7 +413,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     localStorage.removeItem('disbursement_draft');
     setShowDraftModal(false);
     resetForm();
-    
+
     const initHeader = { date: new Date().toISOString().split('T')[0], project_code: '', payee: '', particulars: '', tin: '', cv_no: '', bank: '', check_no: '', or_inv_no: '', accts_pay: '', input_tax: '', output_tax: '', target_cib: '', costing_type: 'normal' };
     const initC = [{ id: Date.now(), category: '', amount: '' }];
     const initM = [{ id: Date.now() + 1, category: '', amount: '' }];
@@ -399,7 +424,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       headerData: JSON.stringify(initHeader),
       expenseLines: JSON.stringify([...initC, ...initM])
     });
-    
+
     setIsModalOpen(true);
   };
 
@@ -440,10 +465,10 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       input_tax: d.input_tax || '',
       output_tax: d.output_tax || '',
       target_cib: (d.target_cib || d.net_amount || '').toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','),
-      costing_type: d.costing_type || 'normal' 
+      costing_type: d.costing_type || 'normal'
     };
     setHeaderData(newHeader);
-    
+
     const loadedExpenses = d.expenses && d.expenses.length > 0 ? d.expenses : [];
     const cLines = [];
     const mLines = [];
@@ -483,7 +508,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
     if (cLines.length === 0) cLines.push({ id: Date.now(), category: '', amount: '' });
     if (mLines.length === 0) mLines.push({ id: Date.now() + 1, category: '', amount: '' });
-    
+
     setConstructionLines(cLines);
     setMiscLines(mLines);
     setModalAttachments(d.attachments || []);
@@ -493,12 +518,12 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     } else {
       setShowTaxFields(false);
     }
-    
+
     setInitialFormState({
       headerData: JSON.stringify(newHeader),
       expenseLines: JSON.stringify(expensesWithCommas)
     });
-    
+
     setErrorMessage('');
     setIsModalOpen(true);
   };
@@ -506,13 +531,13 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   const executeSave = async (disbursementData) => {
     setIsSaving(true);
     try {
-      const token = localStorage.getItem('fbtmcc_token'); 
+      const token = localStorage.getItem('fbtmcc_token');
       const url = editingId ? `${API_URL}/disbursements/${editingId}` : `${API_URL}/disbursements`;
       const method = editingId ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
         method: method,
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
@@ -520,8 +545,8 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       });
 
       if (response.ok) {
-        await refreshData(); 
-        setPostSavePrompt(true); 
+        await refreshData();
+        setPostSavePrompt(true);
       } else {
         const errData = await response.json();
         setErrorMessage("Server Error: " + (errData.error || "Hindi ma-save ang data."));
@@ -536,7 +561,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    setErrorMessage(''); 
+    setErrorMessage('');
 
     if (!headerData.project_code || !canEdit || totals.totalDebit === 0) return;
     if (!headerData.cv_no) { setErrorMessage("Kailangan ilagay ang CV#."); return; }
@@ -559,13 +584,13 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     const invalidLines = combinedLines.filter(line => !line.category || line.category.trim() === '');
     if (invalidLines.length > 0) {
       const errorIds = invalidLines.map(line => line.id);
-      setLineErrors(errorIds); 
+      setLineErrors(errorIds);
       setErrorMessage("Paki-pili ang kategorya para sa lahat ng nilagyan ng amount.");
-      return; 
+      return;
     }
 
     const newDisbursement = {
-      id: editingId || Date.now().toString(36) + Math.floor(Math.random()*1000).toString(), 
+      id: editingId || Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(),
       ...headerData,
       target_cib: String(headerData.target_cib).replace(/,/g, ''),
       expenses: combinedLines,
@@ -591,7 +616,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   const executeDelete = async (id) => {
     try {
       const token = localStorage.getItem('fbtmcc_token');
-      const response = await fetch(`${API_URL}/disbursements/${id}`, { 
+      const response = await fetch(`${API_URL}/disbursements/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -624,7 +649,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   // ==========================================
   // 5. USE EFFECTS (Listeners & Auto-Opens)
   // ==========================================
-  
+
   useEffect(() => {
     if (onModalStateChange) {
       onModalStateChange(isModalOpen || showUnsavedModal || showDraftModal || passwordModal.isOpen || postSavePrompt);
@@ -642,7 +667,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
         return () => clearTimeout(timer);
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialDisbursementId, disbursements]);
 
   useEffect(() => {
@@ -665,30 +690,30 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
           event.preventDefault();
           handleCloseModalAfterSave();
         }
-        return; 
+        return;
       }
 
       if (event.key === 'Escape') {
         if (isModalOpen && !showUnsavedModal && !showDraftModal) handleCloseRequest();
         if (isFilterOpen) setIsFilterOpen(false);
       }
-      
+
       if (isModalOpen && !postSavePrompt && (event.ctrlKey || event.metaKey) && event.key === 'Enter') {
         event.preventDefault();
-        
+
         const isDup = disbursements.some((d) => d.id !== editingId && d.cv_no && d.cv_no.trim().toLowerCase() === headerData.cv_no.trim().toLowerCase());
         const tCib = parseFloat(headerData.target_cib) || 0;
         const isVarZero = Math.abs(tCib - totals.cib_coh) < 0.01;
-        
+
         if (!isDup && isVarZero && tCib > 0 && !isSaving && canEdit && headerData.project_code && headerData.cv_no) {
-           const fakeEvent = { preventDefault: () => {} };
-           handleSubmit(fakeEvent);
+          const fakeEvent = { preventDefault: () => { } };
+          handleSubmit(fakeEvent);
         }
       }
     }
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isModalOpen, isFilterOpen, showUnsavedModal, showDraftModal, postSavePrompt, headerData, constructionLines, miscLines, initialFormState, isSaving, totals, disbursements, editingId, canEdit]);
 
 
@@ -725,32 +750,32 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       </header>
 
       <main className="flex-1 overflow-hidden flex flex-col p-8 space-y-8">
-        
+
         {/* STATS CARDS */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
-          <HealthCard 
-            title="Total of Debit (Gross)" 
-            amount={ledgerTotals.dr} 
-            colorClass="bg-blue-600 dark:bg-blue-500" 
-            textClass="text-blue-600 dark:text-blue-400" 
+          <HealthCard
+            title="Total of Debit (Gross)"
+            amount={ledgerTotals.dr}
+            colorClass="bg-blue-600 dark:bg-blue-500"
+            textClass="text-blue-600 dark:text-blue-400"
           />
-          <HealthCard 
-            title="Total of Credit (Net+Tax)" 
-            amount={ledgerTotals.cr} 
-            colorClass="bg-emerald-600 dark:bg-emerald-500" 
-            textClass="text-emerald-600 dark:text-emerald-400" 
+          <HealthCard
+            title="Total of Credit (Net+Tax)"
+            amount={ledgerTotals.cr}
+            colorClass="bg-emerald-600 dark:bg-emerald-500"
+            textClass="text-emerald-600 dark:text-emerald-400"
           />
-          <HealthCard 
-            title="Current Variance" 
-            amount={ledgerTotals.diff} 
-            colorClass={ledgerTotals.diff === 0 ? "bg-emerald-500" : "bg-rose-500"} 
-            textClass={ledgerTotals.diff === 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"} 
+          <HealthCard
+            title="Current Variance"
+            amount={ledgerTotals.diff}
+            colorClass={ledgerTotals.diff === 0 ? "bg-emerald-500" : "bg-rose-500"}
+            textClass={ledgerTotals.diff === 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}
           />
         </section>
 
         {/* LEDGER TABLE SECTION */}
         <section className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0 transition-colors duration-300">
-          
+
           {/* ACTION BAR */}
           <div className="px-8 py-6 bg-slate-50/50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-700 flex flex-wrap items-center justify-between gap-4 shrink-0 transition-colors duration-300">
             <div className="flex items-center gap-4 flex-1">
@@ -766,7 +791,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
               </div>
 
               <div className="relative" ref={filterRef}>
-                <button 
+                <button
                   onClick={() => {
                     setTempSelectedMonths(selectedMonths);
                     setIsFilterOpen(!isFilterOpen);
@@ -785,8 +810,8 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                     </div>
                     <div className="p-3 max-h-64 overflow-y-auto space-y-1 custom-scrollbar">
                       <label className="flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl cursor-pointer transition-colors group">
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           checked={tempSelectedMonths.includes('All')}
                           onChange={() => handleToggleMonth('All')}
                           className="rounded-lg border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 w-5 h-5 cursor-pointer bg-white dark:bg-slate-800"
@@ -795,8 +820,8 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                       </label>
                       {availableMonths.map(month => (
                         <label key={month} className="flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl cursor-pointer transition-colors group">
-                          <input 
-                            type="checkbox" 
+                          <input
+                            type="checkbox"
                             checked={tempSelectedMonths.includes(month)}
                             onChange={() => handleToggleMonth(month)}
                             className="rounded-lg border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 w-5 h-5 cursor-pointer bg-white dark:bg-slate-800"
@@ -806,7 +831,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                       ))}
                     </div>
                     <div className="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-                      <button 
+                      <button
                         onClick={applyFilter}
                         className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-black transition-all shadow-lg shadow-blue-100 dark:shadow-none"
                       >
@@ -819,9 +844,9 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
               {/* ZOOM CONTROLS */}
               <div className="flex items-center bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-2 py-1 shadow-sm gap-1 ml-2 transition-colors duration-300">
-                <button 
-                  onClick={handleZoomOut} 
-                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-lg text-slate-500 dark:text-slate-400 transition-colors disabled:opacity-30" 
+                <button
+                  onClick={handleZoomOut}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-lg text-slate-500 dark:text-slate-400 transition-colors disabled:opacity-30"
                   title="Zoom Out"
                   disabled={zoomLevel <= 0.6}
                 >
@@ -830,18 +855,18 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                 <div className="text-[10px] font-black text-slate-400 dark:text-slate-500 w-12 text-center select-none uppercase tracking-tighter">
                   {Math.round(zoomLevel * 100)}%
                 </div>
-                <button 
-                  onClick={handleZoomIn} 
-                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-lg text-slate-500 dark:text-slate-400 transition-colors disabled:opacity-30" 
+                <button
+                  onClick={handleZoomIn}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-lg text-slate-500 dark:text-slate-400 transition-colors disabled:opacity-30"
                   title="Zoom In"
                   disabled={zoomLevel >= 1.5}
                 >
                   <ZoomIn size={16} />
                 </button>
                 <div className="w-px h-4 bg-slate-200 dark:bg-slate-600 mx-1"></div>
-                <button 
-                  onClick={resetZoom} 
-                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors" 
+                <button
+                  onClick={resetZoom}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-600 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                   title="Reset Zoom"
                 >
                   <RotateCcw size={14} />
@@ -850,7 +875,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
             </div>
 
             {canEdit && (
-              <button 
+              <button
                 onClick={handleNewDisbursement}
                 className="flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-black transition-all shadow-lg shadow-blue-200 dark:shadow-none"
               >
@@ -894,8 +919,8 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                     </td>
                   </tr>
                 ) : filteredDisbursements.map(d => (
-                  <tr 
-                    key={d.id} 
+                  <tr
+                    key={d.id}
                     className={`even:bg-slate-50/80 dark:even:bg-slate-800/80 hover:bg-blue-100/50 dark:hover:bg-blue-900/30 transition-colors group ${canEdit ? 'cursor-pointer' : ''}`}
                     onDoubleClick={() => handleEditRow(d)}
                   >
@@ -903,9 +928,9 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                     <td className="px-6 py-4 font-black text-slate-800 dark:text-slate-200 border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20">{d.payee}</td>
                     <td className="px-6 py-4 font-black text-blue-700 dark:text-blue-400 text-center border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20">#{d.cv_no}</td>
                     <td className="px-6 py-4 font-black text-slate-500 dark:text-slate-400 text-center border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20">{d.project_code}</td>
-                    <td className="px-6 py-4 text-right font-mono font-black text-slate-900 dark:text-white border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20">₱{(d.gross_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td className="px-6 py-4 text-right font-mono font-black text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-emerald-100/30 dark:group-hover:bg-emerald-900/30">₱{(d.net_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td className="px-6 py-4 text-right font-mono font-black text-rose-600 dark:text-rose-400 bg-rose-50/20 dark:bg-rose-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-rose-100/20 dark:group-hover:bg-rose-900/30">₱{(d.ewt_amount || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td className="px-6 py-4 text-right font-mono font-black text-slate-900 dark:text-white border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20">₱{(d.gross_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="px-6 py-4 text-right font-mono font-black text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-emerald-100/30 dark:group-hover:bg-emerald-900/30">₱{(d.net_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="px-6 py-4 text-right font-mono font-black text-rose-600 dark:text-rose-400 bg-rose-50/20 dark:bg-rose-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-rose-100/20 dark:group-hover:bg-rose-900/30">₱{(d.ewt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     {categories.map(cat => {
                       const amt = getCategoryAmount(d, cat);
                       return (
@@ -934,9 +959,9 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                 <tfoot className="bg-slate-100 dark:bg-slate-800 font-black text-slate-800 dark:text-slate-200 border-t-4 border-slate-400 dark:border-slate-600 transition-colors duration-300">
                   <tr>
                     <td colSpan="4" className="px-6 py-6 text-right text-xs tracking-widest text-slate-500 dark:text-slate-400 sticky left-0 z-10 bg-slate-100 dark:bg-slate-800 border-r border-slate-400 dark:border-slate-600 shadow-[3px_0_0_0_#94a3b8] dark:shadow-[3px_0_0_0_#475569] transition-colors duration-300">TOTAL SUMMARY:</td>
-                    <td className="px-6 py-6 text-right font-mono text-blue-800 dark:text-blue-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.dr.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td className="px-6 py-6 text-right font-mono text-emerald-800 dark:text-emerald-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.cib.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td className="px-6 py-6 text-right font-mono text-rose-800 dark:text-rose-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.ewt.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td className="px-6 py-6 text-right font-mono text-blue-800 dark:text-blue-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.dr.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="px-6 py-6 text-right font-mono text-emerald-800 dark:text-emerald-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.cib.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="px-6 py-6 text-right font-mono text-rose-800 dark:text-rose-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.ewt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     <td colSpan={categories.length + (canEdit ? 2 : 1)} className="px-6 py-6"></td>
                   </tr>
                 </tfoot>
@@ -958,18 +983,18 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
               <p className="text-slate-500 dark:text-slate-400 font-medium mb-8">
                 The disbursement voucher has been successfully recorded in the ledger. Would you like to add a new one?
               </p>
-              
+
               <div className="flex flex-col sm:flex-row w-full gap-3">
-                <button 
+                <button
                   onClick={handleCloseModalAfterSave}
                   className="flex-1 py-3.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-black rounded-xl transition-all"
                 >
                   <span className="flex items-center justify-center gap-2">
-                    <X size={16} /> Close 
+                    <X size={16} /> Close
                   </span>
                   <div className="text-[10px] font-medium text-slate-400 dark:text-slate-500 mt-0.5 uppercase tracking-widest">(ESC)</div>
                 </button>
-                <button 
+                <button
                   onClick={handleStayInModal}
                   className="flex-[1.5] py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl transition-all shadow-lg shadow-blue-200 dark:shadow-none"
                 >
@@ -987,7 +1012,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       {isModalOpen && canEdit && !postSavePrompt && (
         <div className="fixed inset-0 z-50 flex justify-center items-start pt-6 pb-6 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm px-4 overflow-hidden transition-colors duration-300">
           <div className="bg-slate-50 dark:bg-slate-900 w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-full border border-slate-200 dark:border-slate-800">
-            
+
             <div className="bg-white dark:bg-slate-800 px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center shrink-0 transition-colors duration-300">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
@@ -1022,7 +1047,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                     <span>1. Voucher Details</span>
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    
+
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Payee <span className="text-red-500">*</span></label>
                       <input type="text" name="payee" placeholder="Name of Payee" className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none font-medium text-slate-800 dark:text-white transition-colors"
@@ -1044,23 +1069,22 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">CV # <span className="text-red-500">*</span></label>
-                      <input 
-                        type="text" 
-                        name="cv_no" 
+                      <input
+                        type="text"
+                        name="cv_no"
                         inputMode="numeric"
                         pattern="[0-9]*"
-                        placeholder="Unique CV#" 
-                        className={`w-full p-2 rounded-md text-sm outline-none font-bold transition-all duration-200 ${
-                          isDuplicateCV 
-                            ? 'border-2 border-red-500 dark:border-red-400 text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 focus:ring-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]' 
-                            : 'border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 bg-amber-50 dark:bg-amber-900/10 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400'
-                        }`}
-                        value={headerData.cv_no} 
+                        placeholder="Unique CV#"
+                        className={`w-full p-2 rounded-md text-sm outline-none font-bold transition-all duration-200 ${isDuplicateCV
+                          ? 'border-2 border-red-500 dark:border-red-400 text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 focus:ring-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
+                          : 'border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 bg-amber-50 dark:bg-amber-900/10 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400'
+                          }`}
+                        value={headerData.cv_no}
                         onChange={(e) => {
                           const onlyNums = e.target.value.replace(/[^0-9]/g, '');
                           handleHeaderChange({ target: { name: 'cv_no', value: onlyNums } });
-                        }} 
-                        required 
+                        }}
+                        required
                       />
                       {isDuplicateCV && (
                         <p className="text-[10px] text-red-600 dark:text-red-400 font-bold flex items-center gap-1 animate-in slide-in-from-top-1">
@@ -1068,7 +1092,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                         </p>
                       )}
                     </div>
-                    
+
                     <div className="space-y-1 md:col-span-2">
                       <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Particulars (Description) <span className="text-red-500">*</span></label>
                       <input type="text" name="particulars" placeholder="Details..." className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors"
@@ -1101,7 +1125,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                       <label className="text-xs font-bold text-blue-800 dark:text-blue-300 uppercase flex items-center justify-between">
                         <span>Target CIB/COH (₱) <span className="text-red-500">*</span></span>
                       </label>
-                      <input type="text" name="target_cib" placeholder="0.00" 
+                      <input type="text" name="target_cib" placeholder="0.00"
                         className="w-full p-1.5 border border-blue-200 dark:border-blue-700 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none font-black text-blue-900 dark:text-blue-100 bg-white dark:bg-slate-800 transition-colors"
                         value={headerData.target_cib} onChange={(e) => {
                           let val = e.target.value.replace(/[^0-9.]/g, '');
@@ -1118,35 +1142,35 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
                     <div className="space-y-1 md:col-span-1 flex items-end pb-1">
                       <button type="button" onClick={() => setShowTaxFields(!showTaxFields)} className="text-blue-600 dark:text-blue-400 text-xs font-medium hover:underline flex items-center gap-1 whitespace-nowrap">
-                        {showTaxFields ? 'Hide Tax/Payables Fields' : 'Show Advanced Fields (Accts Pay, BIR-VAT, etc.)'} <ChevronDown size={14}/>
+                        {showTaxFields ? 'Hide Tax/Payables Fields' : 'Show Advanced Fields (Accts Pay, BIR-VAT, etc.)'} <ChevronDown size={14} />
                       </button>
                     </div>
                   </div>
 
                   {showTaxFields && (
-                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg transition-colors duration-300">
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Accts Pay</label>
-                          <input type="number" step="0.01" name="accts_pay" placeholder="0.00" className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors"
-                            value={headerData.accts_pay} onChange={handleHeaderChange} />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Input Tax (Vat Input)</label>
-                          <input type="number" step="0.01" name="input_tax" placeholder="0.00" className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors"
-                            value={headerData.input_tax} onChange={handleHeaderChange} />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Output Tax</label>
-                          <input type="number" step="0.01" name="output_tax" placeholder="0.00" className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors"
-                            value={headerData.output_tax} onChange={handleHeaderChange} />
-                        </div>
-                     </div>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-lg transition-colors duration-300">
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Accts Pay</label>
+                        <input type="number" step="0.01" name="accts_pay" placeholder="0.00" className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors"
+                          value={headerData.accts_pay} onChange={handleHeaderChange} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Input Tax (Vat Input)</label>
+                        <input type="number" step="0.01" name="input_tax" placeholder="0.00" className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors"
+                          value={headerData.input_tax} onChange={handleHeaderChange} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Output Tax</label>
+                        <input type="number" step="0.01" name="output_tax" placeholder="0.00" className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors"
+                          value={headerData.output_tax} onChange={handleHeaderChange} />
+                      </div>
+                    </div>
                   )}
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className={`lg:col-span-2 space-y-6 transition-all duration-300 ${targetCib <= 0 ? 'opacity-40 pointer-events-none grayscale-[50%]' : ''}`}>
-                    
+
                     {/* 2. CONSTRUCTION COST BREAKDOWN */}
                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden transition-colors duration-300">
                       <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100 dark:border-slate-700">
@@ -1167,17 +1191,17 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                               {index + 1}
                             </div>
                             <div className="flex-1">
-                                  <SearchableDropdown 
-                                  options={mainCategoriesList}
-                                  value={line.category}
-                                  onChange={(val) => handleLineChange(line.id, 'category', val, 'construction')}
-                                  placeholder="-- Find Construction Category --"
-                                  hasError={lineErrors.includes(line.id)}
-                                  />
-                              </div>
+                              <SearchableDropdown
+                                options={mainCategoriesList}
+                                value={line.category}
+                                onChange={(val) => handleLineChange(line.id, 'category', val, 'construction')}
+                                placeholder="-- Find Construction Category --"
+                                hasError={lineErrors.includes(line.id)}
+                              />
+                            </div>
                             <div className="w-40 relative mt-1">
                               <span className="absolute left-3 top-2 text-slate-400 dark:text-slate-500 text-sm font-medium">₱</span>
-                              <input type="text" placeholder="0.00" 
+                              <input type="text" placeholder="0.00"
                                 className="w-full pl-7 p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-right text-slate-800 dark:text-white transition-colors"
                                 value={line.amount} onChange={(e) => handleLineChange(line.id, 'amount', e.target.value, 'construction')} />
                             </div>
@@ -1217,17 +1241,17 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                               {index + 1}
                             </div>
                             <div className="flex-1">
-                                  <SearchableDropdown 
-                                  options={miscCategoriesList}
-                                  value={line.category}
-                                  onChange={(val) => handleLineChange(line.id, 'category', val, 'misc')}
-                                  placeholder="-- Find Miscellaneous Item --"
-                                  hasError={lineErrors.includes(line.id)}
-                                  />
-                              </div>
+                              <SearchableDropdown
+                                options={miscCategoriesList}
+                                value={line.category}
+                                onChange={(val) => handleLineChange(line.id, 'category', val, 'misc')}
+                                placeholder="-- Find Miscellaneous Item --"
+                                hasError={lineErrors.includes(line.id)}
+                              />
+                            </div>
                             <div className="w-40 relative mt-1">
                               <span className="absolute left-3 top-2 text-slate-400 dark:text-slate-500 text-sm font-medium">₱</span>
-                              <input type="text" placeholder="0.00" 
+                              <input type="text" placeholder="0.00"
                                 className="w-full pl-7 p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-right text-slate-800 dark:text-white transition-colors"
                                 value={line.amount} onChange={(e) => handleLineChange(line.id, 'amount', e.target.value, 'misc')} />
                             </div>
@@ -1396,16 +1420,16 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                       <div className="space-y-3">
                         <div className="flex justify-between items-center text-slate-300 dark:text-slate-400 text-sm">
                           <span>Total of Debit (Gross Exp.)</span>
-                          <span className="font-mono text-white">₱ {totals.totalDebit.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                          <span className="font-mono text-white">₱ {totals.totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
                         <div className="flex justify-between items-center text-rose-300 dark:text-rose-400 text-sm">
                           <span>Less: EWT Payable</span>
-                          <span className="font-mono">- ₱ {totals.ewtPayable.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                          <span className="font-mono">- ₱ {totals.ewtPayable.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
                         {headerData.input_tax && (
                           <div className="flex justify-between items-center text-slate-400 dark:text-slate-500 text-xs">
                             <span>Input Tax</span>
-                            <span className="font-mono text-slate-300">₱ {parseFloat(headerData.input_tax).toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                            <span className="font-mono text-slate-300">₱ {parseFloat(headerData.input_tax).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                           </div>
                         )}
                       </div>
@@ -1415,35 +1439,34 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                       <div className="flex justify-between items-end mb-3">
                         <div>
                           <div className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-wider mb-1">Target CIB (From Receipt)</div>
-                          <div className="text-lg font-bold text-slate-300 dark:text-white">₱ {targetCib.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                          <div className="text-lg font-bold text-slate-300 dark:text-white">₱ {targetCib.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                         </div>
                         <div className="text-right">
                           <div className="text-[10px] text-blue-300 dark:text-blue-400 font-semibold uppercase tracking-wider mb-1">Computed CIB/COH</div>
                           <div className="text-2xl font-black text-blue-400 dark:text-blue-500 tracking-tight">
-                            ₱ {totals.cib_coh.toLocaleString(undefined, {minimumFractionDigits: 2})}
+                            ₱ {totals.cib_coh.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                           </div>
                         </div>
                       </div>
 
                       <div className={`p-3 rounded-lg flex items-center justify-between mb-4 border transition-colors ${isVarianceZero ? 'bg-emerald-500/10 border-emerald-500/30 dark:bg-emerald-900/20 dark:border-emerald-800' : 'bg-red-500/10 border-red-500/30 dark:bg-red-900/20 dark:border-red-800'}`}>
-                         <span className={`text-xs font-bold uppercase ${isVarianceZero ? 'text-emerald-400 dark:text-emerald-500' : 'text-red-400 dark:text-red-500'}`}>
-                            {isVarianceZero ? '✓ Balanced' : '⚠️ Variance (Short/Over)'}
-                         </span>
-                         <span className={`font-mono font-bold ${isVarianceZero ? 'text-emerald-400 dark:text-emerald-500' : 'text-red-400 dark:text-red-500'}`}>
-                            {(targetCib - totals.cib_coh) > 0 ? '+' : ''}{(targetCib - totals.cib_coh).toLocaleString(undefined, {minimumFractionDigits: 2})}
-                         </span>
+                        <span className={`text-xs font-bold uppercase ${isVarianceZero ? 'text-emerald-400 dark:text-emerald-500' : 'text-red-400 dark:text-red-500'}`}>
+                          {isVarianceZero ? '✓ Balance' : '⚠️ Variance (Short/Over)'}
+                        </span>
+                        <span className={`font-mono font-bold ${isVarianceZero ? 'text-emerald-400 dark:text-emerald-500' : 'text-red-400 dark:text-red-500'}`}>
+                          {(targetCib - totals.cib_coh) > 0 ? '+' : ''}{(targetCib - totals.cib_coh).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </span>
                       </div>
-                      
+
                       <div className="flex flex-col gap-2">
-                        <button 
-                          type="submit" 
+                        <button
+                          type="submit"
                           onClick={handleSubmit}
                           disabled={isDuplicateCV || !isVarianceZero || targetCib === 0 || isSaving}
-                          className={`w-full text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all shadow-lg ${
-                            (isDuplicateCV || !isVarianceZero || targetCib === 0 || isSaving) 
-                              ? 'bg-slate-500 dark:bg-slate-700 cursor-not-allowed opacity-50 shadow-none' 
-                              : 'bg-blue-600 hover:bg-blue-500 dark:bg-blue-700 dark:hover:bg-blue-600 shadow-blue-900/20 dark:shadow-none'
-                          }`}
+                          className={`w-full text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all shadow-lg ${(isDuplicateCV || !isVarianceZero || targetCib === 0 || isSaving)
+                            ? 'bg-slate-500 dark:bg-slate-700 cursor-not-allowed opacity-50 shadow-none'
+                            : 'bg-blue-600 hover:bg-blue-500 dark:bg-blue-700 dark:hover:bg-blue-600 shadow-blue-900/20 dark:shadow-none'
+                            }`}
                         >
                           <Save size={18} /> {isSaving ? 'Saving...' : (editingId ? 'Update Disbursement' : 'Post Disbursement')}
                         </button>
@@ -1481,9 +1504,9 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       />
 
       {(isSaving || isLoading) && (
-        <LoadingOverlay 
-          message={isSaving ? "Saving Entry" : "Refreshing Data"} 
-          subtext={isSaving ? "Please wait a moment..." : "Syncing your ledger..."}  
+        <LoadingOverlay
+          message={isSaving ? "Saving Entry" : "Refreshing Data"}
+          subtext={isSaving ? "Please wait a moment..." : "Syncing your ledger..."}
         />
       )}
     </div>
