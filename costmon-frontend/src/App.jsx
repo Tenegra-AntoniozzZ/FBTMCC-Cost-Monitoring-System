@@ -42,12 +42,14 @@ export default function App() {
   const [showSaveConfirmModal, setShowSaveConfirmModal] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState(null);
   const [pendingProjectData, setPendingProjectData] = useState(null); // Para i-store yung ise-save
+  const [pendingProjectId, setPendingProjectId] = useState(null); // The exact project being edited
   const [passwordModal, setPasswordModal] = useState({ isOpen: false, action: null });
 
   // Pasa ito sa CostMonitoringScreen para laging updated yung App kung may changes
-  const handleDirtyChange = useCallback((isDirty, currentData) => {
+  const handleDirtyChange = useCallback((isDirty, currentData, projectId) => {
     setIsProjectDirty(isDirty);
     setPendingProjectData(currentData);
+    setPendingProjectId(projectId);
   }, []);
 
   // ==========================================
@@ -178,14 +180,18 @@ export default function App() {
   }, [showLogoutModal, isSearchOpen, isAnyModalOpen, showSaveConfirmModal, passwordModal.isOpen]);
 
   const handleUpdateProject = async (projectId, updatedValues) => {
-    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updatedValues } : p));
+    const cleanValues = {
+      ...updatedValues,
+      contract_cost: updatedValues.contract_cost ? String(updatedValues.contract_cost).replace(/,/g, '') : undefined
+    };
+    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...cleanValues } : p));
     await fetch(`${API_URL}/projects/${projectId}`, {
       method: 'PUT',
       headers: { 
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
       },
-      body: JSON.stringify(updatedValues)
+      body: JSON.stringify(cleanValues)
     });
     setIsProjectDirty(false); // Reset dirty flag after successful save
   };
@@ -240,8 +246,8 @@ export default function App() {
   const handleAppPasswordConfirm = async () => {
     setPasswordModal({ isOpen: false, action: null });
     
-    if (pendingProjectData && initialCostMonitoringProjectId) {
-      await handleUpdateProject(initialCostMonitoringProjectId, pendingProjectData);
+    if (pendingProjectData && pendingProjectId) {
+      await handleUpdateProject(pendingProjectId, pendingProjectData);
     }
 
     if (pendingNavigation === 'logout') {
@@ -457,9 +463,19 @@ export default function App() {
             </p>
             <div className="flex flex-col gap-3">
               <button 
-                onClick={() => {
+                onClick={async () => {
                   setShowSaveConfirmModal(false);
-                  setPasswordModal({ isOpen: true, action: 'save_nav' });
+                  if (pendingProjectData && pendingProjectId) {
+                    await handleUpdateProject(pendingProjectId, pendingProjectData);
+                  }
+                  if (pendingNavigation === 'logout') {
+                    executeLogout();
+                  } else if (pendingNavigation === 'search') {
+                    setIsSearchOpen(true);
+                  } else if (pendingNavigation) {
+                    navigate(pendingNavigation);
+                  }
+                  setPendingNavigation(null);
                 }} 
                 className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-lg transition-all flex justify-center items-center gap-2"
               >

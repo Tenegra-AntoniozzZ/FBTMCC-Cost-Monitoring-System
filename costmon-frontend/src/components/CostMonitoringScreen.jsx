@@ -97,7 +97,13 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
 
   const [editingValues, setEditingValues] = useState(() => {
     const p = projects.find(item => item.id === (initialProjectId || projects[0]?.id || ''));
-    if (p) return { contract_cost: p.contract_cost || 0, profit_percentage: p.profit_percentage || 0.15, project_area: p.project_area || '', project_start: p.project_start || '', days_end: p.days_end || '' };
+    if (p) return { 
+      contract_cost: p.contract_cost !== undefined && p.contract_cost !== null ? p.contract_cost : '0', 
+      profit_percentage: p.profit_percentage !== undefined && p.profit_percentage !== null ? p.profit_percentage : 0.15, 
+      project_area: p.project_area !== null && p.project_area !== undefined ? String(p.project_area) : '', 
+      project_start: p.project_start || '', 
+      days_end: p.days_end || '' 
+    };
     return { profit_percentage: 0.15 };
   });
 
@@ -105,7 +111,13 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
   if (project?.id !== prevProject?.id) {
     setPrevProject(project);
     if (project) {
-      setEditingValues({ contract_cost: project.contract_cost ? project.contract_cost.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '0', profit_percentage: project.profit_percentage || 0.15, project_area: project.project_area || '', project_start: project.project_start || '', days_end: project.days_end || '' });
+      setEditingValues({ 
+        contract_cost: project.contract_cost !== undefined && project.contract_cost !== null ? project.contract_cost.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '0', 
+        profit_percentage: project.profit_percentage !== undefined && project.profit_percentage !== null ? project.profit_percentage : 0.15, 
+        project_area: project.project_area !== null && project.project_area !== undefined ? String(project.project_area) : '', 
+        project_start: project.project_start || '', 
+        days_end: project.days_end || '' 
+      });
       setPulsingCategory(null);
     }
   }
@@ -113,20 +125,46 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
   // CHECKER KUNG MAY BAGO SA PROJECT DETAILS
   const isProjectDirty = useMemo(() => {
     if (!project) return false;
-    return (
-      parseFloat(String(editingValues.contract_cost || 0).replace(/,/g, '')) !== parseFloat(project.contract_cost || 0) ||
-      parseFloat(editingValues.profit_percentage || 0) !== parseFloat(project.profit_percentage || 0.15) ||
-      (editingValues.project_area || '') !== (project.project_area || '') ||
-      (editingValues.project_start || '') !== (project.project_start || '') ||
-      (editingValues.days_end || '') !== (project.days_end || '')
-    );
+    
+    const currentCost = parseFloat(String(editingValues.contract_cost || 0).replace(/,/g, ''));
+    const projectCost = parseFloat(String(project.contract_cost || 0).replace(/,/g, ''));
+    if (Math.abs(currentCost - projectCost) > 0.01) return true;
+
+    const currentProfit = parseFloat(editingValues.profit_percentage !== undefined && editingValues.profit_percentage !== null ? editingValues.profit_percentage : 0.15);
+    const projectProfit = parseFloat(project.profit_percentage !== undefined && project.profit_percentage !== null ? project.profit_percentage : 0.15);
+    if (Math.abs(currentProfit - projectProfit) > 0.001) return true;
+
+    const currentArea = String(editingValues.project_area !== null && editingValues.project_area !== undefined ? editingValues.project_area : '').trim();
+    const projectArea = String(project.project_area !== null && project.project_area !== undefined ? project.project_area : '').trim();
+    if (currentArea !== projectArea) return true;
+
+    // Compare only YYYY-MM-DD for dates to avoid timezone/timestamp false mismatches
+    const currentStart = String(editingValues.project_start || '').trim().substring(0, 10);
+    const projectStart = String(project.project_start || '').trim().substring(0, 10);
+    if (currentStart !== projectStart) return true;
+
+    const currentDaysEnd = String(editingValues.days_end || '').trim().substring(0, 10);
+    const projectDaysEnd = String(project.days_end || '').trim().substring(0, 10);
+    if (currentDaysEnd !== projectDaysEnd) return true;
+
+    return false;
   }, [editingValues, project]);
 
+  // Sync dirty state to App.jsx
   useEffect(() => {
     if (onDirtyChange) {
-      onDirtyChange(isProjectDirty, editingValues);
+      onDirtyChange(isProjectDirty, editingValues, project?.id);
     }
-  }, [isProjectDirty, editingValues, onDirtyChange]);
+  }, [isProjectDirty, editingValues, project?.id, onDirtyChange]);
+
+  // Clean up dirty state when navigating away (e.g., via browser BACK button)
+  useEffect(() => {
+    return () => {
+      if (onDirtyChange) {
+        onDirtyChange(false, null, null);
+      }
+    };
+  }, [onDirtyChange]);
 
   useEffect(() => {
     if (onModalStateChange) {
@@ -161,7 +199,7 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
   const handleInputChange = (field, value) => setEditingValues(prev => ({ ...prev, [field]: value }));
   const handleSaveClick = () => {
     if (!canEdit) return;
-    executeSaveProject({ ...editingValues, contract_cost: String(editingValues.contract_cost).replace(/,/g, '') });
+    executeSaveProject(editingValues);
   };
 
   useEffect(() => {
@@ -205,7 +243,11 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
   const executeSaveProject = async (values) => {
     setIsSaving(true);
     if (onUpdateProject && project) {
-      await onUpdateProject(project.id, values);
+      const cleanValues = {
+        ...values,
+        contract_cost: values.contract_cost ? String(values.contract_cost).replace(/,/g, '') : '0'
+      };
+      await onUpdateProject(project.id, cleanValues);
       setShowSaveSuccess(true);
       setTimeout(() => setShowSaveSuccess(false), 3000);
     }
@@ -1188,8 +1230,8 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
     lines.forEach(line => {
       const amt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
       totalDebit += amt;
-      const cat = line.category ? line.category.toUpperCase() : '';
-      if (cat === 'LABOR /SUBCONTRACTOR' || cat === 'LABOR/PAYROLL') {
+      const cat = line.category ? line.category.toUpperCase().replace(/\s+/g, '') : '';
+      if (cat === 'LABOR/SUBCONTRACTOR' || cat === 'LABOR/PAYROLL') {
         ewtPayable += (amt / 0.98) - amt;
       }
     });
