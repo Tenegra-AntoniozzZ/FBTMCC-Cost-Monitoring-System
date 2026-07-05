@@ -46,6 +46,14 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
 
   // Custom Dropdown states & logic
   const [sessionTypes, setSessionTypes] = useState([]);
+  const [deletedTypes, setDeletedTypes] = useState(() => {
+    try {
+      const saved = localStorage.getItem('fbtmcc_deleted_project_types');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   const [customTypeInput, setCustomTypeInput] = useState('');
   const typeDropdownRef = useRef(null);
@@ -65,13 +73,21 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
     'Office',
     ...projects.map(p => p.project_type).filter(Boolean),
     ...sessionTypes
-  ])).sort((a, b) => a.localeCompare(b));
+  ]))
+    .filter(type => !deletedTypes.includes(type))
+    .sort((a, b) => a.localeCompare(b));
 
   const handleAddCustomType = (e) => {
     e.preventDefault();
-    const trimmed = customTypeInput.trim();
+    const trimmed = customTypeInput.trim().toUpperCase();
     if (trimmed) {
-      if (!allProjectTypes.includes(trimmed)) {
+      setDeletedTypes(prev => {
+        const updated = prev.filter(t => t !== trimmed);
+        localStorage.setItem('fbtmcc_deleted_project_types', JSON.stringify(updated));
+        return updated;
+      });
+
+      if (!sessionTypes.includes(trimmed)) {
         setSessionTypes([...sessionTypes, trimmed]);
       }
       if (editingProject) {
@@ -82,6 +98,15 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
       setCustomTypeInput('');
       setIsTypeDropdownOpen(false);
     }
+  };
+
+  const handleDeleteCustomType = (typeToDelete) => {
+    setSessionTypes(prev => prev.filter(t => t !== typeToDelete));
+    setDeletedTypes(prev => {
+      const updated = [...prev, typeToDelete];
+      localStorage.setItem('fbtmcc_deleted_project_types', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   // ==============================================================
@@ -375,7 +400,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                 <div className="md:col-span-1 space-y-1.5 relative">
                   <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase">Code</label>
                   <input 
-                    className={`w-full px-4 py-3 rounded-xl border-2 font-bold focus:outline-none focus:ring-2 transition-all shadow-sm ${
+                    className={`w-full px-4 py-3 rounded-xl border-2 font-bold focus:outline-none focus:ring-2 transition-all shadow-sm uppercase ${
                       projectCodeError 
                         ? 'border-rose-500 bg-rose-50/50 dark:bg-rose-900/20 focus:ring-rose-500 text-rose-700 dark:text-rose-400' 
                         : 'border-slate-400 dark:border-slate-600 focus:ring-indigo-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white'
@@ -383,7 +408,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                     placeholder="RF-000"
                     value={editingProject ? editingProject.project_code : newProject.project_code}
                     onChange={(e) => {
-                      const val = e.target.value;
+                      const val = e.target.value.toUpperCase();
                       if (editingProject) {
                         setEditingProject({...editingProject, project_code: val});
                       } else {
@@ -406,10 +431,17 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                 <div className="md:col-span-2 space-y-1.5">
                   <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase">Project Name</label>
                   <input 
-                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-400 dark:border-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm transition-colors duration-300"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-400 dark:border-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm transition-colors duration-300 uppercase"
                     placeholder="Enter site name..."
                     value={editingProject ? editingProject.project_name : newProject.project_name}
-                    onChange={(e) => editingProject ? setEditingProject({...editingProject, project_name: e.target.value}) : setNewProject({...newProject, project_name: e.target.value})}
+                    onChange={(e) => {
+                      const val = e.target.value.toUpperCase();
+                      if (editingProject) {
+                        setEditingProject({...editingProject, project_name: val});
+                      } else {
+                        setNewProject({...newProject, project_name: val});
+                      }
+                    }}
                     required
                   />
                 </div>
@@ -424,12 +456,12 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                   </div>
                   
                   {isTypeDropdownOpen && (
-                    <div className="absolute z-[60] top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 flex flex-col">
+                    <div className="absolute z-[60] top-full left-0 min-w-[260px] w-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 flex flex-col">
                       <div className="p-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex gap-2">
                         <input
                           type="text"
                           value={customTypeInput}
-                          onChange={(e) => setCustomTypeInput(e.target.value)}
+                          onChange={(e) => setCustomTypeInput(e.target.value.toUpperCase())}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                               e.preventDefault();
@@ -437,7 +469,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                             }
                           }}
                           placeholder="Type new..."
-                          className="flex-1 px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 transition-colors font-medium"
+                          className="flex-1 px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 transition-colors font-medium uppercase"
                         />
                         <button
                           type="button"
@@ -448,26 +480,42 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                         </button>
                       </div>
                       <div className="max-h-48 overflow-y-auto custom-scrollbar">
-                        {allProjectTypes.map((type, idx) => (
-                          <div
-                            key={idx}
-                            onClick={() => {
-                              if (editingProject) {
-                                setEditingProject({...editingProject, project_type: type});
-                              } else {
-                                setNewProject({...newProject, project_type: type});
-                              }
-                              setIsTypeDropdownOpen(false);
-                            }}
-                            className={`px-4 py-2.5 text-sm cursor-pointer transition-colors font-medium ${
-                              (editingProject ? editingProject.project_type : newProject.project_type) === type 
-                                ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400' 
-                                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                            }`}
-                          >
-                            {type}
-                          </div>
-                        ))}
+                        {allProjectTypes.map((type, idx) => {
+                          const isDefault = ['CONSTRUCTION', 'OFFICE'].includes(type.toUpperCase());
+                          return (
+                            <div
+                              key={idx}
+                              onClick={() => {
+                                if (editingProject) {
+                                  setEditingProject({...editingProject, project_type: type});
+                                } else {
+                                  setNewProject({...newProject, project_type: type});
+                                }
+                                setIsTypeDropdownOpen(false);
+                              }}
+                              className={`px-4 py-2.5 text-sm cursor-pointer transition-colors font-medium flex justify-between items-center group/item ${
+                                (editingProject ? editingProject.project_type : newProject.project_type) === type 
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400' 
+                                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                              }`}
+                            >
+                              <span>{type}</span>
+                              {!isDefault && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteCustomType(type);
+                                  }}
+                                  className="p-1 hover:bg-rose-100 dark:hover:bg-rose-950/30 rounded text-slate-400 hover:text-rose-600 transition-colors opacity-0 group-hover/item:opacity-100"
+                                  title="Delete custom type"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -509,40 +557,66 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-400 dark:divide-slate-600">
-                  {projects.map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
-                      <td className="px-6 py-4 border-r border-slate-400 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50 w-[140px] transition-colors duration-300">
-                        <span className="font-black text-indigo-700 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-800 shadow-sm group-hover:bg-white dark:group-hover:bg-slate-800 transition-colors block text-center truncate">{p.project_code}</span>
-                      </td>
-                      <td className="px-6 py-4 border-r border-slate-400 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50 w-[140px] transition-colors duration-300">
-                        <span className={`font-black px-3 py-1.5 rounded-lg border shadow-sm transition-colors block text-center text-xs truncate ${p.project_type === 'Office' ? 'text-amber-700 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800' : 'text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800'}`}>
-                          {p.project_type || 'Construction'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 border-r border-slate-400 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50 transition-colors duration-300">
-                        <div className="font-bold text-slate-800 dark:text-slate-200">{p.project_name}</div>
-                      </td>
-                      <td className="px-6 py-4 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50 sticky right-0 z-10 w-[140px] transition-colors duration-300">
-                        <div className="flex items-center justify-center gap-2">
-                          <button 
-                            onClick={() => setEditingProject({
-                              ...p, 
-                              profit_percentage: (p.profit_percentage * 100).toFixed(0)
-                            })}
-                            className="p-2 text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-50 dark:border-indigo-900/30 rounded-lg transition-colors shadow-sm"
-                          >
-                            <Settings2 size={18} />
-                          </button>
-                          <button 
-                            onClick={() => setPasswordModal({ isOpen: true, action: 'delete_project', payload: p })}
-                            className="p-2 text-rose-500 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 border border-rose-50 dark:border-rose-900/30 rounded-lg transition-colors shadow-sm"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {projects.map((p) => {
+                    const isSelected = editingProject && editingProject.id === p.id;
+                    return (
+                      <tr 
+                        key={p.id} 
+                        className={`transition-colors group ${
+                          isSelected 
+                            ? 'bg-indigo-50/50 dark:bg-indigo-950/40 border-y-2 border-indigo-500 dark:border-indigo-500' 
+                            : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                        }`}
+                      >
+                        <td className={`px-6 py-4 border-r w-[140px] transition-colors duration-300 ${
+                          isSelected 
+                            ? 'border-indigo-500 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20' 
+                            : 'border-slate-400 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50'
+                        }`}>
+                          <span className="font-black text-indigo-700 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-800 shadow-sm group-hover:bg-white dark:group-hover:bg-slate-800 transition-colors block text-center truncate">{p.project_code}</span>
+                        </td>
+                        <td className={`px-6 py-4 border-r w-[140px] transition-colors duration-300 ${
+                          isSelected 
+                            ? 'border-indigo-500 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20' 
+                            : 'border-slate-400 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50'
+                        }`}>
+                          <span className={`font-black px-3 py-1.5 rounded-lg border shadow-sm transition-colors block text-center text-xs truncate ${p.project_type === 'Office' ? 'text-amber-700 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800' : 'text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800'}`}>
+                            {p.project_type || 'Construction'}
+                          </span>
+                        </td>
+                        <td className={`px-6 py-4 border-r transition-colors duration-300 ${
+                          isSelected 
+                            ? 'border-indigo-500 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20' 
+                            : 'border-slate-400 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50'
+                        }`}>
+                          <div className="font-bold text-slate-800 dark:text-slate-200">{p.project_name}</div>
+                        </td>
+                        <td className={`px-6 py-4 sticky right-0 z-10 w-[140px] transition-colors duration-300 ${
+                          isSelected 
+                            ? 'bg-indigo-50/30 dark:bg-indigo-950/20' 
+                            : 'bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50'
+                        }`}>
+                          <div className="flex items-center justify-center gap-2">
+                            <button 
+                              onClick={() => setEditingProject({
+                                ...p, 
+                                profit_percentage: (p.profit_percentage * 100).toFixed(0)
+                              })}
+                              className="p-2 text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-50 dark:border-indigo-900/30 rounded-lg transition-colors shadow-sm"
+                            >
+                              <Settings2 size={18} />
+                            </button>
+                            <button 
+                              onClick={() => setPasswordModal({ isOpen: true, action: 'delete_project', payload: p })}
+                              className="p-2 text-rose-500 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 border border-rose-50 dark:border-rose-900/30 rounded-lg transition-colors shadow-sm"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -571,10 +645,10 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
               <div className="flex gap-2 items-end">
                 <div className="flex-[2] space-y-1.5">
                   <input 
-                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-400 dark:border-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm text-sm transition-colors duration-300"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-400 dark:border-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm text-sm transition-colors duration-300 uppercase"
                     placeholder="Enter category name..."
                     value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value)}
+                    onChange={(e) => setNewCategory(e.target.value.toUpperCase())}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleAddCategory(null, false); }}
                   />
                 </div>
@@ -647,10 +721,10 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
               <div className="flex gap-2 items-end">
                 <div className="flex-[2] space-y-1.5">
                   <input 
-                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-400 dark:border-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-teal-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm text-sm transition-colors duration-300"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-400 dark:border-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-teal-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm text-sm transition-colors duration-300 uppercase"
                     placeholder="e.g. EXTRA LABOR..."
                     value={newSubCategory}
-                    onChange={(e) => setNewSubCategory(e.target.value)}
+                    onChange={(e) => setNewSubCategory(e.target.value.toUpperCase())}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleAddCategory(null, true); }}
                   />
                 </div>
