@@ -1,1 +1,0 @@
-const sqlite3 = require('sqlite3').verbose(); const db = new sqlite3.Database('fbtmcc.db'); db.all('SELECT * FROM expense_categories', (err, rows) => { const fs = require('fs'); fs.writeFileSync('cats.json', JSON.stringify(rows || err, null, 2)); db.close(); });

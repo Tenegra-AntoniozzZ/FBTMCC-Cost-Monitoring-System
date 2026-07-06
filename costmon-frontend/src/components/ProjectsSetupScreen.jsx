@@ -68,18 +68,20 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const activeProjectTypes = projects.map(p => p.project_type).filter(Boolean);
   const allProjectTypes = Array.from(new Set([
     'Construction',
     'Office',
-    ...projects.map(p => p.project_type).filter(Boolean),
+    ...activeProjectTypes,
     ...sessionTypes
   ]))
-    .filter(type => !deletedTypes.includes(type))
+    .filter(type => !deletedTypes.includes(type) || activeProjectTypes.includes(type))
     .sort((a, b) => a.localeCompare(b));
+  console.log('allProjectTypes:', allProjectTypes);
 
   const handleAddCustomType = (e) => {
     e.preventDefault();
-    const trimmed = customTypeInput.trim().toUpperCase();
+    const trimmed = customTypeInput.trim();
     if (trimmed) {
       setDeletedTypes(prev => {
         const updated = prev.filter(t => t !== trimmed);
@@ -252,8 +254,12 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
         showMessage('Project updated successfully!');
         setEditingProject(null);
         refreshData();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        showMessage(errorData.error || 'Failed to update project.', 'error');
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       showMessage('Failed to update project.', 'error');
     } finally {
       setIsSaving(false);
@@ -286,6 +292,15 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
     const valueToAdd = isMisc ? newSubCategory.trim() : newCategory.trim();
     if (!valueToAdd) {
       showMessage('Please enter a category name.', 'error');
+      return;
+    }
+    
+    const exists = isMisc 
+      ? subCategories.some(c => c.displayName.toLowerCase() === valueToAdd.toLowerCase())
+      : mainCategories.some(c => c.displayName.toLowerCase() === valueToAdd.toLowerCase());
+      
+    if (exists) {
+      showMessage(`Category "${valueToAdd}" already exists!`, 'error');
       return;
     }
     
@@ -355,6 +370,9 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
     setPasswordModal({ isOpen: false, action: null, payload: null });
   };
 
+  const isMainCategoryDuplicate = !!newCategory.trim() && mainCategories.some(c => c.displayName.toLowerCase() === newCategory.trim().toLowerCase());
+  const isSubCategoryDuplicate = !!newSubCategory.trim() && subCategories.some(c => c.displayName.toLowerCase() === newSubCategory.trim().toLowerCase());
+
   return (
     <div className="flex flex-col h-full bg-[#f8fafc] dark:bg-slate-900 overflow-hidden transition-colors duration-300">
       {/* HEADER */}
@@ -395,12 +413,12 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
             </div>
 
             {/* ADD / EDIT FORM */}
-            <div className="p-8 border-b border-slate-100 dark:border-slate-700 bg-indigo-50/30 dark:bg-indigo-900/10 transition-colors duration-300">
+            <div className="p-8 pb-12 border-b border-slate-100 dark:border-slate-700 bg-indigo-50/30 dark:bg-indigo-900/10 transition-colors duration-300">
               <form onSubmit={(e) => { e.preventDefault(); if (editingProject) { setPasswordModal({ isOpen: true, action: 'update_project', payload: null }); } else { handleAddProject(e); } }} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                 <div className="md:col-span-1 space-y-1.5 relative">
                   <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase">Code</label>
                   <input 
-                    className={`w-full px-4 py-3 rounded-xl border-2 font-bold focus:outline-none focus:ring-2 transition-all shadow-sm uppercase ${
+                    className={`w-full px-4 py-3 rounded-xl border-2 font-bold focus:outline-none focus:ring-2 transition-all shadow-sm ${
                       projectCodeError 
                         ? 'border-rose-500 bg-rose-50/50 dark:bg-rose-900/20 focus:ring-rose-500 text-rose-700 dark:text-rose-400' 
                         : 'border-slate-400 dark:border-slate-600 focus:ring-indigo-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white'
@@ -408,13 +426,13 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                     placeholder="RF-000"
                     value={editingProject ? editingProject.project_code : newProject.project_code}
                     onChange={(e) => {
-                      const val = e.target.value.toUpperCase();
+                      const val = e.target.value;
                       if (editingProject) {
                         setEditingProject({...editingProject, project_code: val});
                       } else {
                         setNewProject({...newProject, project_code: val});
                         if (projects.some(p => p.project_code.toLowerCase() === val.toLowerCase())) {
-                           setProjectCodeError(`Code "${val}" na-gamit na!`);
+                           setProjectCodeError(`Code "${val}" already exists!`);
                         } else {
                            setProjectCodeError('');
                         }
@@ -423,7 +441,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                     required
                   />
                   {projectCodeError && !editingProject && (
-                    <p className="absolute -bottom-5 left-1 text-[10px] text-rose-500 font-bold whitespace-nowrap animate-in slide-in-from-top-1">
+                    <p className="absolute -bottom-[22px] left-1 text-[11px] text-rose-500 font-bold whitespace-nowrap animate-in slide-in-from-top-1">
                       {projectCodeError}
                     </p>
                   )}
@@ -431,11 +449,11 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                 <div className="md:col-span-2 space-y-1.5">
                   <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase">Project Name</label>
                   <input 
-                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-400 dark:border-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm transition-colors duration-300 uppercase"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-400 dark:border-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm transition-colors duration-300"
                     placeholder="Enter site name..."
                     value={editingProject ? editingProject.project_name : newProject.project_name}
                     onChange={(e) => {
-                      const val = e.target.value.toUpperCase();
+                      const val = e.target.value;
                       if (editingProject) {
                         setEditingProject({...editingProject, project_name: val});
                       } else {
@@ -461,7 +479,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                         <input
                           type="text"
                           value={customTypeInput}
-                          onChange={(e) => setCustomTypeInput(e.target.value.toUpperCase())}
+                          onChange={(e) => setCustomTypeInput(e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                               e.preventDefault();
@@ -469,7 +487,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                             }
                           }}
                           placeholder="Type new..."
-                          className="flex-1 px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 transition-colors font-medium uppercase"
+                          className="flex-1 px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 transition-colors font-medium"
                         />
                         <button
                           type="button"
@@ -640,22 +658,31 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
               </span>
             </div>
 
-            <div className="p-5 border-b border-slate-400 dark:border-slate-600 bg-amber-50/20 dark:bg-amber-900/10 transition-colors duration-300">
+            <div className="p-5 pb-8 border-b border-slate-400 dark:border-slate-600 bg-amber-50/20 dark:bg-amber-900/10 transition-colors duration-300">
               <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase block mb-1.5">Add Main Category</label>
               <div className="flex gap-2 items-end">
-                <div className="flex-[2] space-y-1.5">
+                <div className="flex-[2] space-y-1.5 relative">
                   <input 
-                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-400 dark:border-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm text-sm transition-colors duration-300 uppercase"
+                    className={`w-full px-4 py-3 rounded-xl border-2 font-bold focus:outline-none focus:ring-2 shadow-sm text-sm transition-colors duration-300 uppercase ${
+                      isMainCategoryDuplicate 
+                        ? 'border-rose-500 focus:ring-rose-500 text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10' 
+                        : 'border-slate-400 dark:border-slate-600 focus:ring-amber-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white'
+                    }`}
                     placeholder="Enter category name..."
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value.toUpperCase())}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleAddCategory(null, false); }}
                   />
+                  {isMainCategoryDuplicate && (
+                    <span className="absolute -bottom-[22px] left-1 text-[11px] font-bold text-rose-500 dark:text-rose-400">
+                      Category "{newCategory}" already exists!
+                    </span>
+                  )}
                 </div>
                 <div className="flex-1 space-y-1.5">
                   <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase block">Type</label>
                   <SearchableDropdown 
-                    options={['Construction', 'Office', 'Both']}
+                    options={Array.from(new Set([...allProjectTypes, 'Both']))}
                     value={newCategoryType}
                     onChange={setNewCategoryType}
                     placeholder="Select Type"
@@ -664,8 +691,13 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                 </div>
                 <button 
                   type="button"
+                  disabled={isMainCategoryDuplicate}
                   onClick={() => handleAddCategory(null, false)}
-                  className="flex items-center justify-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl shadow-lg shadow-indigo-100 dark:shadow-none transition-all text-sm whitespace-nowrap"
+                  className={`flex items-center justify-center gap-2 px-5 py-3 font-black rounded-xl shadow-lg transition-all text-sm whitespace-nowrap ${
+                    isMainCategoryDuplicate
+                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed dark:bg-slate-700 dark:text-slate-500 shadow-none'
+                      : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-100 dark:shadow-none'
+                  }`}
                 >
                   <Plus size={16} /> Add
                 </button>
@@ -716,22 +748,31 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
               </span>
             </div>
 
-            <div className="p-5 border-b border-slate-400 dark:border-slate-600 bg-teal-50/30 dark:bg-teal-900/10 transition-colors duration-300">
+            <div className="p-5 pb-8 border-b border-slate-400 dark:border-slate-600 bg-teal-50/30 dark:bg-teal-900/10 transition-colors duration-300">
               <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase block mb-1.5">Add Misc Sub-Category</label>
               <div className="flex gap-2 items-end">
-                <div className="flex-[2] space-y-1.5">
+                <div className="flex-[2] space-y-1.5 relative">
                   <input 
-                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-400 dark:border-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-teal-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm text-sm transition-colors duration-300 uppercase"
+                    className={`w-full px-4 py-3 rounded-xl border-2 font-bold focus:outline-none focus:ring-2 shadow-sm text-sm transition-colors duration-300 uppercase ${
+                      isSubCategoryDuplicate 
+                        ? 'border-rose-500 focus:ring-rose-500 text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10' 
+                        : 'border-slate-400 dark:border-slate-600 focus:ring-teal-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white'
+                    }`}
                     placeholder="e.g. EXTRA LABOR..."
                     value={newSubCategory}
                     onChange={(e) => setNewSubCategory(e.target.value.toUpperCase())}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleAddCategory(null, true); }}
                   />
+                  {isSubCategoryDuplicate && (
+                    <span className="absolute -bottom-[22px] left-1 text-[11px] font-bold text-rose-500 dark:text-rose-400">
+                      Category "{newSubCategory}" already exists!
+                    </span>
+                  )}
                 </div>
                 <div className="flex-1 space-y-1.5">
                   <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase block">Type</label>
                   <SearchableDropdown 
-                    options={['Construction', 'Office', 'Both']}
+                    options={Array.from(new Set([...allProjectTypes, 'Both']))}
                     value={newSubCategoryType}
                     onChange={setNewSubCategoryType}
                     placeholder="Select Type"
@@ -740,8 +781,13 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                 </div>
                 <button 
                   type="button"
+                  disabled={isSubCategoryDuplicate}
                   onClick={() => handleAddCategory(null, true)}
-                  className="flex items-center justify-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl shadow-lg shadow-indigo-100 dark:shadow-none transition-all text-sm whitespace-nowrap"
+                  className={`flex items-center justify-center gap-2 px-5 py-3 font-black rounded-xl shadow-lg transition-all text-sm whitespace-nowrap ${
+                    isSubCategoryDuplicate
+                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed dark:bg-slate-700 dark:text-slate-500 shadow-none'
+                      : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-100 dark:shadow-none'
+                  }`}
                 >
                   <Plus size={16} /> Add
                 </button>
