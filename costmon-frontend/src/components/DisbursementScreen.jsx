@@ -227,7 +227,9 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     const pType = selectedProject ? selectedProject.project_type : 'Construction';
 
     (categoryObjects || []).forEach(catObj => {
-      if (catObj.category_type && catObj.category_type !== 'Both' && catObj.category_type !== pType) {
+      const catType = (catObj.category_type || '').toLowerCase();
+      const projType = (pType || '').toLowerCase();
+      if (catType && catType !== 'both' && catType !== projType) {
         return;
       }
 
@@ -501,7 +503,9 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     // Build the correct main list for this project, same logic as the useMemo
     const inlineMain = new Set();
     (categoryObjects || []).forEach(catObj => {
-      if (catObj.category_type && catObj.category_type !== 'Both' && catObj.category_type !== pType) return;
+      const catType = (catObj.category_type || '').toLowerCase();
+      const projType = (pType || '').toLowerCase();
+      if (catType && catType !== 'both' && catType !== projType) return;
       const rawName = catObj.name;
       if (rawName.startsWith('[MAIN] ')) {
         inlineMain.add(rawName.replace('[MAIN] ', ''));
