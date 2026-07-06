@@ -1076,8 +1076,8 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                       <input
                         type="text"
                         name="cv_no"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
+                        inputMode="text"
+                        pattern="[0-9\-]*"
                         placeholder="Unique CV#"
                         className={`w-full p-2 rounded-md text-sm outline-none font-bold transition-all duration-200 ${isDuplicateCV
                           ? 'border-2 border-red-500 dark:border-red-400 text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 focus:ring-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
@@ -1085,7 +1085,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                           }`}
                         value={headerData.cv_no}
                         onChange={(e) => {
-                          const onlyNums = e.target.value.replace(/[^0-9]/g, '');
+                          const onlyNums = e.target.value.replace(/[^0-9-]/g, '');
                           handleHeaderChange({ target: { name: 'cv_no', value: onlyNums } });
                         }}
                         required
