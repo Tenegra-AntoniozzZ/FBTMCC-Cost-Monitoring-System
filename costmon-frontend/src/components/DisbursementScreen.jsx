@@ -174,22 +174,32 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     let cr = 0;
     let ewt = 0;
     let cib = 0;
+    let accts_pay = 0;
 
     filteredDisbursements.forEach(d => {
       const inputTax = parseFloat(d.input_tax) || 0;
       const outputTax = parseFloat(d.output_tax) || 0;
-      const acctsPay = parseFloat(d.accts_pay) || 0;
+      
+      let netAmount = parseFloat(d.net_amount) || 0;
+      let acctsPay = parseFloat(d.accts_pay) || 0;
+
+      // Overwrite: If project is Credit Card, move CIB to Accts Pay
+      if (d.project_code && d.project_code.toLowerCase() === 'credit card') {
+        acctsPay += netAmount;
+        netAmount = 0;
+      }
 
       const currentDr = (parseFloat(d.gross_amount) || 0) + inputTax;
-      const currentCr = (parseFloat(d.net_amount) || 0) + (parseFloat(d.ewt_amount) || 0) + acctsPay + outputTax;
+      const currentCr = netAmount + (parseFloat(d.ewt_amount) || 0) + acctsPay + outputTax;
 
       dr += currentDr;
       cr += currentCr;
       ewt += (parseFloat(d.ewt_amount) || 0);
-      cib += (parseFloat(d.net_amount) || 0);
+      cib += netAmount;
+      accts_pay += acctsPay;
     });
 
-    return { dr, cr, diff: dr - cr, ewt, cib };
+    return { dr, cr, diff: dr - cr, ewt, cib, accts_pay };
   }, [filteredDisbursements]);
 
   // ==========================================
@@ -900,6 +910,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                   <th className="px-6 py-5 text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 text-center">Project</th>
                   <th className="px-6 py-5 text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 text-right">Debit (Gross)</th>
                   <th className="px-6 py-5 text-xs font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 text-right bg-emerald-100/50 dark:bg-emerald-900/30">Credit (CIB)</th>
+                  <th className="px-6 py-5 text-xs font-black text-amber-800 dark:text-amber-400 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 text-right bg-amber-50/50 dark:bg-amber-900/30">Accts Pay (Credit Card)</th>
                   <th className="px-6 py-5 text-xs font-black text-rose-800 dark:text-rose-400 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 text-right bg-rose-50/50 dark:bg-rose-900/30">EWT</th>
                   {categories.map(cat => (
                     <th key={cat} className="px-4 py-5 text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest border-b-2 border-r border-slate-400 dark:border-slate-600 text-right min-w-[120px] bg-slate-50 dark:bg-slate-800" title={cat}>
@@ -933,7 +944,8 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                     <td className="px-6 py-4 font-black text-blue-700 dark:text-blue-400 text-center border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20">#{d.cv_no}</td>
                     <td className="px-6 py-4 font-black text-slate-500 dark:text-slate-400 text-center border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20">{d.project_code}</td>
                     <td className="px-6 py-4 text-right font-mono font-black text-slate-900 dark:text-white border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20">₱{(d.gross_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                    <td className="px-6 py-4 text-right font-mono font-black text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-emerald-100/30 dark:group-hover:bg-emerald-900/30">₱{(d.net_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="px-6 py-4 text-right font-mono font-black text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-emerald-100/30 dark:group-hover:bg-emerald-900/30">₱{(d.project_code && d.project_code.toLowerCase() === 'credit card' ? 0 : (d.net_amount || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="px-6 py-4 text-right font-mono font-black text-amber-700 dark:text-amber-400 bg-amber-50/30 dark:bg-amber-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-amber-100/30 dark:group-hover:bg-amber-900/30">₱{((parseFloat(d.accts_pay) || 0) + (d.project_code && d.project_code.toLowerCase() === 'credit card' ? (parseFloat(d.net_amount) || 0) : 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     <td className="px-6 py-4 text-right font-mono font-black text-rose-600 dark:text-rose-400 bg-rose-50/20 dark:bg-rose-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-rose-100/20 dark:group-hover:bg-rose-900/30">₱{(d.ewt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     {categories.map(cat => {
                       const amt = getCategoryAmount(d, cat);
@@ -965,6 +977,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                     <td colSpan="4" className="px-6 py-6 text-right text-xs tracking-widest text-slate-500 dark:text-slate-400 sticky left-0 z-10 bg-slate-100 dark:bg-slate-800 border-r border-slate-400 dark:border-slate-600 shadow-[3px_0_0_0_#94a3b8] dark:shadow-[3px_0_0_0_#475569] transition-colors duration-300">TOTAL SUMMARY:</td>
                     <td className="px-6 py-6 text-right font-mono text-blue-800 dark:text-blue-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.dr.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     <td className="px-6 py-6 text-right font-mono text-emerald-800 dark:text-emerald-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.cib.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="px-6 py-6 text-right font-mono text-amber-800 dark:text-amber-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.accts_pay.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     <td className="px-6 py-6 text-right font-mono text-rose-800 dark:text-rose-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.ewt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     <td colSpan={categories.length + (canEdit ? 2 : 1)} className="px-6 py-6"></td>
                   </tr>
