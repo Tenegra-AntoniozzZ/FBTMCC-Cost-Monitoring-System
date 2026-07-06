@@ -304,7 +304,17 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
     let pBudget = 0;
     let totalExp = 0;
 
+    // 1. Identify project codes where project_type is 'Office'
+    const officeProjectCodes = new Set(
+      projects.filter(p => p.project_type === 'Office').map(p => p.project_code.toUpperCase())
+    );
+
+    // 2. Compute construction projects data
     projects.forEach(p => {
+      if (p.project_type === 'Office') {
+        return; // Office is handled by disbursements below
+      }
+
       const projExpenses = filteredDisbursements.filter(d =>
         d.project_code && d.project_code.toUpperCase() === p.project_code.toUpperCase()
       );
@@ -386,14 +396,73 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
         exp_supplies, exp_car_repair, exp_car_reg, exp_contribution
       };
 
-      const code = p.project_code.toUpperCase();
-      if (code.includes('ADMIN') || code.includes('OFFICE') || code.includes('SHOP')) {
-        office.push(computedData);
-        oBudget += CC;
-      } else {
-        projs.push(computedData);
-        pBudget += CC;
-      }
+      projs.push(computedData);
+      pBudget += CC;
+    });
+
+    // 3. Filter and map office disbursements
+    const officeDisbursements = filteredDisbursements.filter(d =>
+      d.project_code && officeProjectCodes.has(d.project_code.toUpperCase())
+    );
+
+    officeDisbursements.forEach(d => {
+      const getDisbCategoryTotal = (keywords) => {
+        return (d.expenses || [])
+          .filter(e => e.category && keywords.some(kw => e.category.toLowerCase().includes(kw.toLowerCase())))
+          .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+      };
+
+      const exp_payroll = getDisbCategoryTotal(['payroll', 'labor']);
+      const exp_electrical = getDisbCategoryTotal(['electrical', 'light', 'power']);
+      const exp_water = getDisbCategoryTotal(['water']);
+      const exp_comms = getDisbCategoryTotal(['comunication', 'telephone', 'internet', 'comms']);
+      const exp_retainer = getDisbCategoryTotal(['retainer', 'sop']);
+      const exp_supplies = getDisbCategoryTotal(['office supplies', 'outing', 'supplies']);
+      const exp_car_repair = getDisbCategoryTotal(['car repair', 'maintenance', 'repair']);
+      const exp_car_reg = getDisbCategoryTotal(['car registration', 'registration']);
+      const exp_contribution = getDisbCategoryTotal(['contribution']);
+
+      const total_specific_expenses = exp_payroll + exp_electrical + exp_water + exp_comms + exp_retainer + exp_supplies + exp_car_repair + exp_car_reg + exp_contribution;
+      const NET_PROFIT = 0 - total_specific_expenses;
+
+      office.push({
+        id: d.id,
+        project_start: d.date,
+        project_code: d.project_code,
+        project_name: 'Office Expense',
+        CC: 0,
+        TAW: 0,
+        additionalExpensesList: [],
+        TCC: 0,
+        VAT_12: 0,
+        CC_WITHOUT_VAT: 0,
+        OH_30: 0,
+        OH_20: 0,
+        OH_12: 0,
+        TARGET_DLM_30: 0,
+        TARGET_DLM_20: 0,
+        TARGET_DLM_12: 0,
+        ADLM: 0,
+        SAVING_30: 0,
+        SAVING_20: 0,
+        SAVING_12: 0,
+        NET_PROFIT,
+        RETENTION_10: 0,
+        CC_WO_VAT_OH_PM: 0,
+        EFFECTIVE_OVERHEAD: 0,
+        total_specific_expenses,
+        exp_payroll,
+        exp_electrical,
+        exp_water,
+        exp_comms,
+        exp_retainer,
+        exp_supplies,
+        exp_car_repair,
+        exp_car_reg,
+        exp_contribution
+      });
+
+      totalExp += total_specific_expenses;
     });
 
     return {
@@ -502,7 +571,7 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
             <div className="border-t border-slate-200 dark:border-slate-800/50 mb-12"></div>
 
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100">Detailed Ledgers</h2>
+              <h2 className="text-xl font-black text-slate-800 dark:text-slate-100">Detailed Ledgers</h2>
               <p className="text-slate-500 dark:text-slate-400 mt-2">Choose your master spreadsheet.</p>
             </div>
 
