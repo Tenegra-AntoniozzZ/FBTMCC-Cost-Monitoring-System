@@ -387,6 +387,7 @@ export default function App() {
               <CostMonitoringScreen 
                 projects={projects} 
                 disbursements={disbursements} 
+                categories={categories}
                 onUpdateProject={handleUpdateProject} 
                 initialProjectId={initialCostMonitoringProjectId} 
                 userRole={userRole} 

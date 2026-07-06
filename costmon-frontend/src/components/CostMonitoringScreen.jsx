@@ -300,7 +300,21 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
     };
   }, [editingValues, disbursements, project]);
 
-  const REQUIRED_CATEGORIES = useMemo(() => ["PERMITS & CONSTRUCTION PLANS", "DOWN PAYMENT", "CARPENTRY", "PAINTING", "ELECTRICAL", "PLUMBING", "TEMPERED GLASS", "SSS/PAG-IBIG / PHILHEALTH", "MISCELLANEOUS COST", "LABOR/PAYROLL", "ABB 1196 FORWARD", "ZAM-546"], []);
+  const REQUIRED_CATEGORIES = useMemo(() => [
+    "PERMITS & CONSTRUCTION PLANS",
+    "DOWN PAYMENT",
+    "CARPENTRY",
+    "PAINTING",
+    "ELECTRICAL",
+    "PLUMBING",
+    "TEMPERED GLASS",
+    "SSS/PAG-IBIG / PHILHEALTH",
+    "MISCELLANEOUS COST",
+    "LABOR/PAYROLL",
+    "ABB 1196 FORWARD",
+    "ZAM-546",
+    "SOP"
+  ], []);
 
   const expensesByCategory = useMemo(() => {
     const grouped = {};
@@ -532,7 +546,7 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
                   <div className="flex-1 border-r-2 border-slate-400 dark:border-slate-600 flex flex-col">
                     <div className="bg-orange-100 dark:bg-orange-900/30 text-orange-900 dark:text-orange-400 text-center font-black text-xs uppercase py-3 border-b-2 border-slate-400 dark:border-slate-600 tracking-wider">Progress-Based Costing</div>
                     <div className="p-6 space-y-3 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase flex-1 flex flex-col">
-                      {["PERMITS & CONSTRUCTION PLANS", "DOWN PAYMENT", "CARPENTRY", "PAINTING", "ELECTRICAL", "PLUMBING", "TEMPERED GLASS", "MISCELLANEOUS COST", "LABOR/PAYROLL"].map(cat => {
+                      {["PERMITS & CONSTRUCTION PLANS", "DOWN PAYMENT", "CARPENTRY", "PAINTING", "ELECTRICAL", "PLUMBING", "TEMPERED GLASS", "MISCELLANEOUS COST", "LABOR/PAYROLL", "SOP"].map(cat => {
                         const catTotal = expensesByCategory[cat]?.reduce((sum, item) => sum + item.amount, 0) || 0;
                         if (catTotal === 0) return null;
                         return (
