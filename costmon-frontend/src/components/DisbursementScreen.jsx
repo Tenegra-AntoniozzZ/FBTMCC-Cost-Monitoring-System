@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, Plus, Trash2, FileText, ChevronDown, Filter, X, Lock, Save, Receipt, Edit2, ZoomIn, ZoomOut, RotateCcw, CheckCircle2, Paperclip, Camera, FileImage, FileType, Loader2, ExternalLink } from 'lucide-react';
+import { Search, Plus, Trash2, FileText, ChevronDown, Filter, X, Lock, Save, Receipt, Edit2, ZoomIn, ZoomOut, RotateCcw, CheckCircle2, Paperclip, Camera, FileImage, FileType, Loader2, ExternalLink, Download } from 'lucide-react';
 import SearchableDropdown from './SearchableDropdown';
 import HealthCard from './HealthCard';
 import PasswordConfirmModal from './PasswordConfirmModal';
@@ -37,6 +37,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery || '');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [selectedMonths, setSelectedMonths] = useState([]);
   const [tempSelectedMonths, setTempSelectedMonths] = useState([]);
   const [selectedYears, setSelectedYears] = useState([]);
@@ -191,6 +192,43 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     setSelectedTransactionFilter('All');
     setTempSelectedTransactionFilter('All');
     setIsFilterOpen(false);
+  };
+
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (searchQuery) params.append('search', searchQuery);
+      if (selectedMonths.length > 0) params.append('months', selectedMonths.join(','));
+      if (selectedYears.length > 0) params.append('years', selectedYears.join(','));
+      if (selectedTransactionFilter !== 'All') params.append('transactionFilter', selectedTransactionFilter);
+
+      const token = localStorage.getItem('fbtmcc_token');
+      const response = await fetch(`${API_URL}/disbursements/export?${params}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!response.ok) {
+        let errMsg = 'Export failed.';
+        try { const d = await response.json(); errMsg = d.error || errMsg; } catch (_) {}
+        throw new Error(errMsg);
+      }
+
+      const disposition = response.headers.get('content-disposition') || '';
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : `disbursement_ledger_${Date.now()}.xlsx`;
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Excel export error:', err.message);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const isAcctsPayVisible = useMemo(() => {
@@ -893,6 +931,16 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                   </div>
                 )}
               </div>
+
+              <button
+                onClick={handleExportExcel}
+                disabled={isExporting}
+                className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50 px-4 py-3 rounded-xl font-bold transition-all shadow-sm ml-2 disabled:opacity-50"
+                title="Export Filtered Data to Excel"
+              >
+                {isExporting ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                <span className="hidden sm:inline">Export Excel</span>
+              </button>
 
               {/* ZOOM CONTROLS */}
               <div className="flex items-center bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-2 py-1 shadow-sm gap-1 ml-2 transition-colors duration-300">

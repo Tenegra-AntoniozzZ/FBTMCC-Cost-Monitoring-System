@@ -580,6 +580,315 @@ app.delete('/api/disbursements/:id', authenticateToken, (req, res) => {
 });
 
 // ==========================================
+// DISBURSEMENTS EXCEL EXPORT
+// ==========================================
+app.get('/api/disbursements/export', authenticateToken, async (req, res) => {
+  const { search, months, years, transactionFilter } = req.query;
+  const monthArray = months ? months.split(',') : [];
+  const yearArray = years ? years.split(',') : [];
+
+  db.all("SELECT * FROM disbursements ORDER BY date DESC, cv_no DESC", [], async (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    // 1. Filter rows in JavaScript
+    let filtered = rows.filter(row => row.costing_type !== 'additional');
+
+    if (monthArray.length > 0 || yearArray.length > 0) {
+      filtered = filtered.filter(d => {
+        if (!d.date) return false;
+        const y = d.date.substring(0, 4);
+        const m = d.date.substring(5, 7);
+        const yearMatches = yearArray.length === 0 || yearArray.includes(y);
+        const monthMatches = monthArray.length === 0 || monthArray.includes(m);
+        return yearMatches && monthMatches;
+      });
+    }
+
+    if (transactionFilter === 'EWT') {
+      filtered = filtered.filter(d => (parseFloat(d.ewt_amount) || 0) > 0);
+    }
+
+    if (search && search.trim() !== '') {
+      const q = search.toLowerCase().trim();
+      filtered = filtered.filter(d => d.cv_no && d.cv_no.toLowerCase().includes(q));
+    }
+
+    // Parse expenses and collect dynamic categories
+    const allCategories = new Set();
+    const processedRows = filtered.map(row => {
+      let expenses = [];
+      try {
+        expenses = row.expenses_json ? JSON.parse(row.expenses_json) : [];
+      } catch (e) {
+        expenses = [];
+      }
+      expenses.forEach(exp => {
+        if (exp.category && (parseFloat(exp.amount) || 0) > 0) {
+          allCategories.add(exp.category);
+        }
+      });
+      return { ...row, expenses };
+    });
+
+    const dynamicCategories = Array.from(allCategories).sort((a, b) => a.localeCompare(b));
+
+    // 2. Build the Excel Workbook
+    try {
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'FBTMCC Cost Monitoring System';
+      workbook.created = new Date();
+      const sheet = workbook.addWorksheet('Disbursement Ledger', {
+        pageSetup: { paperSize: 9, orientation: 'landscape' }
+      });
+
+      // BUILD ACCOUNTING SUMMARY AT TOP
+      let totalDrGross = 0;
+      let totalCrCIB = 0;
+      let totalCrEWT = 0;
+
+      processedRows.forEach(row => {
+         totalDrGross += parseFloat(row.gross_amount) || 0;
+         const isCreditCard = row.project_code && row.project_code.toLowerCase() === 'credit card';
+         const originalNet = parseFloat(row.net_amount) || 0;
+         const originalAcctsPay = parseFloat(row.accts_pay) || 0;
+         // Combine CIB and Accts Pay
+         totalCrCIB += (isCreditCard ? 0 : originalNet) + (isCreditCard ? (originalAcctsPay + originalNet) : originalAcctsPay);
+         totalCrEWT += parseFloat(row.ewt_amount) || 0;
+      });
+
+      // Format Date String
+      const monthNames = {
+         '01': 'JANUARY', '02': 'FEBRUARY', '03': 'MARCH', '04': 'APRIL', '05': 'MAY', '06': 'JUNE',
+         '07': 'JULY', '08': 'AUGUST', '09': 'SEPTEMBER', '10': 'OCTOBER', '11': 'NOVEMBER', '12': 'DECEMBER'
+      };
+      
+      let dateString = '';
+      if (monthArray.length > 0 && yearArray.length > 0) {
+         const mStr = monthArray.map(m => monthNames[m] || m).join(', ');
+         const yStr = yearArray.join(', ');
+         dateString = `For the month of ${mStr} ${yStr}`;
+      } else if (monthArray.length > 0) {
+         dateString = `For the month of ${monthArray.map(m => monthNames[m] || m).join(', ')}`;
+      } else if (yearArray.length > 0) {
+         dateString = `For the year ${yearArray.join(', ')}`;
+      } else {
+         dateString = `All Records`;
+      }
+
+      // Add Summary Rows (Rows 1 to 5)
+      const sumR1 = sheet.addRow(['FBT MARKETING AND CONSTR', '', '', 'Dr', 'Cr']);
+      const sumR2 = sheet.addRow(['Summary of Disbursement', '', '', totalDrGross, totalCrCIB]);
+      const sumR3 = sheet.addRow([dateString, '', '', null, transactionFilter === 'EWT' ? totalCrEWT : (totalCrEWT > 0 ? totalCrEWT : null)]);
+      const sumR4 = sheet.addRow(['', '', '', totalDrGross, totalCrCIB + totalCrEWT]);
+      sheet.addRow([]); // Empty row 5
+
+      // Style Summary block
+      [sumR1, sumR2, sumR3, sumR4].forEach(r => {
+         r.getCell(1).font = { bold: true, name: 'Calibri', size: 11 };
+         r.getCell(4).numFmt = '#,##0.00';
+         r.getCell(5).numFmt = '#,##0.00';
+      });
+
+      sumR1.getCell(4).font = { bold: true, color: { argb: 'FF2563EB' } };
+      sumR1.getCell(5).font = { bold: true, color: { argb: 'FF2563EB' } };
+      sumR1.getCell(4).alignment = { horizontal: 'center' };
+      sumR1.getCell(5).alignment = { horizontal: 'center' };
+      
+      sumR3.getCell(5).border = { bottom: { style: 'thin' } };
+      sumR4.getCell(4).border = { top: { style: 'thin' }, bottom: { style: 'double' } };
+      sumR4.getCell(5).border = { bottom: { style: 'double' } };
+
+      sheet.mergeCells(`A1:C1`);
+      sheet.mergeCells(`A2:C2`);
+      sheet.mergeCells(`A3:C3`);
+      sheet.mergeCells(`A4:C4`);
+
+      // Define Columns WITHOUT sheet.columns (to avoid writing header to row 1)
+      const colDefinitions = [
+        { key: 'date', width: 15 },
+        { key: 'payee', width: 25 },
+        { key: 'cv_no', width: 15 },
+        { key: 'project', width: 18 },
+        { key: 'gross', width: 18 },
+        { key: 'cib', width: 18 },
+        { key: 'accts_pay', width: 22 },
+        { key: 'ewt', width: 18 }
+      ];
+
+      dynamicCategories.forEach(cat => {
+        colDefinitions.push({ key: `cat_${cat}`, width: 16 });
+      });
+      colDefinitions.push({ key: 'particulars', width: 40 });
+
+      // Apply widths and keys manually
+      colDefinitions.forEach((col, i) => {
+         const colObj = sheet.getColumn(i + 1);
+         colObj.width = col.width;
+         colObj.key = col.key;
+      });
+
+      // ADD HEADER ROW (Row 6)
+      const headers = ['Date', 'Payee', 'CV No.', 'Project', 'Debit (Gross)', 'Credit (CIB)', 'Accts Pay (Credit Card)', 'EWT'];
+      dynamicCategories.forEach(cat => headers.push(cat));
+      headers.push('Particulars');
+
+      const headerRow = sheet.addRow(headers);
+      headerRow.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3730A3' } };
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11, name: 'Calibri' };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        cell.border = {
+          top: { style: 'medium', color: { argb: 'FF3730A3' } },
+          left: { style: 'medium', color: { argb: 'FF3730A3' } },
+          bottom: { style: 'medium', color: { argb: 'FF3730A3' } },
+          right: { style: 'medium', color: { argb: 'FF3730A3' } }
+        };
+      });
+      headerRow.height = 28;
+      headerRow.commit();
+
+      // Freeze panes below header
+      sheet.views = [{ state: 'frozen', ySplit: 6 }];
+
+      const thinBorder = {
+        top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+        left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+        bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+        right: { style: 'thin', color: { argb: 'FFD1D5DB' } }
+      };
+
+      const startDataRowIndex = sheet.rowCount + 1; // Row 7
+
+      // Populate Data Rows
+      processedRows.forEach((row, idx) => {
+        const isCreditCard = row.project_code && row.project_code.toLowerCase() === 'credit card';
+        
+        let grossAmount = parseFloat(row.gross_amount) || 0;
+        let originalNet = parseFloat(row.net_amount) || 0;
+        let originalAcctsPay = parseFloat(row.accts_pay) || 0;
+        let ewtAmount = parseFloat(row.ewt_amount) || 0;
+
+        let cib = isCreditCard ? 0 : originalNet;
+        let finalAcctsPay = isCreditCard ? (originalAcctsPay + originalNet) : originalAcctsPay;
+
+        const rowData = {
+          date: row.date || '',
+          payee: row.payee || '',
+          cv_no: row.cv_no ? `#${row.cv_no}` : '',
+          project: row.project_code || '',
+          gross: grossAmount,
+          cib: cib,
+          accts_pay: finalAcctsPay,
+          ewt: ewtAmount,
+          particulars: row.particulars || ''
+        };
+
+        // Add dynamic category amounts
+        dynamicCategories.forEach(cat => {
+          const exp = row.expenses.find(e => e.category === cat);
+          rowData[`cat_${cat}`] = (exp && parseFloat(exp.amount)) ? parseFloat(exp.amount) : 0;
+        });
+
+        const dataRow = sheet.addRow(rowData);
+
+        const rowFill = idx % 2 === 0
+          ? { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }
+          : { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+
+        dataRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          cell.fill = rowFill;
+          cell.border = thinBorder;
+          cell.font = { name: 'Calibri', size: 10, color: { argb: 'FF1E293B' } };
+          cell.alignment = { vertical: 'middle', wrapText: true };
+          
+          // EWT column highlight (8th column)
+          if (colNumber === 8) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE4E6' } };
+            cell.font = { name: 'Calibri', size: 10, color: { argb: 'FF9F1239' }, bold: true };
+          }
+
+          // Format numbers as Currency
+          if (colNumber >= 5 && colNumber <= (8 + dynamicCategories.length)) {
+            cell.numFmt = '"₱"#,##0.00';
+            if (cell.value === 0) {
+              cell.value = null; // To display blank instead of 0 if preferred, or keep 0. Let's keep 0 but Excel will format it
+            }
+          }
+          
+          // Align CV No and Project to center
+          if (colNumber === 3 || colNumber === 4) {
+             cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+          }
+        });
+        dataRow.height = 18;
+        dataRow.commit();
+      });
+
+      // TOTAL SUMMARY ROW
+      const summaryRow = sheet.addRow({});
+      summaryRow.getCell(4).value = 'TOTAL SUMMARY:';
+      summaryRow.getCell(4).font = { bold: true, name: 'Calibri', size: 11, color: { argb: 'FF475569' } };
+      summaryRow.getCell(4).alignment = { horizontal: 'right', vertical: 'middle' };
+
+      // Add SUM formulas
+      const rowCount = processedRows.length;
+      if (rowCount > 0) {
+         const endRow = sheet.rowCount - 1;
+         
+         const sumCols = [];
+         for(let c = 5; c <= 8 + dynamicCategories.length; c++) {
+            sumCols.push(c);
+         }
+
+         sumCols.forEach(colIndex => {
+            const colLetter = sheet.getColumn(colIndex).letter;
+            const cell = summaryRow.getCell(colIndex);
+            cell.value = { formula: `SUM(${colLetter}${startDataRowIndex}:${colLetter}${endRow})` };
+            cell.numFmt = '"₱"#,##0.00';
+            cell.font = { bold: true, name: 'Calibri', size: 11, color: { argb: 'FF1E293B' } };
+            // Highlight EWT sum
+            if (colIndex === 8) {
+               cell.font = { bold: true, name: 'Calibri', size: 11, color: { argb: 'FF9F1239' } };
+               cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE4E6' } };
+            }
+         });
+      }
+
+      summaryRow.eachCell({ includeEmpty: true }, (cell) => {
+         cell.border = {
+            top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+            bottom: { style: 'double', color: { argb: 'FF1E293B' } }
+         };
+      });
+      summaryRow.height = 24;
+      summaryRow.commit();
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      let filePrefix = 'All_Transaction_Disbursement';
+      if (transactionFilter === 'EWT') {
+         filePrefix = 'EWT_Transaction_Disbursement';
+      } else if (transactionFilter && transactionFilter !== 'All') {
+         filePrefix = `${transactionFilter}_Transaction_Disbursement`;
+      }
+      const filename = `${filePrefix}_${timestamp}.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+      await workbook.xlsx.write(res);
+      res.end();
+
+      logActivity(req.user.username, 'EXPORT_DISBURSEMENT_LEDGER', 'disbursements', 'excel', `Exported ${processedRows.length} filtered records`);
+    } catch (err) {
+      console.error('Disbursement export error:', err.message);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to generate Excel file.' });
+      }
+    }
+  });
+});
+
+// ==========================================
 // FILE UPLOAD ENDPOINTS
 // ==========================================
 app.post('/api/disbursements/:id/upload', authenticateToken, upload.single('receipt'), (req, res) => {
