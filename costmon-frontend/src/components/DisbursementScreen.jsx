@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, Plus, Trash2, FileText, ChevronDown, Filter, X, Lock, Save, Receipt, Edit2, ZoomIn, ZoomOut, RotateCcw, CheckCircle2, Paperclip, Camera, FileImage, FileType, Loader2, ExternalLink, Download } from 'lucide-react';
 import SearchableDropdown from './SearchableDropdown';
+import MultiSelectDropdown from './MultiSelectDropdown';
 import HealthCard from './HealthCard';
 import PasswordConfirmModal from './PasswordConfirmModal';
 import LoadingOverlay from './LoadingOverlay';
@@ -1170,7 +1171,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Project Code (#) <span className="text-red-500">*</span></label>
-                      <SearchableDropdown
+                      <MultiSelectDropdown
                         options={projects.map(p => p.project_code)}
                         value={headerData.project_code}
                         onChange={(val) => handleHeaderChange({ target: { name: 'project_code', value: val } })}
