@@ -37,8 +37,12 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery || '');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [selectedMonths, setSelectedMonths] = useState(['All']);
-  const [tempSelectedMonths, setTempSelectedMonths] = useState(['All']);
+  const [selectedMonths, setSelectedMonths] = useState([]);
+  const [tempSelectedMonths, setTempSelectedMonths] = useState([]);
+  const [selectedYears, setSelectedYears] = useState([]);
+  const [tempSelectedYears, setTempSelectedYears] = useState([]);
+  const [selectedTransactionFilter, setSelectedTransactionFilter] = useState('All');
+  const [tempSelectedTransactionFilter, setTempSelectedTransactionFilter] = useState('All');
   const filterRef = useRef(null);
 
   // Zoom
@@ -92,17 +96,43 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     localStorage.setItem('disbursement_zoom', '1');
   };
 
-  const availableMonths = useMemo(() => {
-    const months = disbursements.map(d => d.date && d.date.substring(0, 7)).filter(Boolean);
-    return [...new Set(months)].sort((a, b) => b.localeCompare(a));
+  const availableYears = useMemo(() => {
+    const years = (disbursements || []).map(d => d.date && d.date.substring(0, 4)).filter(Boolean);
+    return [...new Set(years)].sort((a, b) => b.localeCompare(a));
   }, [disbursements]);
+
+  const monthOptions = [
+    { value: '01', label: 'January' },
+    { value: '02', label: 'February' },
+    { value: '03', label: 'March' },
+    { value: '04', label: 'April' },
+    { value: '05', label: 'May' },
+    { value: '06', label: 'June' },
+    { value: '07', label: 'July' },
+    { value: '08', label: 'August' },
+    { value: '09', label: 'September' },
+    { value: '10', label: 'October' },
+    { value: '11', label: 'November' },
+    { value: '12', label: 'December' }
+  ];
 
   const filteredDisbursements = useMemo(() => {
     // HARD FILTER: Remove anything marked as 'additional' so they NEVER show up here
-    let result = disbursements.filter(d => d.costing_type !== 'additional');
+    let result = (disbursements || []).filter(d => d.costing_type !== 'additional');
 
-    if (!selectedMonths.includes('All')) {
-      result = result.filter(d => selectedMonths.some(m => d.date && d.date.startsWith(m)));
+    if (selectedMonths.length > 0 || selectedYears.length > 0) {
+      result = result.filter(d => {
+        if (!d.date) return false;
+        const year = d.date.substring(0, 4);
+        const month = d.date.substring(5, 7);
+        const yearMatches = selectedYears.length === 0 || selectedYears.includes(year);
+        const monthMatches = selectedMonths.length === 0 || selectedMonths.includes(month);
+        return yearMatches && monthMatches;
+      });
+    }
+
+    if (selectedTransactionFilter === 'EWT') {
+      result = result.filter(d => parseFloat(d.ewt_amount) > 0);
     }
 
     if (searchQuery.trim() !== '') {
@@ -136,38 +166,56 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     });
 
     return result;
-  }, [disbursements, selectedMonths, searchQuery]);
+  }, [disbursements, selectedMonths, selectedYears, selectedTransactionFilter, searchQuery]);
 
-  const formatMonth = (monthString) => {
-    if (monthString === 'All') return 'Lahat ng Buwan (All)';
-    const [year, month] = monthString.split('-');
-    const date = new Date(year, parseInt(month) - 1);
-    return date.toLocaleString('en-US', { month: 'long', year: 'numeric' }).toUpperCase();
+  const handleToggleMonth = (val) => {
+    setTempSelectedMonths(prev => prev.includes(val) ? prev.filter(m => m !== val) : [...prev, val]);
   };
 
-  const activeMonthDisplay = selectedMonths.includes('All')
-    ? 'FOR ALL MONTHS'
-    : selectedMonths.map(formatMonth).join(', ');
-
-  const handleToggleMonth = (month) => {
-    if (month === 'All') {
-      setTempSelectedMonths(['All']);
-    } else {
-      let updated = tempSelectedMonths.filter(m => m !== 'All');
-      if (updated.includes(month)) {
-        updated = updated.filter(m => m !== month);
-      } else {
-        updated.push(month);
-      }
-      if (updated.length === 0) updated = ['All'];
-      setTempSelectedMonths(updated);
-    }
+  const handleToggleYear = (val) => {
+    setTempSelectedYears(prev => prev.includes(val) ? prev.filter(y => y !== val) : [...prev, val]);
   };
 
   const applyFilter = () => {
     setSelectedMonths(tempSelectedMonths);
+    setSelectedYears(tempSelectedYears);
+    setSelectedTransactionFilter(tempSelectedTransactionFilter);
     setIsFilterOpen(false);
   };
+
+  const clearFilter = () => {
+    setSelectedMonths([]);
+    setSelectedYears([]);
+    setTempSelectedMonths([]);
+    setTempSelectedYears([]);
+    setSelectedTransactionFilter('All');
+    setTempSelectedTransactionFilter('All');
+    setIsFilterOpen(false);
+  };
+
+  const isAcctsPayVisible = useMemo(() => {
+    return (filteredDisbursements || []).some(d => {
+      const ap = (parseFloat(d.accts_pay) || 0) + (d.project_code && d.project_code.toLowerCase() === 'credit card' ? (parseFloat(d.net_amount) || 0) : 0);
+      return ap > 0;
+    });
+  }, [filteredDisbursements]);
+
+  const isEwtVisible = useMemo(() => {
+    return (filteredDisbursements || []).some(d => (parseFloat(d.ewt_amount) || 0) > 0);
+  }, [filteredDisbursements]);
+
+  const visibleCategories = useMemo(() => {
+    return (categories || []).filter(cat => {
+      return (filteredDisbursements || []).some(d => {
+        const amt = getCategoryAmount(d, cat);
+        return amt && amt > 0;
+      });
+    });
+  }, [categories, filteredDisbursements]);
+
+  const totalVisibleColumns = useMemo(() => {
+    return 7 + (isAcctsPayVisible ? 1 : 0) + (isEwtVisible ? 1 : 0) + visibleCategories.length + (canEdit ? 1 : 0);
+  }, [isAcctsPayVisible, isEwtVisible, visibleCategories, canEdit]);
 
   const ledgerTotals = useMemo(() => {
     let dr = 0;
@@ -648,11 +696,11 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     setPasswordModal({ isOpen: false, action: null, payload: null });
   };
 
-  const getCategoryAmount = (disbursement, catName) => {
+  function getCategoryAmount(disbursement, catName) {
     if (!disbursement.expenses) return null;
     const exp = disbursement.expenses.find(e => e.category === catName);
     return exp && parseFloat(exp.amount) ? parseFloat(exp.amount) : null;
-  };
+  }
 
   // ==========================================
   // 5. USE EFFECTS (Listeners & Auto-Opens)
@@ -739,7 +787,11 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
             </div>
             DISBURSEMENT LEDGER
           </h1>
-          <p className={`text-slate-500 dark:text-slate-400 mt-2.5 font-medium italic ${selectedMonths.includes('All') ? 'text-xs tracking-wider' : 'text-sm'}`}>{activeMonthDisplay}</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-2.5 font-medium italic text-sm">
+            {selectedMonths.length > 0 || selectedYears.length > 0 || selectedTransactionFilter !== 'All'
+              ? `${selectedMonths.length > 0 ? selectedMonths.map(m => monthOptions.find(opt => opt.value === m)?.label.substring(0,3)).join(', ') : 'ALL MONTHS'} | ${selectedYears.length > 0 ? selectedYears.join(', ') : 'ALL YEARS'}`.toUpperCase() + (selectedTransactionFilter !== 'All' ? ` | ${selectedTransactionFilter === 'EWT' ? 'EWT ONLY' : selectedTransactionFilter.toUpperCase()}` : '')
+              : 'FOR ALL DATES'}
+          </p>
         </div>
 
         <div className="flex items-center gap-4">
@@ -802,46 +854,81 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                 <button
                   onClick={() => {
                     setTempSelectedMonths(selectedMonths);
+                    setTempSelectedYears(selectedYears);
+                    setTempSelectedTransactionFilter(selectedTransactionFilter);
                     setIsFilterOpen(!isFilterOpen);
                   }}
                   className="flex items-center gap-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 px-5 py-3 rounded-xl font-bold transition-all shadow-sm"
                 >
-                  <Filter size={18} className={selectedMonths.includes('All') ? 'text-slate-400 dark:text-slate-500' : 'text-blue-600 dark:text-blue-400'} />
-                  <span>{selectedMonths.includes('All') ? 'All Months' : `${selectedMonths.length} Months`}</span>
+                  <Filter size={18} className={selectedMonths.length === 0 && selectedYears.length === 0 && selectedTransactionFilter === 'All' ? 'text-slate-400 dark:text-slate-500' : 'text-blue-600 dark:text-blue-400'} />
+                  <span>{selectedMonths.length > 0 || selectedYears.length > 0 || selectedTransactionFilter !== 'All' ? `${selectedMonths.length > 0 ? selectedMonths.length + ' Months' : 'All Months'} | ${selectedYears.length > 0 ? selectedYears.length + ' Years' : 'All Years'}` + (selectedTransactionFilter !== 'All' ? ` | ${selectedTransactionFilter}` : '') : 'All Dates'}</span>
                 </button>
 
                 {isFilterOpen && (
-                  <div className="absolute left-0 mt-3 w-72 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-20 overflow-hidden animate-in fade-in zoom-in-95">
+                  <div className="absolute left-0 mt-3 w-80 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-20 overflow-hidden animate-in fade-in zoom-in-95">
                     <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center">
-                      <span className="font-black text-slate-700 dark:text-slate-300 text-sm tracking-tight uppercase">Select Months</span>
+                      <span className="font-black text-slate-700 dark:text-slate-300 text-sm tracking-tight uppercase">Filter by Date</span>
                       <button onClick={() => setIsFilterOpen(false)} className="text-slate-400 hover:text-rose-500 transition-colors"><X size={18} /></button>
                     </div>
-                    <div className="p-3 max-h-64 overflow-y-auto space-y-1 custom-scrollbar">
-                      <label className="flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl cursor-pointer transition-colors group">
-                        <input
-                          type="checkbox"
-                          checked={tempSelectedMonths.includes('All')}
-                          onChange={() => handleToggleMonth('All')}
-                          className="rounded-lg border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 w-5 h-5 cursor-pointer bg-white dark:bg-slate-800"
-                        />
-                        <span className={`text-sm ${tempSelectedMonths.includes('All') ? 'font-black text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400 font-bold'}`}>Show All Data</span>
-                      </label>
-                      {availableMonths.map(month => (
-                        <label key={month} className="flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl cursor-pointer transition-colors group">
-                          <input
-                            type="checkbox"
-                            checked={tempSelectedMonths.includes(month)}
-                            onChange={() => handleToggleMonth(month)}
-                            className="rounded-lg border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 w-5 h-5 cursor-pointer bg-white dark:bg-slate-800"
-                          />
-                          <span className={`text-sm ${tempSelectedMonths.includes(month) ? 'font-black text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400 font-bold'}`}>{formatMonth(month)}</span>
+                    <div className="p-4 space-y-5 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                      <div className="space-y-3">
+                        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex justify-between items-center">
+                          <span>Months</span>
+                          <button onClick={() => setTempSelectedMonths([])} className="text-[10px] text-blue-500 hover:text-blue-600 border border-blue-200 dark:border-blue-800 px-2 py-0.5 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors">Clear</button>
                         </label>
-                      ))}
+                        <div className="grid grid-cols-3 gap-2">
+                          {monthOptions.map(m => (
+                            <button
+                              key={m.value}
+                              onClick={() => handleToggleMonth(m.value)}
+                              className={`px-2 py-2 text-[11px] rounded-lg border font-bold transition-all ${tempSelectedMonths.includes(m.value) ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-200 dark:shadow-none' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600'}`}
+                            >
+                              {m.label.substring(0, 3)}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex justify-between items-center">
+                          <span>Years</span>
+                          <button onClick={() => setTempSelectedYears([])} className="text-[10px] text-blue-500 hover:text-blue-600 border border-blue-200 dark:border-blue-800 px-2 py-0.5 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors">Clear</button>
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {availableYears.map(year => (
+                            <button
+                              key={year}
+                              onClick={() => handleToggleYear(year)}
+                              className={`px-2 py-2 text-[11px] rounded-lg border font-bold transition-all ${tempSelectedYears.includes(year) ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-200 dark:shadow-none' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600'}`}
+                            >
+                              {year}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-3 border-t border-slate-100 dark:border-slate-700 pt-4">
+                        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex justify-between items-center">
+                          <span>Transaction Type</span>
+                        </label>
+                        <select
+                          value={tempSelectedTransactionFilter}
+                          onChange={(e) => setTempSelectedTransactionFilter(e.target.value)}
+                          className="w-full p-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors cursor-pointer"
+                        >
+                          <option value="All">All Transactions</option>
+                          <option value="EWT">With EWT Payable</option>
+                        </select>
+                      </div>
                     </div>
-                    <div className="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                    <div className="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex gap-2">
+                      <button
+                        onClick={clearFilter}
+                        className="flex-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 py-2.5 rounded-xl font-bold transition-all text-sm"
+                      >
+                        Clear All
+                      </button>
                       <button
                         onClick={applyFilter}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-black transition-all shadow-lg shadow-blue-100 dark:shadow-none"
+                        className="flex-[2] bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl font-black transition-all shadow-lg shadow-blue-100 dark:shadow-none text-sm"
                       >
                         Apply Filters
                       </button>
@@ -904,9 +991,13 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                   <th className="px-6 py-5 text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 text-center">Project</th>
                   <th className="px-6 py-5 text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 text-right">Debit (Gross)</th>
                   <th className="px-6 py-5 text-xs font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 text-right bg-emerald-100/50 dark:bg-emerald-900/30">Credit (CIB)</th>
-                  <th className="px-6 py-5 text-xs font-black text-amber-800 dark:text-amber-400 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 text-right bg-amber-50/50 dark:bg-amber-900/30">Accts Pay (Credit Card)</th>
-                  <th className="px-6 py-5 text-xs font-black text-rose-800 dark:text-rose-400 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 text-right bg-rose-50/50 dark:bg-rose-900/30">EWT</th>
-                  {categories.map(cat => (
+                  {isAcctsPayVisible && (
+                    <th className="px-6 py-5 text-xs font-black text-amber-800 dark:text-amber-400 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 text-right bg-amber-50/50 dark:bg-amber-900/30">Accts Pay (Credit Card)</th>
+                  )}
+                  {isEwtVisible && (
+                    <th className="px-6 py-5 text-xs font-black text-rose-800 dark:text-rose-400 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 text-right bg-rose-50/50 dark:bg-rose-900/30">EWT</th>
+                  )}
+                  {visibleCategories.map(cat => (
                     <th key={cat} className="px-4 py-5 text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest border-b-2 border-r border-slate-400 dark:border-slate-600 text-right min-w-[120px] bg-slate-50 dark:bg-slate-800" title={cat}>
                       {cat}
                     </th>
@@ -918,7 +1009,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
               <tbody className="divide-y divide-slate-400 dark:divide-slate-600">
                 {filteredDisbursements.length === 0 ? (
                   <tr>
-                    <td colSpan={8 + categories.length} className="px-8 py-20 text-center">
+                    <td colSpan={totalVisibleColumns} className="px-8 py-20 text-center">
                       <div className="flex flex-col items-center gap-4">
                         <div className="bg-slate-100 dark:bg-slate-800 p-6 rounded-full text-slate-300 dark:text-slate-600">
                           <Receipt size={48} />
@@ -939,9 +1030,13 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                     <td className="px-6 py-4 font-black text-slate-500 dark:text-slate-400 text-center border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20">{d.project_code}</td>
                     <td className="px-6 py-4 text-right font-mono font-black text-slate-900 dark:text-white border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20">₱{(d.gross_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     <td className="px-6 py-4 text-right font-mono font-black text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-emerald-100/30 dark:group-hover:bg-emerald-900/30">₱{(d.project_code && d.project_code.toLowerCase() === 'credit card' ? 0 : (d.net_amount || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                    <td className="px-6 py-4 text-right font-mono font-black text-amber-700 dark:text-amber-400 bg-amber-50/30 dark:bg-amber-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-amber-100/30 dark:group-hover:bg-amber-900/30">₱{((parseFloat(d.accts_pay) || 0) + (d.project_code && d.project_code.toLowerCase() === 'credit card' ? (parseFloat(d.net_amount) || 0) : 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                    <td className="px-6 py-4 text-right font-mono font-black text-rose-600 dark:text-rose-400 bg-rose-50/20 dark:bg-rose-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-rose-100/20 dark:group-hover:bg-rose-900/30">₱{(d.ewt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                    {categories.map(cat => {
+                    {isAcctsPayVisible && (
+                      <td className="px-6 py-4 text-right font-mono font-black text-amber-700 dark:text-amber-400 bg-amber-50/30 dark:bg-amber-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-amber-100/30 dark:group-hover:bg-amber-900/30">₱{((parseFloat(d.accts_pay) || 0) + (d.project_code && d.project_code.toLowerCase() === 'credit card' ? (parseFloat(d.net_amount) || 0) : 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    )}
+                    {isEwtVisible && (
+                      <td className="px-6 py-4 text-right font-mono font-black text-rose-600 dark:text-rose-400 bg-rose-50/20 dark:bg-rose-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-rose-100/20 dark:group-hover:bg-rose-900/30">₱{(d.ewt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    )}
+                    {visibleCategories.map(cat => {
                       const amt = getCategoryAmount(d, cat);
                       return (
                         <td key={cat} className={`px-4 py-4 text-right font-mono text-sm border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/30 dark:group-hover:bg-blue-900/20 ${amt ? 'font-black text-slate-800 dark:text-slate-200 bg-slate-100/40 dark:bg-slate-700/40' : 'text-slate-300 dark:text-slate-600'}`}>
@@ -971,9 +1066,13 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                     <td colSpan="4" className="px-6 py-6 text-right text-xs tracking-widest text-slate-500 dark:text-slate-400 sticky left-0 z-10 bg-slate-100 dark:bg-slate-800 border-r border-slate-400 dark:border-slate-600 shadow-[3px_0_0_0_#94a3b8] dark:shadow-[3px_0_0_0_#475569] transition-colors duration-300">TOTAL SUMMARY:</td>
                     <td className="px-6 py-6 text-right font-mono text-blue-800 dark:text-blue-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.dr.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     <td className="px-6 py-6 text-right font-mono text-emerald-800 dark:text-emerald-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.cib.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                    <td className="px-6 py-6 text-right font-mono text-amber-800 dark:text-amber-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.accts_pay.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                    <td className="px-6 py-6 text-right font-mono text-rose-800 dark:text-rose-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.ewt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                    <td colSpan={categories.length + (canEdit ? 2 : 1)} className="px-6 py-6"></td>
+                    {isAcctsPayVisible && (
+                      <td className="px-6 py-6 text-right font-mono text-amber-800 dark:text-amber-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.accts_pay.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    )}
+                    {isEwtVisible && (
+                      <td className="px-6 py-6 text-right font-mono text-rose-800 dark:text-rose-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.ewt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    )}
+                    <td colSpan={visibleCategories.length + (canEdit ? 2 : 1)} className="px-6 py-6"></td>
                   </tr>
                 </tfoot>
               )}
