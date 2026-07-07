@@ -223,15 +223,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       { raw: "ZAM-546", clean: "ZAM-546" }
     ];
 
-    const selectedProject = projects.find(p => p.project_code === headerData.project_code);
-    const pType = selectedProject ? selectedProject.project_type : 'Construction';
-
     (categoryObjects || []).forEach(catObj => {
-      const catType = (catObj.category_type || '').toLowerCase();
-      const projType = (pType || '').toLowerCase();
-      if (catType && catType !== 'both' && catType !== projType) {
-        return;
-      }
 
       const rawName = catObj.name;
       const upperName = rawName.toUpperCase();
@@ -252,19 +244,17 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       }
     });
 
-    if (pType === 'Construction' || !pType) {
-      DEFAULT_MAIN_VALS.forEach(m => {
-        if (!foundMains.has(m.raw) && !main.includes(m.raw)) {
-          main.push(m.raw);
-        }
-      });
-    }
+    DEFAULT_MAIN_VALS.forEach(m => {
+      if (!foundMains.has(m.raw) && !main.includes(m.raw)) {
+        main.push(m.raw);
+      }
+    });
 
     return {
       mainCategoriesList: [...new Set(main)].sort((a, b) => a.localeCompare(b)),
       miscCategoriesList: [...new Set(misc)].sort((a, b) => a.localeCompare(b))
     };
-  }, [categoryObjects, headerData.project_code, projects]);
+  }, [categoryObjects]);
 
   const totals = useMemo(() => {
     let totalDebit = 0;
