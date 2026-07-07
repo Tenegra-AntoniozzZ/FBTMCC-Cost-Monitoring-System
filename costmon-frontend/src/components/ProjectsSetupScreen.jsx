@@ -1,17 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
-import { 
-  Tags, 
-  Trash2, 
-  Plus, 
-  Settings2, 
+import { useState, useEffect } from 'react';
+import {
+  Tags,
+  Trash2,
+  Plus,
+  Settings2,
   AlertCircle,
   Save,
   X,
   FileCode,
   CheckCircle2,
   BarChart3,
-  Layers,
-  ChevronDown
+  Layers
 } from 'lucide-react';
 import SearchableDropdown from './SearchableDropdown';
 import PasswordConfirmModal from './PasswordConfirmModal';
@@ -19,97 +18,29 @@ import LoadingOverlay from './LoadingOverlay';
 import { API_URL } from '../utils/Constants';
 
 export default function ProjectsSetupScreen({ projects, categories, refreshData, onNavigateToCostMonitoring, onModalStateChange }) {
-  const [newProject, setNewProject] = useState({ 
-    project_code: '', 
-    project_name: '', 
-    contract_cost: '', 
-    profit_percentage: '20', 
-    project_type: 'Construction' 
+  const [newProject, setNewProject] = useState({
+    project_code: '',
+    project_name: '',
+    contract_cost: '',
+    profit_percentage: '20'
   });
   const [newCategory, setNewCategory] = useState('');
   const [newSubCategory, setNewSubCategory] = useState('');
-  const [newCategoryType, setNewCategoryType] = useState('Construction');
-  const [newSubCategoryType, setNewSubCategoryType] = useState('Construction');
-  
-  
+
+
   const [editingProject, setEditingProject] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
   const [projectCodeError, setProjectCodeError] = useState('');
-  
+
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showCategorySuccessModal, setShowCategorySuccessModal] = useState(false);
   const [showSubCategorySuccessModal, setShowSubCategorySuccessModal] = useState(false);
-  
+
   const [recentlyAddedProject, setRecentlyAddedProject] = useState(null);
   const [passwordModal, setPasswordModal] = useState({ isOpen: false, action: null, payload: null });
 
-  // Custom Dropdown states & logic
-  const [sessionTypes, setSessionTypes] = useState([]);
-  const [deletedTypes, setDeletedTypes] = useState(() => {
-    try {
-      const saved = localStorage.getItem('fbtmcc_deleted_project_types');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
-  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
-  const [customTypeInput, setCustomTypeInput] = useState('');
-  const typeDropdownRef = useRef(null);
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (typeDropdownRef.current && !typeDropdownRef.current.contains(event.target)) {
-        setIsTypeDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const activeProjectTypes = projects.map(p => p.project_type).filter(Boolean);
-  const allProjectTypes = Array.from(new Set([
-    'Construction',
-    'Office',
-    ...activeProjectTypes,
-    ...sessionTypes
-  ]))
-    .filter(type => !deletedTypes.includes(type) || activeProjectTypes.includes(type))
-    .sort((a, b) => a.localeCompare(b));
-  console.log('allProjectTypes:', allProjectTypes);
-
-  const handleAddCustomType = (e) => {
-    e.preventDefault();
-    const trimmed = customTypeInput.trim();
-    if (trimmed) {
-      setDeletedTypes(prev => {
-        const updated = prev.filter(t => t !== trimmed);
-        localStorage.setItem('fbtmcc_deleted_project_types', JSON.stringify(updated));
-        return updated;
-      });
-
-      if (!sessionTypes.includes(trimmed)) {
-        setSessionTypes([...sessionTypes, trimmed]);
-      }
-      if (editingProject) {
-        setEditingProject({...editingProject, project_type: trimmed});
-      } else {
-        setNewProject({...newProject, project_type: trimmed});
-      }
-      setCustomTypeInput('');
-      setIsTypeDropdownOpen(false);
-    }
-  };
-
-  const handleDeleteCustomType = (typeToDelete) => {
-    setSessionTypes(prev => prev.filter(t => t !== typeToDelete));
-    setDeletedTypes(prev => {
-      const updated = [...prev, typeToDelete];
-      localStorage.setItem('fbtmcc_deleted_project_types', JSON.stringify(updated));
-      return updated;
-    });
-  };
 
   // ==============================================================
   // CATEGORY FILTERING & INJECTION LOGIC
@@ -144,7 +75,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
     } else {
       // Tingnan kung isa ito sa mga default na Main Categories
       const matchedMain = DEFAULT_MAIN_CATEGORIES.find(m => cleanUpper === m.clean || upperName.includes(m.clean));
-      
+
       if (matchedMain) {
         foundMains.add(matchedMain.raw);
         mainCategories.push({ ...c, displayName: matchedMain.raw }); // Gamitin ang exact na format
@@ -205,13 +136,13 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
       setProjectCodeError(`Code "${newProject.project_code}" already exists!`);
       return;
     }
-    
+
     setProjectCodeError('');
     setIsSaving(true);
     try {
       const response = await fetch(`${API_URL}/projects`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
         },
@@ -220,12 +151,12 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
           profit_percentage: parseFloat(newProject.profit_percentage || 20) / 100
         })
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setRecentlyAddedProject({ id: data.id, code: newProject.project_code });
         setShowSuccessModal(true);
-        setNewProject({ project_code: '', project_name: '', contract_cost: '', profit_percentage: '20', project_type: 'Construction' });
+        setNewProject({ project_code: '', project_name: '', contract_cost: '', profit_percentage: '20' });
         refreshData();
       }
     } catch {
@@ -240,7 +171,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
     try {
       const response = await fetch(`${API_URL}/projects/${editingProject.id}`, {
         method: 'PUT',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
         },
@@ -249,7 +180,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
           profit_percentage: parseFloat(editingProject.profit_percentage) / 100
         })
       });
-      
+
       if (response.ok) {
         showMessage('Project updated successfully!');
         setEditingProject(null);
@@ -269,7 +200,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
   const executeDeleteProject = async (project) => {
     setIsSaving(true);
     try {
-      const response = await fetch(`${API_URL}/projects/${project.id}`, { 
+      const response = await fetch(`${API_URL}/projects/${project.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
@@ -288,36 +219,35 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
 
   const handleAddCategory = async (e, isMisc = false) => {
     if (e) e.preventDefault();
-    
+
     const valueToAdd = isMisc ? newSubCategory.trim() : newCategory.trim();
     if (!valueToAdd) {
       showMessage('Please enter a category name.', 'error');
       return;
     }
-    
-    const exists = isMisc 
+
+    const exists = isMisc
       ? subCategories.some(c => c.displayName.toLowerCase() === valueToAdd.toLowerCase())
       : mainCategories.some(c => c.displayName.toLowerCase() === valueToAdd.toLowerCase());
-      
+
     if (exists) {
       showMessage(`Category "${valueToAdd}" already exists!`, 'error');
       return;
     }
-    
+
     const finalName = isMisc ? `[MISC] ${valueToAdd}` : `[MAIN] ${valueToAdd}`;
-    const categoryType = isMisc ? newSubCategoryType : newCategoryType;
-    
+
     setIsSaving(true);
     try {
       const response = await fetch(`${API_URL}/categories`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
         },
-        body: JSON.stringify({ name: finalName, category_type: categoryType })
+        body: JSON.stringify({ name: finalName })
       });
-      
+
       if (response.ok) {
         if (isMisc) {
           setShowSubCategorySuccessModal(true);
@@ -338,11 +268,11 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
   };
 
   const executeDeleteCategory = async (category) => {
-    if (category.isHardcoded) return; 
-    
+    if (category.isHardcoded) return;
+
     setIsSaving(true);
     try {
-      const response = await fetch(`${API_URL}/categories/${category.id}`, { 
+      const response = await fetch(`${API_URL}/categories/${category.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
@@ -388,9 +318,8 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
         </div>
 
         {message.text && (
-          <div className={`px-6 py-3 rounded-2xl font-bold flex items-center gap-2 animate-in slide-in-from-top-4 ${
-            message.type === 'error' ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-500/20' : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-500/20'
-          }`}>
+          <div className={`px-6 py-3 rounded-2xl font-bold flex items-center gap-2 animate-in slide-in-from-top-4 ${message.type === 'error' ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-500/20' : 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-500/20'
+            }`}>
             {message.type === 'error' ? <AlertCircle size={18} /> : <Save size={18} />}
             {message.text}
           </div>
@@ -398,7 +327,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
       </header>
 
       <main className="flex-1 overflow-y-auto p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 custom-scrollbar">
-        
+
         {/* PROJECTS MANAGEMENT (7 COLS) */}
         <section className="lg:col-span-7 space-y-6">
           <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex flex-col transition-colors duration-300">
@@ -417,24 +346,23 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
               <form onSubmit={(e) => { e.preventDefault(); if (editingProject) { setPasswordModal({ isOpen: true, action: 'update_project', payload: null }); } else { handleAddProject(e); } }} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                 <div className="md:col-span-1 space-y-1.5 relative">
                   <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase">Code</label>
-                  <input 
-                    className={`w-full px-4 py-3 rounded-xl border-2 font-bold focus:outline-none focus:ring-2 transition-all shadow-sm ${
-                      projectCodeError 
-                        ? 'border-rose-500 bg-rose-50/50 dark:bg-rose-900/20 focus:ring-rose-500 text-rose-700 dark:text-rose-400' 
+                  <input
+                    className={`w-full px-4 py-3 rounded-xl border-2 font-bold focus:outline-none focus:ring-2 transition-all shadow-sm ${projectCodeError
+                        ? 'border-rose-500 bg-rose-50/50 dark:bg-rose-900/20 focus:ring-rose-500 text-rose-700 dark:text-rose-400'
                         : 'border-slate-400 dark:border-slate-600 focus:ring-indigo-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white'
-                    }`}
+                      }`}
                     placeholder="RF-000"
                     value={editingProject ? editingProject.project_code : newProject.project_code}
                     onChange={(e) => {
                       const val = e.target.value;
                       if (editingProject) {
-                        setEditingProject({...editingProject, project_code: val});
+                        setEditingProject({ ...editingProject, project_code: val });
                       } else {
-                        setNewProject({...newProject, project_code: val});
+                        setNewProject({ ...newProject, project_code: val });
                         if (projects.some(p => p.project_code.toLowerCase() === val.toLowerCase())) {
-                           setProjectCodeError(`Code "${val}" already exists!`);
+                          setProjectCodeError(`Code "${val}" already exists!`);
                         } else {
-                           setProjectCodeError('');
+                          setProjectCodeError('');
                         }
                       }
                     }}
@@ -448,112 +376,36 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                 </div>
                 <div className="md:col-span-2 space-y-1.5">
                   <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase">Project Name</label>
-                  <input 
+                  <input
                     className="w-full px-4 py-3 rounded-xl border-2 border-slate-400 dark:border-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm transition-colors duration-300"
                     placeholder="Enter site name..."
                     value={editingProject ? editingProject.project_name : newProject.project_name}
                     onChange={(e) => {
                       const val = e.target.value;
                       if (editingProject) {
-                        setEditingProject({...editingProject, project_name: val});
+                        setEditingProject({ ...editingProject, project_name: val });
                       } else {
-                        setNewProject({...newProject, project_name: val});
+                        setNewProject({ ...newProject, project_name: val });
                       }
                     }}
                     required
                   />
                 </div>
-                <div className="md:col-span-1 space-y-1.5 relative" ref={typeDropdownRef}>
-                  <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase">Type</label>
-                  <div 
-                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-400 dark:border-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow-sm transition-colors duration-300 flex justify-between items-center cursor-pointer"
-                    onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
-                  >
-                    <span className="truncate">{editingProject ? (editingProject.project_type || 'Construction') : (newProject.project_type || 'Construction')}</span>
-                    <ChevronDown size={16} className={`text-slate-400 transition-transform ${isTypeDropdownOpen ? 'rotate-180' : ''}`} />
-                  </div>
-                  
-                  {isTypeDropdownOpen && (
-                    <div className="absolute z-[60] top-full left-0 min-w-[260px] w-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 flex flex-col">
-                      <div className="p-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex gap-2">
-                        <input
-                          type="text"
-                          value={customTypeInput}
-                          onChange={(e) => setCustomTypeInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleAddCustomType(e);
-                            }
-                          }}
-                          placeholder="Type new..."
-                          className="flex-1 px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 transition-colors font-medium"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddCustomType}
-                          className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors flex items-center justify-center shadow-md shadow-indigo-200 dark:shadow-none"
-                        >
-                          <Plus size={16} />
-                        </button>
-                      </div>
-                      <div className="max-h-48 overflow-y-auto custom-scrollbar">
-                        {allProjectTypes.map((type, idx) => {
-                          const isDefault = ['CONSTRUCTION', 'OFFICE'].includes(type.toUpperCase());
-                          return (
-                            <div
-                              key={idx}
-                              onClick={() => {
-                                if (editingProject) {
-                                  setEditingProject({...editingProject, project_type: type});
-                                } else {
-                                  setNewProject({...newProject, project_type: type});
-                                }
-                                setIsTypeDropdownOpen(false);
-                              }}
-                              className={`px-4 py-2.5 text-sm cursor-pointer transition-colors font-medium flex justify-between items-center group/item ${
-                                (editingProject ? editingProject.project_type : newProject.project_type) === type 
-                                  ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400' 
-                                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                              }`}
-                            >
-                              <span>{type}</span>
-                              {!isDefault && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteCustomType(type);
-                                  }}
-                                  className="p-1 hover:bg-rose-100 dark:hover:bg-rose-950/30 rounded text-slate-400 hover:text-rose-600 transition-colors opacity-0 group-hover/item:opacity-100"
-                                  title="Delete custom type"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
                 <div className="flex gap-2">
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     disabled={isSaving || (!!projectCodeError && !editingProject)}
-                    className={`flex-1 text-white font-black py-3 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-                      (!!projectCodeError && !editingProject)
-                        ? 'bg-slate-400 dark:bg-slate-600 shadow-slate-100 dark:shadow-none' 
+                    className={`flex-1 text-white font-black py-3 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${(!!projectCodeError && !editingProject)
+                        ? 'bg-slate-400 dark:bg-slate-600 shadow-slate-100 dark:shadow-none'
                         : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100 dark:shadow-none'
-                    }`}
+                      }`}
                   >
                     {editingProject ? <Save size={18} /> : <Plus size={18} />}
                     {editingProject ? 'Update' : 'Add'}
                   </button>
                   {editingProject && (
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={() => setEditingProject(null)}
                       className="p-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-400 dark:text-slate-300 hover:text-slate-600 dark:hover:text-white rounded-xl transition-colors duration-300"
                     >
@@ -569,7 +421,6 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                 <thead>
                   <tr className="bg-slate-100 dark:bg-slate-700 transition-colors duration-300">
                     <th className="px-6 py-4 text-[10px] font-black text-slate-600 dark:text-slate-300 tracking-widest border-b-2 border-r border-slate-400 dark:border-slate-600 uppercase w-[140px]">Code</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-600 dark:text-slate-300 tracking-widest border-b-2 border-r border-slate-400 dark:border-slate-600 uppercase w-[140px]">Type</th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-600 dark:text-slate-300 tracking-widest border-b-2 border-r border-slate-400 dark:border-slate-600 uppercase">Project Name</th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-600 dark:text-slate-300 tracking-widest border-b-2 border-slate-400 dark:border-slate-600 uppercase text-center sticky right-0 z-10 bg-slate-100 dark:bg-slate-700 w-[140px]">Actions</th>
                   </tr>
@@ -578,53 +429,40 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                   {projects.map((p) => {
                     const isSelected = editingProject && editingProject.id === p.id;
                     return (
-                      <tr 
-                        key={p.id} 
-                        className={`transition-colors group ${
-                          isSelected 
-                            ? 'bg-indigo-50/50 dark:bg-indigo-950/40 border-y-2 border-indigo-500 dark:border-indigo-500' 
+                      <tr
+                        key={p.id}
+                        className={`transition-colors group ${isSelected
+                            ? 'bg-indigo-50/50 dark:bg-indigo-950/40 border-y-2 border-indigo-500 dark:border-indigo-500'
                             : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'
-                        }`}
+                          }`}
                       >
-                        <td className={`px-6 py-4 border-r w-[140px] transition-colors duration-300 ${
-                          isSelected 
-                            ? 'border-indigo-500 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20' 
+                        <td className={`px-6 py-4 border-r w-[140px] transition-colors duration-300 ${isSelected
+                            ? 'border-indigo-500 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20'
                             : 'border-slate-400 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50'
-                        }`}>
+                          }`}>
                           <span className="font-black text-indigo-700 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-lg border border-indigo-100 dark:border-indigo-800 shadow-sm group-hover:bg-white dark:group-hover:bg-slate-800 transition-colors block text-center truncate">{p.project_code}</span>
                         </td>
-                        <td className={`px-6 py-4 border-r w-[140px] transition-colors duration-300 ${
-                          isSelected 
-                            ? 'border-indigo-500 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20' 
+                        <td className={`px-6 py-4 border-r transition-colors duration-300 ${isSelected
+                            ? 'border-indigo-500 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20'
                             : 'border-slate-400 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50'
-                        }`}>
-                          <span className={`font-black px-3 py-1.5 rounded-lg border shadow-sm transition-colors block text-center text-xs truncate ${p.project_type === 'Office' ? 'text-amber-700 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800' : 'text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800'}`}>
-                            {p.project_type || 'Construction'}
-                          </span>
-                        </td>
-                        <td className={`px-6 py-4 border-r transition-colors duration-300 ${
-                          isSelected 
-                            ? 'border-indigo-500 dark:border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/20' 
-                            : 'border-slate-400 dark:border-slate-600 bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50'
-                        }`}>
+                          }`}>
                           <div className="font-bold text-slate-800 dark:text-slate-200">{p.project_name}</div>
                         </td>
-                        <td className={`px-6 py-4 sticky right-0 z-10 w-[140px] transition-colors duration-300 ${
-                          isSelected 
-                            ? 'bg-indigo-50/30 dark:bg-indigo-950/20' 
+                        <td className={`px-6 py-4 sticky right-0 z-10 w-[140px] transition-colors duration-300 ${isSelected
+                            ? 'bg-indigo-50/30 dark:bg-indigo-950/20'
                             : 'bg-white dark:bg-slate-800 group-hover:bg-slate-50 dark:group-hover:bg-slate-700/50'
-                        }`}>
+                          }`}>
                           <div className="flex items-center justify-center gap-2">
-                            <button 
+                            <button
                               onClick={() => setEditingProject({
-                                ...p, 
+                                ...p,
                                 profit_percentage: (p.profit_percentage * 100).toFixed(0)
                               })}
                               className="p-2 text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-50 dark:border-indigo-900/30 rounded-lg transition-colors shadow-sm"
                             >
                               <Settings2 size={18} />
                             </button>
-                            <button 
+                            <button
                               onClick={() => setPasswordModal({ isOpen: true, action: 'delete_project', payload: p })}
                               className="p-2 text-rose-500 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 border border-rose-50 dark:border-rose-900/30 rounded-lg transition-colors shadow-sm"
                             >
@@ -645,7 +483,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
             CATEGORIES MANAGEMENT (5 COLS) 
         ============================================== */}
         <section className="lg:col-span-5 space-y-6 flex flex-col h-[calc(100vh-140px)]">
-          
+
           {/* 1. MAIN CATEGORIES BOX */}
           <div className="bg-white dark:bg-slate-800 rounded-[2rem] border border-slate-400 dark:border-slate-600 shadow-sm overflow-hidden flex flex-col flex-1 min-h-[300px] transition-colors duration-300">
             <div className="px-8 py-5 bg-slate-50/50 dark:bg-slate-800/50 border-b border-slate-400 dark:border-slate-600 flex items-center justify-between">
@@ -661,13 +499,12 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
             <div className="p-5 pb-8 border-b border-slate-400 dark:border-slate-600 bg-amber-50/20 dark:bg-amber-900/10 transition-colors duration-300">
               <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase block mb-1.5">Add Main Category</label>
               <div className="flex gap-2 items-end">
-                <div className="flex-[2] space-y-1.5 relative">
-                  <input 
-                    className={`w-full px-4 py-3 rounded-xl border-2 font-bold focus:outline-none focus:ring-2 shadow-sm text-sm transition-colors duration-300 uppercase ${
-                      isMainCategoryDuplicate 
-                        ? 'border-rose-500 focus:ring-rose-500 text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10' 
+                <div className="flex-1 space-y-1.5 relative">
+                  <input
+                    className={`w-full px-4 py-3 rounded-xl border-2 font-bold focus:outline-none focus:ring-2 shadow-sm text-sm transition-colors duration-300 uppercase ${isMainCategoryDuplicate
+                        ? 'border-rose-500 focus:ring-rose-500 text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10'
                         : 'border-slate-400 dark:border-slate-600 focus:ring-amber-500 bg-white dark:bg-slate-700 text-slate-800 dark:text-white'
-                    }`}
+                      }`}
                     placeholder="Enter category name..."
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value.toUpperCase())}
@@ -679,25 +516,14 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                     </span>
                   )}
                 </div>
-                <div className="flex-1 space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase block">Type</label>
-                  <SearchableDropdown 
-                    options={Array.from(new Set([...allProjectTypes, 'Both']))}
-                    value={newCategoryType}
-                    onChange={setNewCategoryType}
-                    placeholder="Select Type"
-                    size="large"
-                  />
-                </div>
-                <button 
+                <button
                   type="button"
                   disabled={isMainCategoryDuplicate}
                   onClick={() => handleAddCategory(null, false)}
-                  className={`flex items-center justify-center gap-2 px-5 py-3 font-black rounded-xl shadow-lg transition-all text-sm whitespace-nowrap ${
-                    isMainCategoryDuplicate
+                  className={`flex items-center justify-center gap-2 px-5 py-3 font-black rounded-xl shadow-lg transition-all text-sm whitespace-nowrap ${isMainCategoryDuplicate
                       ? 'bg-slate-300 text-slate-500 cursor-not-allowed dark:bg-slate-700 dark:text-slate-500 shadow-none'
                       : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-100 dark:shadow-none'
-                  }`}
+                    }`}
                 >
                   <Plus size={16} /> Add
                 </button>
@@ -707,22 +533,10 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
             <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
               <div className="space-y-2">
                 {mainCategories.map((cat) => (
-                  <div key={cat.id} className="group flex items-start justify-between p-3 rounded-xl border border-slate-300 dark:border-slate-600 hover:border-amber-200 dark:hover:border-amber-500/50 hover:bg-amber-50/30 dark:hover:bg-amber-900/20 transition-all duration-300">
-                    <div className="flex flex-col gap-1">
-                       <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{cat.displayName}</span>
-                       <span className={`text-[10px] font-black w-fit px-2 py-0.5 rounded-md border ${
-                          cat.category_type === 'Office' 
-                            ? 'text-amber-700 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800' 
-                            : cat.category_type === 'Both'
-                            ? 'text-indigo-700 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800'
-                            : 'text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800'
-                       }`}>
-                          {cat.category_type || 'Construction'}
-                       </span>
-                    </div>
-                    
+                  <div key={cat.id} className="group flex items-center justify-between p-3 rounded-xl border border-slate-300 dark:border-slate-600 hover:border-amber-200 dark:hover:border-amber-500/50 hover:bg-amber-50/30 dark:hover:bg-amber-900/20 transition-all duration-300">
+                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{cat.displayName}</span>
                     {!cat.isHardcoded && (
-                      <button 
+                      <button
                         onClick={() => setPasswordModal({ isOpen: true, action: 'delete_category', payload: cat })}
                         className="p-1.5 text-slate-300 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all"
                         title="Delete Category"
@@ -751,13 +565,12 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
             <div className="p-5 pb-8 border-b border-slate-400 dark:border-slate-600 bg-teal-50/30 dark:bg-teal-900/10 transition-colors duration-300">
               <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase block mb-1.5">Add Misc Sub-Category</label>
               <div className="flex gap-2 items-end">
-                <div className="flex-[2] space-y-1.5 relative">
-                  <input 
-                    className={`w-full px-4 py-3 rounded-xl border-2 font-bold focus:outline-none focus:ring-2 shadow-sm text-sm transition-colors duration-300 uppercase ${
-                      isSubCategoryDuplicate 
-                        ? 'border-rose-500 focus:ring-rose-500 text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10' 
+                <div className="flex-1 space-y-1.5 relative">
+                  <input
+                    className={`w-full px-4 py-3 rounded-xl border-2 font-bold focus:outline-none focus:ring-2 shadow-sm text-sm transition-colors duration-300 uppercase ${isSubCategoryDuplicate
+                        ? 'border-rose-500 focus:ring-rose-500 text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10'
                         : 'border-slate-400 dark:border-slate-600 focus:ring-teal-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white'
-                    }`}
+                      }`}
                     placeholder="e.g. EXTRA LABOR..."
                     value={newSubCategory}
                     onChange={(e) => setNewSubCategory(e.target.value.toUpperCase())}
@@ -769,25 +582,14 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                     </span>
                   )}
                 </div>
-                <div className="flex-1 space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-600 dark:text-slate-400 tracking-widest ml-1 uppercase block">Type</label>
-                  <SearchableDropdown 
-                    options={Array.from(new Set([...allProjectTypes, 'Both']))}
-                    value={newSubCategoryType}
-                    onChange={setNewSubCategoryType}
-                    placeholder="Select Type"
-                    size="large"
-                  />
-                </div>
-                <button 
+                <button
                   type="button"
                   disabled={isSubCategoryDuplicate}
                   onClick={() => handleAddCategory(null, true)}
-                  className={`flex items-center justify-center gap-2 px-5 py-3 font-black rounded-xl shadow-lg transition-all text-sm whitespace-nowrap ${
-                    isSubCategoryDuplicate
+                  className={`flex items-center justify-center gap-2 px-5 py-3 font-black rounded-xl shadow-lg transition-all text-sm whitespace-nowrap ${isSubCategoryDuplicate
                       ? 'bg-slate-300 text-slate-500 cursor-not-allowed dark:bg-slate-700 dark:text-slate-500 shadow-none'
                       : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-100 dark:shadow-none'
-                  }`}
+                    }`}
                 >
                   <Plus size={16} /> Add
                 </button>
@@ -797,20 +599,9 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
             <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
               <div className="space-y-2">
                 {subCategories.map((cat) => (
-                  <div key={cat.id} className="group flex items-start justify-between p-3 rounded-xl border border-slate-300 dark:border-slate-600 hover:border-teal-200 dark:hover:border-teal-500/50 hover:bg-teal-50/30 dark:hover:bg-teal-900/20 transition-all duration-300">
-                    <div className="flex flex-col gap-1">
-                       <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{cat.displayName}</span>
-                       <span className={`text-[10px] font-black w-fit px-2 py-0.5 rounded-md border ${
-                          cat.category_type === 'Office' 
-                            ? 'text-amber-700 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800' 
-                            : cat.category_type === 'Both'
-                            ? 'text-indigo-700 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800'
-                            : 'text-emerald-700 dark:text-emerald-400 bg-emerald-50/50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800'
-                       }`}>
-                          {cat.category_type || 'Construction'}
-                       </span>
-                    </div>
-                    <button 
+                  <div key={cat.id} className="group flex items-center justify-between p-3 rounded-xl border border-slate-300 dark:border-slate-600 hover:border-teal-200 dark:hover:border-teal-500/50 hover:bg-teal-50/30 dark:hover:bg-teal-900/20 transition-all duration-300">
+                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{cat.displayName}</span>
+                    <button
                       onClick={() => setPasswordModal({ isOpen: true, action: 'delete_category', payload: cat })}
                       className="p-1.5 text-slate-300 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all"
                     >
@@ -883,9 +674,9 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                   Successfully created project code <strong className="text-indigo-600 dark:text-indigo-400">{recentlyAddedProject?.code}</strong>.
                 </p>
               </div>
-              
+
               <div className="flex flex-row w-full gap-5 mt-4">
-                <button 
+                <button
                   onClick={() => {
                     setShowSuccessModal(false);
                     onNavigateToCostMonitoring(recentlyAddedProject?.id);
@@ -895,7 +686,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
                   <BarChart3 size={24} strokeWidth={2.5} />
                   Go to Monitoring
                 </button>
-                <button 
+                <button
                   onClick={() => setShowSuccessModal(false)}
                   className="flex-1 py-5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-2xl transition-all text-lg"
                 >
@@ -915,9 +706,9 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
       />
 
       {isSaving && (
-        <LoadingOverlay 
-          message="Updating System" 
-          subtext="Please wait while changes are being saved..." 
+        <LoadingOverlay
+          message="Updating System"
+          subtext="Please wait while changes are being saved..."
         />
       )}
     </div>
