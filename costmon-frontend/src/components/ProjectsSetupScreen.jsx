@@ -45,60 +45,20 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
   // ==============================================================
   // CATEGORY FILTERING & INJECTION LOGIC
   // ==============================================================
-  const DEFAULT_MAIN_CATEGORIES = [
-    { raw: "PERMITS & CONSTRUCTION PLANS", clean: "PERMITS & CONSTRUCTION PLANS" },
-    { raw: "DOWN PAYMENT", clean: "DOWN PAYMENT" },
-    { raw: "CARPENTRY", clean: "CARPENTRY" },
-    { raw: "PAINTING", clean: "PAINTING" },
-    { raw: "ELECTRICAL", clean: "ELECTRICAL" },
-    { raw: "PLUMBING", clean: "PLUMBING" },
-    { raw: "TEMPERED GLASS", clean: "TEMPERED GLASS" },
-    { raw: "LABOR/PAYROLL", clean: "LABOR/PAYROLL" },
-    { raw: "ABB 1196 FORWARD", clean: "ABB 1196 FORWARD" },
-    { raw: "ZAM-546", clean: "ZAM-546" }
-  ];
-
   const mainCategories = [];
   const subCategories = [];
-  const foundMains = new Set();
 
-  // 1. Isala lahat ng nasa Database
   categories.forEach(c => {
     const rawName = c.name;
-    const upperName = rawName.toUpperCase();
-    const cleanUpper = upperName.replace(/\(-+PHP\)/gi, '').trim();
-
     if (rawName.startsWith('[MAIN] ')) {
       mainCategories.push({ ...c, displayName: rawName.replace('[MAIN] ', '') });
     } else if (rawName.startsWith('[MISC] ')) {
       subCategories.push({ ...c, displayName: rawName.replace('[MISC] ', '') });
     } else {
-      // Tingnan kung isa ito sa mga default na Main Categories
-      const matchedMain = DEFAULT_MAIN_CATEGORIES.find(m => cleanUpper === m.clean || upperName.includes(m.clean));
-
-      if (matchedMain) {
-        foundMains.add(matchedMain.raw);
-        mainCategories.push({ ...c, displayName: matchedMain.raw }); // Gamitin ang exact na format
-      } else {
-        // Ang mga natitira (Office Supplies, Food/Meals, etc.) ay ibabato sa Misc
-        subCategories.push({ ...c, displayName: rawName });
-      }
+      subCategories.push({ ...c, displayName: rawName });
     }
   });
 
-  // 2. I-INJECT ang mga default Main Categories kung HINDI nahanap sa Database
-  DEFAULT_MAIN_CATEGORIES.forEach((m, index) => {
-    if (!foundMains.has(m.raw)) {
-      mainCategories.push({
-        id: `default-${index}`,
-        name: m.raw,
-        displayName: m.raw,
-        isHardcoded: true // Para itago ang delete button
-      });
-    }
-  });
-
-  // 3. I-sort para malinis
   mainCategories.sort((a, b) => a.displayName.localeCompare(b.displayName));
   subCategories.sort((a, b) => a.displayName.localeCompare(b.displayName));
 

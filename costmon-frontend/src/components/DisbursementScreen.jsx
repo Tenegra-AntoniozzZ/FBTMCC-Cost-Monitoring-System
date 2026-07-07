@@ -256,45 +256,15 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   const { mainCategoriesList, miscCategoriesList } = useMemo(() => {
     const main = [];
     const misc = [];
-    const foundMains = new Set();
-    const DEFAULT_MAIN_VALS = [
-      { raw: "PERMITS & CONSTRUCTION PLANS", clean: "PERMITS & CONSTRUCTION PLANS" },
-      { raw: "DOWN PAYMENT", clean: "DOWN PAYMENT" },
-      { raw: "CARPENTRY", clean: "CARPENTRY" },
-      { raw: "PAINTING", clean: "PAINTING" },
-      { raw: "ELECTRICAL", clean: "ELECTRICAL" },
-      { raw: "PLUMBING", clean: "PLUMBING" },
-      { raw: "TEMPERED GLASS", clean: "TEMPERED GLASS" },
-      { raw: "SSS/PAG-IBIG / PHILHEALTH", clean: "SSS/PAG-IBIG / PHILHEALTH" },
-      { raw: "LABOR/PAYROLL", clean: "LABOR/PAYROLL" },
-      { raw: "ABB 1196 FORWARD", clean: "ABB 1196 FORWARD" },
-      { raw: "ZAM-546", clean: "ZAM-546" }
-    ];
-
     (categoryObjects || []).forEach(catObj => {
-
       const rawName = catObj.name;
-      const upperName = rawName.toUpperCase();
-      const cleanUpper = upperName.replace(/\(-+PHP\)/gi, '').trim();
 
       if (rawName.startsWith('[MAIN] ')) {
         main.push(rawName.replace('[MAIN] ', ''));
       } else if (rawName.startsWith('[MISC] ')) {
         misc.push(rawName.replace('[MISC] ', ''));
       } else {
-        const matchedMain = DEFAULT_MAIN_VALS.find(m => cleanUpper === m.clean || upperName.includes(m.clean));
-        if (matchedMain) {
-          foundMains.add(matchedMain.raw);
-          main.push(rawName);
-        } else {
-          misc.push(rawName);
-        }
-      }
-    });
-
-    DEFAULT_MAIN_VALS.forEach(m => {
-      if (!foundMains.has(m.raw) && !main.includes(m.raw)) {
-        main.push(m.raw);
+        misc.push(rawName);
       }
     });
 
@@ -532,26 +502,13 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     const selectedProject = projects.find(p => p.project_code === d.project_code);
     const pType = selectedProject ? selectedProject.project_type : 'Construction';
 
-    const DEFAULT_MAIN_KEYWORDS = [
-      "PERMITS & CONSTRUCTION PLANS", "DOWN PAYMENT", "CARPENTRY", "PAINTING",
-      "ELECTRICAL", "PLUMBING", "TEMPERED GLASS", "SSS/PAG-IBIG / PHILHEALTH",
-      "LABOR/PAYROLL", "ABB 1196 FORWARD", "ZAM-546"
-    ];
-
-    // Build the correct main list for this project, same logic as the useMemo
     const inlineMain = new Set();
     (categoryObjects || []).forEach(catObj => {
-      const catType = (catObj.category_type || '').toLowerCase();
-      const projType = (pType || '').toLowerCase();
-      if (catType && catType !== 'both' && catType !== projType) return;
       const rawName = catObj.name;
       if (rawName.startsWith('[MAIN] ')) {
         inlineMain.add(rawName.replace('[MAIN] ', ''));
       }
     });
-    if (pType === 'Construction' || !pType) {
-      DEFAULT_MAIN_KEYWORDS.forEach(k => inlineMain.add(k));
-    }
 
     const expensesWithCommas = loadedExpenses.map(e => ({ ...e, amount: e.amount ? String(e.amount).replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '' }));
     expensesWithCommas.forEach(exp => {
