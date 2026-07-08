@@ -99,12 +99,12 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
     const p = projects.find(item => item.id === (initialProjectId || projects[0]?.id || ''));
     if (p) return {
       contract_cost: p.contract_cost !== undefined && p.contract_cost !== null ? p.contract_cost : '0',
-      profit_percentage: p.profit_percentage !== undefined && p.profit_percentage !== null ? p.profit_percentage : 0.15,
+      profit_percentage: p.profit_percentage !== undefined && p.profit_percentage !== null ? p.profit_percentage : 0.3,
       project_area: p.project_area !== null && p.project_area !== undefined ? String(p.project_area) : '',
       project_start: p.project_start || '',
       days_end: p.days_end || ''
     };
-    return { profit_percentage: 0.15 };
+    return { profit_percentage: 0.3 };
   });
 
   const [prevProject, setPrevProject] = useState(project);
@@ -113,7 +113,7 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
     if (project) {
       setEditingValues({
         contract_cost: project.contract_cost !== undefined && project.contract_cost !== null ? project.contract_cost.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '0',
-        profit_percentage: project.profit_percentage !== undefined && project.profit_percentage !== null ? project.profit_percentage : 0.15,
+        profit_percentage: project.profit_percentage !== undefined && project.profit_percentage !== null ? project.profit_percentage : 0.3,
         project_area: project.project_area !== null && project.project_area !== undefined ? String(project.project_area) : '',
         project_start: project.project_start || '',
         days_end: project.days_end || ''
@@ -130,8 +130,8 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
     const projectCost = parseFloat(String(project.contract_cost || 0).replace(/,/g, ''));
     if (Math.abs(currentCost - projectCost) > 0.01) return true;
 
-    const currentProfit = parseFloat(editingValues.profit_percentage !== undefined && editingValues.profit_percentage !== null ? editingValues.profit_percentage : 0.15);
-    const projectProfit = parseFloat(project.profit_percentage !== undefined && project.profit_percentage !== null ? project.profit_percentage : 0.15);
+    const currentProfit = parseFloat(editingValues.profit_percentage !== undefined && editingValues.profit_percentage !== null ? editingValues.profit_percentage : 0.3);
+    const projectProfit = parseFloat(project.profit_percentage !== undefined && project.profit_percentage !== null ? project.profit_percentage : 0.3);
     if (Math.abs(currentProfit - projectProfit) > 0.001) return true;
 
     const currentArea = String(editingValues.project_area !== null && editingValues.project_area !== undefined ? editingValues.project_area : '').trim();

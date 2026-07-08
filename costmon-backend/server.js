@@ -126,9 +126,12 @@ db.serialize(() => {
 
   db.run(`CREATE TABLE IF NOT EXISTS projects (
     id TEXT PRIMARY KEY, project_code TEXT UNIQUE, project_name TEXT,
-    contract_cost REAL DEFAULT 0, profit_percentage REAL DEFAULT 0.20,
+    contract_cost REAL DEFAULT 0, profit_percentage REAL DEFAULT 0.30,
     project_type TEXT DEFAULT 'Construction'
   )`);
+  db.run("UPDATE projects SET profit_percentage = 0.30 WHERE profit_percentage = 0.20 OR profit_percentage = 0.15", (err) => {
+    if (err) console.error("Error updating old default profit percentages:", err.message);
+  });
   db.run("ALTER TABLE projects ADD COLUMN project_type TEXT DEFAULT 'Construction'", (err) => {
     if (!err) {
       db.run("UPDATE projects SET project_type = 'Office' WHERE project_code LIKE '%ADMIN%' OR project_code LIKE '%OFFICE%' OR project_code LIKE '%SHOP%'");
