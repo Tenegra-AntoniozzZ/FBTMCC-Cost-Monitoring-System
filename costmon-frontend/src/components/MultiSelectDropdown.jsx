@@ -10,8 +10,10 @@ export default function MultiSelectDropdown({ options, value, onChange, placehol
   const wrapperRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Convert comma-separated string to array
-  const selectedValues = value ? value.split(',').map(s => s.trim()).filter(Boolean) : [];
+  // Convert to array safely whether it's an array or a comma-separated string
+  const selectedValues = Array.isArray(value) 
+    ? value 
+    : (value ? String(value).split(',').map(s => s.trim()).filter(Boolean) : []);
 
   useEffect(() => {
     function handleClickOutside(event) {

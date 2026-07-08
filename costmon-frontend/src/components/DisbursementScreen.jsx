@@ -211,7 +211,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
       if (!response.ok) {
         let errMsg = 'Export failed.';
-        try { const d = await response.json(); errMsg = d.error || errMsg; } catch (_) {}
+        try { const d = await response.json(); errMsg = d.error || errMsg; } catch (_) { }
         throw new Error(errMsg);
       }
 
@@ -266,7 +266,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     filteredDisbursements.forEach(d => {
       const inputTax = parseFloat(d.input_tax) || 0;
       const outputTax = parseFloat(d.output_tax) || 0;
-      
+
       let netAmount = parseFloat(d.net_amount) || 0;
       let acctsPay = parseFloat(d.accts_pay) || 0;
 
@@ -337,6 +337,15 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
   const isDuplicateCV = useMemo(() => {
     if (!headerData.cv_no) return false;
+    
+    // Bypass validation if in edit mode and the CV hasn't changed from its original value
+    if (editingId) {
+      const originalRecord = disbursements.find(d => d.id === editingId);
+      if (originalRecord && originalRecord.cv_no && originalRecord.cv_no.trim().toLowerCase() === headerData.cv_no.trim().toLowerCase()) {
+        return false;
+      }
+    }
+
     return disbursements.some(
       (d) => d.id !== editingId && d.cv_no && d.cv_no.trim().toLowerCase() === headerData.cv_no.trim().toLowerCase()
     );
@@ -514,9 +523,15 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   const handleEditRow = (d) => {
     if (!canEdit) return;
     setEditingId(d.id);
+
+    // Normalize project_code to an array to prevent crashes when older string data or grouped array data is passed
+    const projCodes = Array.isArray(d.project_code) 
+      ? d.project_code 
+      : (d.project_code ? String(d.project_code).split(',').map(c => c.trim()).filter(Boolean) : []);
+
     const newHeader = {
       date: d.date || '',
-      project_code: d.project_code || '',
+      project_code: projCodes,
       payee: d.payee || '',
       particulars: d.particulars || '',
       tin: d.tin || '',
@@ -538,7 +553,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
     // Compute classification inline — can't use mainCategoriesList useMemo here since
     // setHeaderData(newHeader) is async and the memo hasn't recomputed yet.
-    const selectedProject = projects.find(p => p.project_code === d.project_code);
+    const selectedProject = projects.find(p => projCodes.includes(p.project_code));
     const pType = selectedProject ? selectedProject.project_type : 'Construction';
 
     const inlineMain = new Set();
@@ -584,28 +599,35 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     setIsSaving(true);
     try {
       const token = localStorage.getItem('fbtmcc_token');
-      const url = editingId ? `${API_URL}/disbursements/${editingId}` : `${API_URL}/disbursements`;
-      const method = editingId ? 'PUT' : 'POST';
+      const payloads = Array.isArray(disbursementData) ? disbursementData : [disbursementData];
 
-      const response = await fetch(url, {
-        method: method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(disbursementData)
+      const promises = payloads.map(data => {
+        const url = editingId ? `${API_URL}/disbursements/${editingId}` : `${API_URL}/disbursements`;
+        const method = editingId ? 'PUT' : 'POST';
+
+        return fetch(url, {
+          method: method,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(data)
+        }).then(async (res) => {
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || "Hindi ma-save ang data.");
+          }
+          return res;
+        });
       });
 
-      if (response.ok) {
-        await refreshData();
-        setPostSavePrompt(true);
-      } else {
-        const errData = await response.json();
-        setErrorMessage("Server Error: " + (errData.error || "Hindi ma-save ang data."));
-      }
+      await Promise.all(promises);
+
+      await refreshData();
+      setPostSavePrompt(true);
     } catch (error) {
       console.error(error);
-      setErrorMessage("Network Error: Hindi makonekta sa Local Server.");
+      setErrorMessage(error.message || "Network Error: Hindi makonekta sa Local Server.");
     } finally {
       setIsSaving(false);
     }
@@ -641,22 +663,61 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       return;
     }
 
-    const newDisbursement = {
-      id: editingId || Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(),
-      ...headerData,
-      target_cib: String(headerData.target_cib).replace(/,/g, ''),
-      expenses: combinedLines,
-      attachments: modalAttachments,
-      gross_amount: totals.cib_coh,
-      ewt_amount: totals.ewtPayable,
-      net_amount: totals.totalDebit,
-      created_at: editingId ? disbursements.find(d => d.id === editingId).created_at : new Date().toISOString()
-    };
+    const projectCodes = Array.isArray(headerData.project_code)
+      ? headerData.project_code
+      : (typeof headerData.project_code === 'string' ? headerData.project_code.split(',').map(c => c.trim()).filter(Boolean) : []);
+
+    if (projectCodes.length === 0) {
+      setErrorMessage("Kailangan pumili ng Project Code.");
+      return;
+    }
 
     if (editingId) {
+      const newDisbursement = {
+        id: editingId,
+        ...headerData,
+        project_code: projectCodes[0],
+        target_cib: String(headerData.target_cib).replace(/,/g, ''),
+        expenses: combinedLines,
+        attachments: modalAttachments,
+        gross_amount: totals.cib_coh,
+        ewt_amount: totals.ewtPayable,
+        net_amount: totals.totalDebit,
+        created_at: disbursements.find(d => d.id === editingId)?.created_at || new Date().toISOString()
+      };
       setPasswordModal({ isOpen: true, action: 'update', payload: newDisbursement });
     } else {
-      executeSave(newDisbursement);
+      const divisor = projectCodes.length;
+      const payloads = projectCodes.map((projCode, index) => {
+        const splitAmount = (val) => {
+          if (!val) return val;
+          const num = parseFloat(String(val).replace(/,/g, ''));
+          if (isNaN(num)) return val;
+          return Number((num / divisor).toFixed(2));
+        };
+
+        const splitExpenses = combinedLines.map(line => ({
+          ...line,
+          amount: splitAmount(line.amount)
+        }));
+
+        return {
+          id: Date.now().toString(36) + Math.floor(Math.random() * 1000).toString() + index,
+          ...headerData,
+          project_code: projCode,
+          target_cib: splitAmount(headerData.target_cib),
+          input_tax: splitAmount(headerData.input_tax),
+          output_tax: splitAmount(headerData.output_tax),
+          accts_pay: splitAmount(headerData.accts_pay),
+          expenses: splitExpenses,
+          attachments: modalAttachments,
+          gross_amount: splitAmount(totals.cib_coh),
+          ewt_amount: splitAmount(totals.ewtPayable),
+          net_amount: splitAmount(totals.totalDebit),
+          created_at: new Date().toISOString()
+        };
+      });
+      executeSave(payloads);
     }
   };
 
@@ -753,7 +814,9 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       if (isModalOpen && !postSavePrompt && (event.ctrlKey || event.metaKey) && event.key === 'Enter') {
         event.preventDefault();
 
-        const isDup = disbursements.some((d) => d.id !== editingId && d.cv_no && d.cv_no.trim().toLowerCase() === headerData.cv_no.trim().toLowerCase());
+        const originalRecord = editingId ? disbursements.find(d => d.id === editingId) : null;
+        const isSameAsOriginal = originalRecord && originalRecord.cv_no && originalRecord.cv_no.trim().toLowerCase() === headerData.cv_no.trim().toLowerCase();
+        const isDup = !isSameAsOriginal && disbursements.some((d) => d.id !== editingId && d.cv_no && d.cv_no.trim().toLowerCase() === headerData.cv_no.trim().toLowerCase());
         const tCib = parseFloat(headerData.target_cib) || 0;
         const isVarZero = Math.abs(tCib - totals.cib_coh) < 0.01;
 
@@ -768,6 +831,66 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isModalOpen, isFilterOpen, showUnsavedModal, showDraftModal, postSavePrompt, headerData, constructionLines, miscLines, initialFormState, isSaving, totals, disbursements, editingId, canEdit]);
 
+
+  const groupedDisbursements = useMemo(() => {
+    const groups = {};
+    filteredDisbursements.forEach(d => {
+      if (!d.cv_no) {
+        groups[`no_cv_${d.id}`] = { ...d, project_code: [d.project_code] };
+        return;
+      }
+
+      const key = d.cv_no.toLowerCase().trim();
+      if (!groups[key]) {
+        groups[key] = {
+          ...d,
+          project_code: [d.project_code],
+          gross_amount: parseFloat(d.gross_amount) || 0,
+          net_amount: parseFloat(d.net_amount) || 0,
+          ewt_amount: parseFloat(d.ewt_amount) || 0,
+          accts_pay: parseFloat(d.accts_pay) || 0,
+          target_cib: parseFloat(d.target_cib) || 0,
+          input_tax: parseFloat(d.input_tax) || 0,
+          output_tax: parseFloat(d.output_tax) || 0,
+          expenses: d.expenses ? d.expenses.map(e => ({ ...e, amount: parseFloat(e.amount) || 0 })) : []
+        };
+      } else {
+        const group = groups[key];
+        if (d.project_code && !group.project_code.includes(d.project_code)) {
+          group.project_code.push(d.project_code);
+        }
+        group.gross_amount += parseFloat(d.gross_amount) || 0;
+        group.net_amount += parseFloat(d.net_amount) || 0;
+        group.ewt_amount += parseFloat(d.ewt_amount) || 0;
+        group.accts_pay += parseFloat(d.accts_pay) || 0;
+        group.target_cib += parseFloat(d.target_cib) || 0;
+        group.input_tax += parseFloat(d.input_tax) || 0;
+        group.output_tax += parseFloat(d.output_tax) || 0;
+
+        if (d.expenses) {
+          d.expenses.forEach(exp => {
+            const existingExp = group.expenses.find(e => e.category === exp.category);
+            if (existingExp) {
+              existingExp.amount = (parseFloat(existingExp.amount) || 0) + (parseFloat(exp.amount) || 0);
+            } else {
+              group.expenses.push({ ...exp, amount: parseFloat(exp.amount) || 0 });
+            }
+          });
+        }
+      }
+    });
+
+    const result = [];
+    const seen = new Set();
+    filteredDisbursements.forEach(d => {
+      const key = d.cv_no ? d.cv_no.toLowerCase().trim() : `no_cv_${d.id}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(groups[key]);
+      }
+    });
+    return result;
+  }, [filteredDisbursements]);
 
   // ==========================================
   // RENDER UI
@@ -785,7 +908,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-2.5 font-medium italic text-sm">
             {selectedMonths.length > 0 || selectedYears.length > 0 || selectedTransactionFilter !== 'All'
-              ? `${selectedMonths.length > 0 ? selectedMonths.map(m => monthOptions.find(opt => opt.value === m)?.label.substring(0,3)).join(', ') : 'ALL MONTHS'} | ${selectedYears.length > 0 ? selectedYears.join(', ') : 'ALL YEARS'}`.toUpperCase() + (selectedTransactionFilter !== 'All' ? ` | ${selectedTransactionFilter === 'EWT' ? 'EWT ONLY' : selectedTransactionFilter.toUpperCase()}` : '')
+              ? `${selectedMonths.length > 0 ? selectedMonths.map(m => monthOptions.find(opt => opt.value === m)?.label.substring(0, 3)).join(', ') : 'ALL MONTHS'} | ${selectedYears.length > 0 ? selectedYears.join(', ') : 'ALL YEARS'}`.toUpperCase() + (selectedTransactionFilter !== 'All' ? ` | ${selectedTransactionFilter === 'EWT' ? 'EWT ONLY' : selectedTransactionFilter.toUpperCase()}` : '')
               : 'FOR ALL DATES'}
           </p>
         </div>
@@ -1013,7 +1136,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-400 dark:divide-slate-600">
-                {filteredDisbursements.length === 0 ? (
+                {groupedDisbursements.length === 0 ? (
                   <tr>
                     <td colSpan={totalVisibleColumns} className="px-8 py-20 text-center">
                       <div className="flex flex-col items-center gap-4">
@@ -1024,7 +1147,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                       </div>
                     </td>
                   </tr>
-                ) : filteredDisbursements.map(d => (
+                ) : groupedDisbursements.map(d => (
                   <tr
                     key={d.id}
                     className={`even:bg-slate-50/80 dark:even:bg-slate-800/80 hover:bg-blue-100/50 dark:hover:bg-blue-900/30 transition-colors group ${canEdit ? 'cursor-pointer' : ''}`}
@@ -1033,11 +1156,17 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                     <td className="px-6 py-4 font-black text-slate-600 dark:text-slate-300 sticky left-0 z-10 bg-white dark:bg-slate-900 group-even:bg-slate-50 dark:group-even:bg-slate-800 group-hover:bg-blue-100/50 dark:group-hover:bg-blue-900/30 border-r border-slate-400 dark:border-slate-600 shadow-[3px_0_0_0_#94a3b8] dark:shadow-[3px_0_0_0_#475569] transition-colors duration-300">{d.date}</td>
                     <td className="px-6 py-4 font-black text-slate-800 dark:text-slate-200 border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20">{d.payee}</td>
                     <td className="px-6 py-4 font-black text-blue-700 dark:text-blue-400 text-center border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20">#{d.cv_no}</td>
-                    <td className="px-6 py-4 font-black text-slate-500 dark:text-slate-400 text-center border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20">{d.project_code}</td>
+                    <td className="px-6 py-4 text-center border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20">
+                      <div className="flex flex-col items-center gap-1">
+                        {(Array.isArray(d.project_code) ? d.project_code : [d.project_code]).map((pc, i) => (
+                          <span key={i} className="text-[10px] leading-tight font-black bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800/50 uppercase tracking-widest">{pc}</span>
+                        ))}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 text-right font-mono font-black text-slate-900 dark:text-white border-r border-slate-400 dark:border-slate-600 group-even:bg-slate-50/30 dark:group-even:bg-slate-800/30 group-hover:bg-blue-50/50 dark:group-hover:bg-blue-900/20">₱{(d.gross_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                    <td className="px-6 py-4 text-right font-mono font-black text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-emerald-100/30 dark:group-hover:bg-emerald-900/30">₱{(d.project_code && d.project_code.toLowerCase() === 'credit card' ? 0 : (d.net_amount || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td className="px-6 py-4 text-right font-mono font-black text-emerald-700 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-emerald-100/30 dark:group-hover:bg-emerald-900/30">₱{((Array.isArray(d.project_code) ? d.project_code.some(pc => pc?.toLowerCase() === 'credit card') : d.project_code?.toLowerCase() === 'credit card') ? 0 : (d.net_amount || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     {isAcctsPayVisible && (
-                      <td className="px-6 py-4 text-right font-mono font-black text-amber-700 dark:text-amber-400 bg-amber-50/30 dark:bg-amber-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-amber-100/30 dark:group-hover:bg-amber-900/30">₱{((parseFloat(d.accts_pay) || 0) + (d.project_code && d.project_code.toLowerCase() === 'credit card' ? (parseFloat(d.net_amount) || 0) : 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                      <td className="px-6 py-4 text-right font-mono font-black text-amber-700 dark:text-amber-400 bg-amber-50/30 dark:bg-amber-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-amber-100/30 dark:group-hover:bg-amber-900/30">₱{((parseFloat(d.accts_pay) || 0) + ((Array.isArray(d.project_code) ? d.project_code.some(pc => pc?.toLowerCase() === 'credit card') : d.project_code?.toLowerCase() === 'credit card') ? (parseFloat(d.net_amount) || 0) : 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     )}
                     {isEwtVisible && (
                       <td className="px-6 py-4 text-right font-mono font-black text-rose-600 dark:text-rose-400 bg-rose-50/20 dark:bg-rose-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-rose-100/20 dark:group-hover:bg-rose-900/30">₱{(d.ewt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
@@ -1066,7 +1195,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                   </tr>
                 ))}
               </tbody>
-              {filteredDisbursements.length > 0 && (
+              {groupedDisbursements.length > 0 && (
                 <tfoot className="bg-slate-100 dark:bg-slate-800 font-black text-slate-800 dark:text-slate-200 border-t-4 border-slate-400 dark:border-slate-600 transition-colors duration-300">
                   <tr>
                     <td colSpan="4" className="px-6 py-6 text-right text-xs tracking-widest text-slate-500 dark:text-slate-400 sticky left-0 z-10 bg-slate-100 dark:bg-slate-800 border-r border-slate-400 dark:border-slate-600 shadow-[3px_0_0_0_#94a3b8] dark:shadow-[3px_0_0_0_#475569] transition-colors duration-300">TOTAL SUMMARY:</td>
@@ -1290,7 +1419,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                     {/* 2. CONSTRUCTION COST BREAKDOWN */}
                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden transition-colors duration-300">
                       <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100 dark:border-slate-700">
-                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">2. CONSTRUCTION COST BREAKDOWN <span className="text-red-500">*</span></h3>
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">2. COST MONITORING BREAKDOWN <span className="text-red-500">*</span></h3>
                         <button type="button" onClick={() => addLine('construction')} disabled={targetCib <= 0 || isAddingLine} className="text-xs bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-md font-medium flex items-center gap-1 transition-colors disabled:opacity-50 min-w-[120px] justify-center">
                           {isAddingLine ? (
                             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500 animate-bounce"></span> Adding...</span>
