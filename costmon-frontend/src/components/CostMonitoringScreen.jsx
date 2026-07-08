@@ -300,47 +300,100 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
     };
   }, [editingValues, disbursements, project]);
 
-  const REQUIRED_CATEGORIES = useMemo(() => [
-    "PERMITS & CONSTRUCTION PLANS",
-    "DOWN PAYMENT",
-    "CARPENTRY",
-    "PAINTING",
-    "ELECTRICAL",
-    "PLUMBING",
-    "TEMPERED GLASS",
-    "SSS/PAG-IBIG / PHILHEALTH",
-    "MISCELLANEOUS COST",
-    "LABOR/PAYROLL",
-    "ABB 1196 FORWARD",
-    "ZAM-546",
-    "SOP"
-  ], []);
+  // ─── Dynamically derive main & misc category sets from the categories prop ───
+  // categories prop items are tagged: "[MAIN] Category Name" or "[MISC] Category Name"
+  const { mainCategorySet, miscCategorySet } = useMemo(() => {
+    const main = new Set();
+    const misc = new Set();
+    (categories || []).forEach(catObj => {
+      const rawName = typeof catObj === 'string' ? catObj : (catObj.name || '');
+      if (rawName.startsWith('[MAIN] ')) {
+        main.add(rawName.replace('[MAIN] ', '').toUpperCase());
+      } else if (rawName.startsWith('[MISC] ')) {
+        misc.add(rawName.replace('[MISC] ', '').toUpperCase());
+      } else {
+        // Untagged categories default to misc
+        misc.add(rawName.toUpperCase());
+      }
+    });
+    return { mainCategorySet: main, miscCategorySet: misc };
+  }, [categories]);
+
+  // ─── Group expenses: main categories each get their own bucket; ───
+  // ─── misc-tagged (or unrecognized) items go to MISCELLANEOUS COST ───
+  const MISC_KEY = 'MISCELLANEOUS COST';
 
   const expensesByCategory = useMemo(() => {
     const grouped = {};
-    REQUIRED_CATEGORIES.forEach(cat => { grouped[cat] = []; });
     financials.projectExpenses.forEach(d => {
       if (d.costing_type === 'normal' && d.expenses && d.expenses.length > 0) {
         d.expenses.forEach(exp => {
-          const originalCat = exp.category || 'UNCATEGORIZED';
+          const originalCat = (exp.category || 'UNCATEGORIZED').trim();
           const catUpper = originalCat.toUpperCase();
-          const matchedCat = REQUIRED_CATEGORIES.find(c => c.toUpperCase() === catUpper);
-          const targetCat = matchedCat ? matchedCat : "MISCELLANEOUS COST";
+
+          // Determine target bucket strictly by tag
+          let targetCat;
+          if (mainCategorySet.has(catUpper)) {
+            // Use the canonical casing from the expense itself
+            targetCat = originalCat;
+          } else {
+            // Misc-tagged OR unrecognized → MISCELLANEOUS COST
+            targetCat = MISC_KEY;
+          }
+
           if (!grouped[targetCat]) grouped[targetCat] = [];
 
           const amount = parseFloat(exp.amount) || 0;
-          let itemDesc = exp.particulars || '';
-          if (!matchedCat && targetCat === "MISCELLANEOUS COST") itemDesc = `[${originalCat}] ${itemDesc}`;
+          // For misc items, prefix with the original category so the user can tell them apart
+          const itemDesc = (targetCat === MISC_KEY && !miscCategorySet.has(catUpper))
+            ? `[${originalCat}] ${exp.particulars || ''}`
+            : (exp.particulars || '');
 
           grouped[targetCat].push({
-            id: d.id, lineId: exp.id, date: d.date, cv_no: d.cv_no, or_inv_no: d.or_inv_no, payee: d.payee, particulars: itemDesc, amount: amount,
-            laborLess: 0, laborEwt: 0, laborTotal: 0, matlQty: 0, matlUnitCost: 0, matlTotal: amount, totalMatlCost: amount, totalLaborCost: 0
+            id: d.id, lineId: exp.id, date: d.date, cv_no: d.cv_no, or_inv_no: d.or_inv_no,
+            payee: d.payee, particulars: itemDesc, amount: amount,
+            // miscCategory holds the original category name for display in the Misc table
+            miscCategory: targetCat === MISC_KEY ? originalCat : '',
+            laborLess: 0, laborEwt: 0, laborTotal: 0, matlQty: 0, matlUnitCost: 0,
+            matlTotal: amount, totalMatlCost: amount, totalLaborCost: 0
           });
         });
       }
     });
     return grouped;
-  }, [financials.projectExpenses, REQUIRED_CATEGORIES]);
+  }, [financials.projectExpenses, mainCategorySet, miscCategorySet]);
+
+  // ─── Ordered list of main categories that actually have data, ───
+  // ─── followed by MISCELLANEOUS COST (if it has data) ───
+  const displayedCategories = useMemo(() => {
+    // Collect unique main category names that have entries, preserving insertion order
+    const mainCatsWithData = [];
+    const seenMain = new Set();
+    financials.projectExpenses.forEach(d => {
+      if (d.costing_type !== 'normal') return;
+      (d.expenses || []).forEach(exp => {
+        const catUpper = (exp.category || '').trim().toUpperCase();
+        if (mainCategorySet.has(catUpper) && !seenMain.has(catUpper)) {
+          seenMain.add(catUpper);
+          mainCatsWithData.push((exp.category || '').trim());
+        }
+      });
+    });
+    // Sort alphabetically for consistent order
+    mainCatsWithData.sort((a, b) => a.localeCompare(b));
+    // Append MISCELLANEOUS COST at the end if it has data
+    if (expensesByCategory[MISC_KEY] && expensesByCategory[MISC_KEY].length > 0) {
+      mainCatsWithData.push(MISC_KEY);
+    }
+    return mainCatsWithData;
+  }, [financials.projectExpenses, mainCategorySet, expensesByCategory]);
+
+  const filteredDisplayedCategories = useMemo(() =>
+    selectedCategories.includes('All')
+      ? displayedCategories
+      : displayedCategories.filter(cat => selectedCategories.includes(cat)),
+    [displayedCategories, selectedCategories]
+  );
 
   // FLAT LIST PARA SA ADDITIONAL COSTING (1 BIG LIST)
   const flatAdditionalExpenses = useMemo(() => {
@@ -350,8 +403,10 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
         d.expenses.forEach(exp => {
           const amount = parseFloat(exp.amount) || 0;
           list.push({
-            id: d.id, lineId: exp.id, date: d.date, cv_no: d.cv_no, or_inv_no: d.or_inv_no, payee: d.payee, particulars: exp.particulars, itemName: exp.category || 'Uncategorized', amount: amount,
-            laborLess: 0, laborEwt: 0, laborTotal: 0, matlQty: 0, matlUnitCost: 0, matlTotal: amount, totalMatlCost: amount, totalLaborCost: 0
+            id: d.id, lineId: exp.id, date: d.date, cv_no: d.cv_no, or_inv_no: d.or_inv_no,
+            payee: d.payee, particulars: exp.particulars, itemName: exp.category || 'Uncategorized',
+            amount: amount, laborLess: 0, laborEwt: 0, laborTotal: 0, matlQty: 0,
+            matlUnitCost: 0, matlTotal: amount, totalMatlCost: amount, totalLaborCost: 0
           });
         });
       }
@@ -359,15 +414,14 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
     return list.sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [financials.projectExpenses]);
 
-  const displayedCategories = useMemo(() => REQUIRED_CATEGORIES.filter(category => expensesByCategory[category] && expensesByCategory[category].length > 0), [REQUIRED_CATEGORIES, expensesByCategory]);
-  const filteredDisplayedCategories = useMemo(() => selectedCategories.includes('All') ? displayedCategories : displayedCategories.filter(cat => selectedCategories.includes(cat)), [displayedCategories, selectedCategories]);
-
   const categoryColorMap = useMemo(() => {
     const colorPalette = ['bg-blue-600', 'bg-red-600', 'bg-emerald-600', 'bg-amber-500', 'bg-purple-600', 'bg-teal-600', 'bg-indigo-600', 'bg-orange-600', 'bg-cyan-600', 'bg-pink-600', 'bg-rose-700', 'bg-sky-600', 'bg-fuchsia-600', 'bg-lime-600'];
     const map = {};
-    REQUIRED_CATEGORIES.forEach((category, index) => { map[category] = colorPalette[index % colorPalette.length]; });
+    displayedCategories.forEach((category, index) => {
+      map[category] = colorPalette[index % colorPalette.length];
+    });
     return map;
-  }, [REQUIRED_CATEGORIES]);
+  }, [displayedCategories]);
 
   const formatMoney = (val) => {
     if (val === null || val === undefined || val === '') return '-';
@@ -772,14 +826,29 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
                   const items = expensesByCategory[category] || [];
                   const headerColor = categoryColorMap[category];
                   const isPulsing = pulsingCategory === category;
+                  const isMisc = category === MISC_KEY;
+
                   return (
                     <div key={category} id={`category-${category}`} className={`border-2 border-slate-800 dark:border-slate-600 rounded-xl overflow-hidden scroll-mt-24 transition-all duration-500 ease-out ${isPulsing ? 'scale-[1.02] shadow-[0_15px_40px_rgba(0,0,0,0.25)] ring-4 ring-slate-400 z-10 relative -translate-y-2' : 'shadow-sm'}`}>
                       <table className="w-full text-left border-collapse text-xs" style={{ zoom: zoomLevel }}>
                         <thead>
-                          <tr className={`${headerColor} border-b-2 border-slate-800 dark:border-slate-600`}><th colSpan={canEdit ? 14 : 13} className="text-center py-3.5 font-black text-white uppercase tracking-[0.15em] text-sm">{category}</th></tr>
-                          <tr className="bg-slate-200 dark:bg-slate-700 border-b-2 border-slate-800 dark:border-slate-600 text-[10px] font-black text-slate-800 dark:text-slate-200 text-center uppercase tracking-wider leading-tight">
-                            <th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Date</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">C.V.#</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Invoice</th><th className="py-3 px-2 w-[15%] text-left border-r border-slate-800 dark:border-slate-600">Supplier / Particulars</th><th className="py-3 px-2 w-[15%] text-left border-r border-slate-800 dark:border-slate-600">Item Description</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Less</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Ewt</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Total</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l QTY</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l Unit Cost</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l Total</th><th className="py-3 px-2 w-[8%] border-r border-slate-800 dark:border-slate-600">Total Mat'l Cost</th><th className="py-3 px-2 w-[8%] border-r border-slate-800 dark:border-slate-600 text-right pr-4">Total Labor Cost</th>{canEdit && <th className="py-3 px-2 w-[4%]">Act</th>}
-                          </tr>
+                          {isMisc ? (
+                            /* ── MISCELLANEOUS COST TABLE HEADER (with Item Description column) ── */
+                            <>
+                              <tr className={`${headerColor} border-b-2 border-slate-800 dark:border-slate-600`}><th colSpan={canEdit ? 14 : 13} className="text-center py-3.5 font-black text-white uppercase tracking-[0.15em] text-sm">{category}</th></tr>
+                              <tr className="bg-slate-200 dark:bg-slate-700 border-b-2 border-slate-800 dark:border-slate-600 text-[10px] font-black text-slate-800 dark:text-slate-200 text-center uppercase tracking-wider leading-tight">
+                                <th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Date</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">C.V.#</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Invoice</th><th className="py-3 px-2 w-[15%] text-left border-r border-slate-800 dark:border-slate-600">Supplier / Particulars</th><th className="py-3 px-2 w-[15%] text-left border-r border-slate-800 dark:border-slate-600">Item Description</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Less</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Ewt</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Total</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l QTY</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l Unit Cost</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l Total</th><th className="py-3 px-2 w-[8%] border-r border-slate-800 dark:border-slate-600">Total Mat'l Cost</th><th className="py-3 px-2 w-[8%] border-r border-slate-800 dark:border-slate-600 text-right pr-4">Total Labor Cost</th>{canEdit && <th className="py-3 px-2 w-[4%]">Act</th>}
+                              </tr>
+                            </>
+                          ) : (
+                            /* ── MAIN CATEGORY TABLE HEADER (no Item Description column) ── */
+                            <>
+                              <tr className={`${headerColor} border-b-2 border-slate-800 dark:border-slate-600`}><th colSpan={canEdit ? 13 : 12} className="text-center py-3.5 font-black text-white uppercase tracking-[0.15em] text-sm">{category}</th></tr>
+                              <tr className="bg-slate-200 dark:bg-slate-700 border-b-2 border-slate-800 dark:border-slate-600 text-[10px] font-black text-slate-800 dark:text-slate-200 text-center uppercase tracking-wider leading-tight">
+                                <th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Date</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">C.V.#</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Invoice</th><th className="py-3 px-2 w-[20%] text-left border-r border-slate-800 dark:border-slate-600">Supplier / Particulars</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Less</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Ewt</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Total</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l QTY</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l Unit Cost</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l Total</th><th className="py-3 px-2 w-[9%] border-r border-slate-800 dark:border-slate-600">Total Mat'l Cost</th><th className="py-3 px-2 w-[9%] border-r border-slate-800 dark:border-slate-600 text-right pr-4">Total Labor Cost</th>{canEdit && <th className="py-3 px-2 w-[4%]">Act</th>}
+                              </tr>
+                            </>
+                          )}
                         </thead>
                         <tbody className="divide-y divide-slate-800 dark:divide-slate-600 bg-white dark:bg-slate-800">
                           {items.map((item, i) => (
@@ -788,7 +857,10 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
                               <td className="p-3 text-center border-r border-slate-800"><span className="px-1.5 py-1 bg-white text-slate-800 rounded font-mono font-bold text-[10px] border border-slate-300">{item.cv_no || 'N/A'}</span></td>
                               <td className="p-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300 border-r border-slate-800">{item.or_inv_no || '-'}</td>
                               <td className="p-3 font-bold text-slate-800 dark:text-slate-200 text-left border-r border-slate-800 truncate max-w-[150px]" title={item.payee}>{item.payee}</td>
-                              <td className="p-3 font-medium text-slate-600 dark:text-slate-400 text-left border-r border-slate-800 truncate max-w-[150px]" title={item.particulars}>{item.particulars}</td>
+                              {/* Item Description column — only for Misc table */}
+                              {isMisc && (
+                                <td className="p-3 font-medium text-slate-600 dark:text-slate-400 text-left border-r border-slate-800 truncate max-w-[150px]" title={item.miscCategory}>{item.miscCategory || '-'}</td>
+                              )}
                               <td className="p-3 text-center font-mono font-medium text-slate-600 dark:text-slate-400 border-r border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">{formatMoney(item.laborLess)}</td>
                               <td className="p-3 text-center font-mono font-medium text-slate-600 dark:text-slate-400 border-r border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">{formatMoney(item.laborEwt)}</td>
                               <td className="p-3 text-center font-mono font-medium text-slate-600 dark:text-slate-400 border-r border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">{formatMoney(item.laborTotal)}</td>
@@ -805,7 +877,7 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
                             </tr>
                           ))}
                           <tr className="bg-slate-100 dark:bg-slate-700/80 border-t-2 border-slate-800 dark:border-slate-600">
-                            <td colSpan="11" className="p-3 text-right font-black text-[11px] uppercase tracking-widest text-slate-800 dark:text-slate-200 border-r border-slate-800">TOTAL FOR {category}:</td>
+                            <td colSpan={isMisc ? 11 : 10} className="p-3 text-right font-black text-[11px] uppercase tracking-widest text-slate-800 dark:text-slate-200 border-r border-slate-800">TOTAL FOR {category}:</td>
                             <td className="p-3 text-right font-mono font-black text-slate-800 dark:text-slate-200 text-sm border-r border-slate-800 bg-slate-200/50">₱ {items.reduce((sum, i) => sum + i.totalMatlCost, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                             <td className="p-3 text-right pr-4 font-mono font-black text-slate-800 dark:text-slate-200 text-sm border-r border-slate-800 bg-slate-200/50">₱ {items.reduce((sum, i) => sum + i.totalLaborCost, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                             {canEdit && <td></td>}
