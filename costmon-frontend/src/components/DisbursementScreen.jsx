@@ -1008,7 +1008,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                 </button>
 
                 {isFilterOpen && (
-                  <div className="absolute left-0 mt-3 w-80 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-20 overflow-hidden animate-in fade-in zoom-in-95">
+                  <div className="absolute left-0 mt-3 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-20 overflow-hidden animate-in fade-in zoom-in-95">
                     <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center">
                       <span className="font-black text-slate-700 dark:text-slate-300 text-sm tracking-tight uppercase">Filter by Date</span>
                       <button onClick={() => setIsFilterOpen(false)} className="text-slate-400 hover:text-rose-500 transition-colors"><X size={18} /></button>

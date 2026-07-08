@@ -704,21 +704,41 @@ app.get('/api/disbursements/export', authenticateToken, async (req, res) => {
       sheet.mergeCells(`A4:C4`);
 
       // Define Columns WITHOUT sheet.columns (to avoid writing header to row 1)
-      const colDefinitions = [
-        { key: 'date', width: 15 },
-        { key: 'payee', width: 25 },
-        { key: 'cv_no', width: 15 },
-        { key: 'project', width: 18 },
-        { key: 'gross', width: 18 },
-        { key: 'cib', width: 18 },
-        { key: 'accts_pay', width: 22 },
-        { key: 'ewt', width: 18 }
-      ];
+      let colDefinitions = [];
+      let headers = [];
 
-      dynamicCategories.forEach(cat => {
-        colDefinitions.push({ key: `cat_${cat}`, width: 16 });
-      });
-      colDefinitions.push({ key: 'particulars', width: 40 });
+      if (transactionFilter === 'EWT') {
+         colDefinitions = [
+           { key: 'date', width: 11 },
+           { key: 'payee', width: 18 },
+           { key: 'cv_no', width: 10 },
+           { key: 'project', width: 10 },
+           { key: 'gross', width: 13 },
+           { key: 'ewt', width: 12 },
+           { key: 'labor_payroll', width: 15 },
+           { key: 'particulars', width: 25 }
+         ];
+         headers = ['Date', 'Payee', 'CV No.', 'Project', 'Debit (Gross)', 'EWT', 'LABOR/PAYROLL', 'Particulars'];
+      } else {
+         colDefinitions = [
+           { key: 'date', width: 15 },
+           { key: 'payee', width: 25 },
+           { key: 'cv_no', width: 15 },
+           { key: 'project', width: 18 },
+           { key: 'gross', width: 18 },
+           { key: 'cib', width: 18 },
+           { key: 'accts_pay', width: 22 },
+           { key: 'ewt', width: 18 }
+         ];
+         dynamicCategories.forEach(cat => {
+           colDefinitions.push({ key: `cat_${cat}`, width: 16 });
+         });
+         colDefinitions.push({ key: 'particulars', width: 40 });
+
+         headers = ['Date', 'Payee', 'CV No.', 'Project', 'Debit (Gross)', 'Credit (CIB)', 'Accts Pay (Credit Card)', 'EWT'];
+         dynamicCategories.forEach(cat => headers.push(cat));
+         headers.push('Particulars');
+      }
 
       // Apply widths and keys manually
       colDefinitions.forEach((col, i) => {
@@ -728,10 +748,6 @@ app.get('/api/disbursements/export', authenticateToken, async (req, res) => {
       });
 
       // ADD HEADER ROW (Row 6)
-      const headers = ['Date', 'Payee', 'CV No.', 'Project', 'Debit (Gross)', 'Credit (CIB)', 'Accts Pay (Credit Card)', 'EWT'];
-      dynamicCategories.forEach(cat => headers.push(cat));
-      headers.push('Particulars');
-
       const headerRow = sheet.addRow(headers);
       headerRow.eachCell((cell) => {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3730A3' } };
@@ -771,23 +787,43 @@ app.get('/api/disbursements/export', authenticateToken, async (req, res) => {
         let cib = isCreditCard ? 0 : originalNet;
         let finalAcctsPay = isCreditCard ? (originalAcctsPay + originalNet) : originalAcctsPay;
 
-        const rowData = {
-          date: row.date || '',
-          payee: row.payee || '',
-          cv_no: row.cv_no ? `#${row.cv_no}` : '',
-          project: row.project_code || '',
-          gross: grossAmount,
-          cib: cib,
-          accts_pay: finalAcctsPay,
-          ewt: ewtAmount,
-          particulars: row.particulars || ''
-        };
+        let rowData = {};
 
-        // Add dynamic category amounts
-        dynamicCategories.forEach(cat => {
-          const exp = row.expenses.find(e => e.category === cat);
-          rowData[`cat_${cat}`] = (exp && parseFloat(exp.amount)) ? parseFloat(exp.amount) : 0;
-        });
+        if (transactionFilter === 'EWT') {
+           let laborAmount = 0;
+           row.expenses.forEach(e => {
+               if (e.category && (e.category.toUpperCase() === 'LABOR/PAYROLL' || e.category.toUpperCase().includes('LABOR'))) {
+                   laborAmount += parseFloat(e.amount) || 0;
+               }
+           });
+           rowData = {
+             date: row.date || '',
+             payee: row.payee || '',
+             cv_no: row.cv_no ? `#${row.cv_no}` : '',
+             project: row.project_code || '',
+             gross: grossAmount,
+             ewt: ewtAmount,
+             labor_payroll: laborAmount,
+             particulars: row.particulars || ''
+           };
+        } else {
+           rowData = {
+             date: row.date || '',
+             payee: row.payee || '',
+             cv_no: row.cv_no ? `#${row.cv_no}` : '',
+             project: row.project_code || '',
+             gross: grossAmount,
+             cib: cib,
+             accts_pay: finalAcctsPay,
+             ewt: ewtAmount,
+             particulars: row.particulars || ''
+           };
+           // Add dynamic category amounts
+           dynamicCategories.forEach(cat => {
+             const exp = row.expenses.find(e => e.category === cat);
+             rowData[`cat_${cat}`] = (exp && parseFloat(exp.amount)) ? parseFloat(exp.amount) : 0;
+           });
+        }
 
         const dataRow = sheet.addRow(rowData);
 
@@ -795,20 +831,23 @@ app.get('/api/disbursements/export', authenticateToken, async (req, res) => {
           ? { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }
           : { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
 
+        const ewtColIndex = transactionFilter === 'EWT' ? 6 : 8;
+        const lastNumCol = transactionFilter === 'EWT' ? 7 : (8 + dynamicCategories.length);
+
         dataRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
           cell.fill = rowFill;
           cell.border = thinBorder;
           cell.font = { name: 'Calibri', size: 10, color: { argb: 'FF1E293B' } };
           cell.alignment = { vertical: 'middle', wrapText: true };
           
-          // EWT column highlight (8th column)
-          if (colNumber === 8) {
+          // EWT column highlight
+          if (colNumber === ewtColIndex) {
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE4E6' } };
             cell.font = { name: 'Calibri', size: 10, color: { argb: 'FF9F1239' }, bold: true };
           }
 
           // Format numbers as Currency
-          if (colNumber >= 5 && colNumber <= (8 + dynamicCategories.length)) {
+          if (colNumber >= 5 && colNumber <= lastNumCol) {
             cell.numFmt = '"₱"#,##0.00';
             if (cell.value === 0) {
               cell.value = null; // To display blank instead of 0 if preferred, or keep 0. Let's keep 0 but Excel will format it
@@ -836,9 +875,12 @@ app.get('/api/disbursements/export', authenticateToken, async (req, res) => {
          const endRow = sheet.rowCount - 1;
          
          const sumCols = [];
-         for(let c = 5; c <= 8 + dynamicCategories.length; c++) {
+         const lastNumCol = transactionFilter === 'EWT' ? 7 : (8 + dynamicCategories.length);
+         for(let c = 5; c <= lastNumCol; c++) {
             sumCols.push(c);
          }
+
+         const ewtColIndex = transactionFilter === 'EWT' ? 6 : 8;
 
          sumCols.forEach(colIndex => {
             const colLetter = sheet.getColumn(colIndex).letter;
@@ -847,7 +889,7 @@ app.get('/api/disbursements/export', authenticateToken, async (req, res) => {
             cell.numFmt = '"₱"#,##0.00';
             cell.font = { bold: true, name: 'Calibri', size: 11, color: { argb: 'FF1E293B' } };
             // Highlight EWT sum
-            if (colIndex === 8) {
+            if (colIndex === ewtColIndex) {
                cell.font = { bold: true, name: 'Calibri', size: 11, color: { argb: 'FF9F1239' } };
                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE4E6' } };
             }
