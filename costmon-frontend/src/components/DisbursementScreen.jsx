@@ -9,6 +9,66 @@ import UnsavedChangesModal from './UnsavedChangesModal';
 import DraftFoundModal from './DraftFoundModal';
 import { API_URL } from '../utils/Constants';
 
+const TargetProjectDropdown = ({ value, onChange, disabled, selectedProjects }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  if (disabled) {
+    return (
+      <div className="text-xs font-bold border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-1.5 bg-slate-50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-70">
+        🌐 For All Projects
+      </div>
+    );
+  }
+
+  const getDisplayValue = () => {
+    if (value === 'all') return '🌐 For All Projects';
+    return `📁 ${value} only`;
+  };
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <div 
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(!isOpen); }}
+        className="flex items-center justify-between min-w-[140px] gap-2 text-xs font-bold border border-blue-200 dark:border-blue-700/50 rounded-lg px-3 py-1.5 bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-slate-600 cursor-pointer transition-all shadow-sm"
+      >
+        <span className="truncate">{getDisplayValue()}</span>
+        <ChevronDown size={14} className={`transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+      </div>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 w-full min-w-max bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden z-[100] animate-in fade-in slide-in-from-top-2">
+          <div 
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChange('all'); setIsOpen(false); }}
+            className={`px-3 py-2 text-xs cursor-pointer transition-colors ${value === 'all' ? 'font-bold bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+          >
+            🌐 For All Projects
+          </div>
+          {selectedProjects.map(pc => (
+            <div 
+              key={pc}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChange(pc); setIsOpen(false); }}
+              className={`px-3 py-2 text-xs cursor-pointer transition-colors border-t border-slate-100 dark:border-slate-700/50 ${value === pc ? 'font-bold bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+            >
+              📁 {pc} only
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function DisbursementScreen({ projects, categories, categoryObjects, disbursements, refreshData, isLoading, userRole, initialSearchQuery, initialDisbursementId, onClearInitialDisbursement, onModalStateChange }) {
   const canEdit = userRole === 'encoder';
 
@@ -18,6 +78,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [postSavePrompt, setPostSavePrompt] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [editingUnderlyingRecords, setEditingUnderlyingRecords] = useState([]);
   const [showTaxFields, setShowTaxFields] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -71,8 +132,14 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     costing_type: 'normal'
   });
 
-  const [constructionLines, setConstructionLines] = useState([{ id: 1, category: '', amount: '' }]);
-  const [miscLines, setMiscLines] = useState([{ id: 2, category: '', amount: '' }]);
+  const makeDefaultGroup = (baseId) => ({
+    id: baseId,
+    targetProject: 'all',
+    constructionLines: [{ id: baseId + 1, category: '', amount: '' }],
+    miscLines: [{ id: baseId + 2, category: '', amount: '' }]
+  });
+
+  const [costingGroups, setCostingGroups] = useState([makeDefaultGroup(1)]);
   const [isAddStocksChecked, setIsAddStocksChecked] = useState(false);
   const [stocksAmount, setStocksAmount] = useState('');
   const [stockDescription, setStockDescription] = useState('');
@@ -122,7 +189,6 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   ];
 
   const filteredDisbursements = useMemo(() => {
-    // HARD FILTER: Remove anything marked as 'additional' so they NEVER show up here
     let result = (disbursements || []).filter(d => d.costing_type !== 'additional');
 
     if (selectedMonths.length > 0 || selectedYears.length > 0) {
@@ -137,7 +203,35 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     }
 
     if (selectedTransactionFilter === 'EWT') {
-      result = result.filter(d => parseFloat(d.ewt_amount) > 0);
+      result = result.filter(d => parseFloat(d.ewt_amount) > 0).map(d => {
+        let laborNet = 0;
+        let laborEwt = 0;
+        let laborGross = 0;
+        
+        if (d.expenses) {
+          d.expenses.forEach(exp => {
+            if (exp.category && exp.category.toUpperCase().includes('LABOR')) {
+              const amt = parseFloat(exp.amount) || 0;
+              laborNet += amt;
+              laborEwt += (amt / 0.98) - amt;
+              laborGross += (amt / 0.98);
+            }
+          });
+        }
+        
+        return {
+          ...d,
+          net_amount: laborNet,
+          ewt_amount: laborEwt,
+          gross_amount: laborGross,
+          target_cib: laborGross,
+          accts_pay: 0,
+          input_tax: 0,
+          output_tax: 0,
+          stocks_amount: 0,
+          expenses: d.expenses ? d.expenses.filter(exp => exp.category && exp.category.toUpperCase().includes('LABOR')) : []
+        };
+      });
     }
 
     if (searchQuery.trim() !== '') {
@@ -148,7 +242,6 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       );
     }
 
-    // Sort by project_code: Z-A for prefix, ascending for number
     result.sort((a, b) => {
       const codeA = (a.project_code || '').toUpperCase();
       const codeB = (b.project_code || '').toUpperCase();
@@ -166,7 +259,6 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       if (prefixA !== prefixB) {
         return prefixB.localeCompare(prefixA);
       }
-
       const numA = matchA && matchA[2] ? parseInt(matchA[2], 10) : 0;
       const numB = matchB && matchB[2] ? parseInt(matchB[2], 10) : 0;
 
@@ -175,6 +267,71 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
     return result;
   }, [disbursements, selectedMonths, selectedYears, selectedTransactionFilter, searchQuery]);
+
+  const groupedDisbursements = useMemo(() => {
+    const groups = {};
+    filteredDisbursements.forEach(d => {
+      if (!d.cv_no) {
+        groups[`no_cv_${d.id}`] = { ...d, project_code: [d.project_code], underlying_records: [d] };
+        return;
+      }
+
+      const key = d.cv_no.toLowerCase().trim();
+      if (!groups[key]) {
+        groups[key] = {
+          ...d,
+          project_code: [d.project_code],
+          underlying_records: [d],
+          gross_amount: parseFloat(d.gross_amount) || 0,
+          net_amount: parseFloat(d.net_amount) || 0,
+          ewt_amount: parseFloat(d.ewt_amount) || 0,
+          accts_pay: parseFloat(d.accts_pay) || 0,
+          target_cib: parseFloat(d.target_cib) || 0,
+          input_tax: parseFloat(d.input_tax) || 0,
+          output_tax: parseFloat(d.output_tax) || 0,
+          stocks_amount: parseFloat(d.stocks_amount) || 0,
+          stock_description: d.stock_description || '',
+          expenses: d.expenses ? d.expenses.map(e => ({ ...e, amount: parseFloat(e.amount) || 0 })) : []
+        };
+      } else {
+        const group = groups[key];
+        group.underlying_records.push(d);
+        if (d.project_code && !group.project_code.includes(d.project_code)) {
+          group.project_code.push(d.project_code);
+        }
+        group.gross_amount += parseFloat(d.gross_amount) || 0;
+        group.net_amount += parseFloat(d.net_amount) || 0;
+        group.ewt_amount += parseFloat(d.ewt_amount) || 0;
+        group.accts_pay += parseFloat(d.accts_pay) || 0;
+        group.target_cib += parseFloat(d.target_cib) || 0;
+        group.input_tax += parseFloat(d.input_tax) || 0;
+        group.output_tax += parseFloat(d.output_tax) || 0;
+        group.stocks_amount += parseFloat(d.stocks_amount) || 0;
+
+        if (d.expenses) {
+          d.expenses.forEach(exp => {
+            const existingExp = group.expenses.find(e => e.category === exp.category);
+            if (existingExp) {
+              existingExp.amount = (parseFloat(existingExp.amount) || 0) + (parseFloat(exp.amount) || 0);
+            } else {
+              group.expenses.push({ ...exp, amount: parseFloat(exp.amount) || 0 });
+            }
+          });
+        }
+      }
+    });
+
+    const result = [];
+    const seen = new Set();
+    filteredDisbursements.forEach(d => {
+      const key = d.cv_no ? d.cv_no.toLowerCase().trim() : `no_cv_${d.id}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(groups[key]);
+      }
+    });
+    return result;
+  }, [filteredDisbursements]);
 
   const handleToggleMonth = (val) => {
     setTempSelectedMonths(prev => prev.includes(val) ? prev.filter(m => m !== val) : [...prev, val]);
@@ -322,22 +479,23 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   const totals = useMemo(() => {
     let totalDebit = 0;
     let ewtPayable = 0;
-    const allLines = [...constructionLines, ...miscLines];
 
-    allLines.forEach(line => {
-      const amt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
-      totalDebit += amt;
-      const cat = line.category ? line.category.toUpperCase() : '';
-      if (cat === 'LABOR /SUBCONTRACTOR' || cat === 'LABOR/PAYROLL') {
-        // Assume inputted amount is NET. Calculate the added EWT to reach Gross.
-        ewtPayable += (amt / 0.98) - amt;
-      }
+    costingGroups.forEach(group => {
+      [...group.constructionLines, ...group.miscLines].forEach(line => {
+        const amt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
+        totalDebit += amt;
+        const cat = line.category ? line.category.toUpperCase() : '';
+        if (cat === 'LABOR /SUBCONTRACTOR' || cat === 'LABOR/PAYROLL') {
+          // Assume inputted amount is NET. Calculate the added EWT to reach Gross.
+          ewtPayable += (amt / 0.98) - amt;
+        }
+      });
     });
 
     const parsedStocksAmount = isAddStocksChecked ? (parseFloat(String(stocksAmount).replace(/,/g, '')) || 0) : 0;
     const cib_coh = totalDebit + ewtPayable + parsedStocksAmount;
     return { totalDebit, ewtPayable, cib_coh, stocksAmountVal: parsedStocksAmount };
-  }, [constructionLines, miscLines, isAddStocksChecked, stocksAmount]);
+  }, [costingGroups, isAddStocksChecked, stocksAmount]);
 
   const targetCib = parseFloat(String(headerData.target_cib).replace(/,/g, '')) || 0;
   const isVarianceZero = Math.abs(targetCib - totals.cib_coh) < 0.01;
@@ -380,12 +538,12 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   const resetForm = () => {
     setHeaderData({ date: new Date().toISOString().split('T')[0], project_code: '', payee: '', particulars: '', tin: '', cv_no: '', bank: '', check_no: '', or_inv_no: '', accts_pay: '', input_tax: '', output_tax: '', target_cib: '', costing_type: 'normal' });
     const now = Date.now();
-    setConstructionLines([{ id: now, category: '', amount: '' }]);
-    setMiscLines([{ id: now + 1, category: '', amount: '' }]);
+    setCostingGroups([makeDefaultGroup(now)]);
     setShowTaxFields(false);
     setErrorMessage('');
     setLineErrors([]);
     setEditingId(null);
+    setEditingUnderlyingRecords([]);
     setIsAddStocksChecked(false);
     setStocksAmount('');
     setStockDescription('');
@@ -398,9 +556,8 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
   const checkUnsavedChanges = () => {
     if (!initialFormState) return false;
-    const currentLines = [...constructionLines, ...miscLines];
     return JSON.stringify(headerData) !== initialFormState.headerData ||
-      JSON.stringify(currentLines) !== initialFormState.expenseLines ||
+      JSON.stringify(costingGroups) !== initialFormState.costingGroups ||
       isAddStocksChecked !== initialFormState.isAddStocksChecked ||
       stocksAmount !== initialFormState.stocksAmount;
   };
@@ -416,12 +573,12 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   const handleStayInModal = () => {
     setPostSavePrompt(false);
     resetForm();
+    const now = Date.now();
     const initHeader = { date: new Date().toISOString().split('T')[0], project_code: '', payee: '', particulars: '', tin: '', cv_no: '', bank: '', check_no: '', or_inv_no: '', accts_pay: '', input_tax: '', output_tax: '', target_cib: '', costing_type: 'normal' };
-    const initC = [{ id: Date.now(), category: '', amount: '' }];
-    const initM = [{ id: Date.now() + 1, category: '', amount: '' }];
+    const initGroups = [makeDefaultGroup(now)];
     setInitialFormState({
       headerData: JSON.stringify(initHeader),
-      expenseLines: JSON.stringify([...initC, ...initM]),
+      costingGroups: JSON.stringify(initGroups),
       isAddStocksChecked: false,
       stocksAmount: '',
       stockDescription: ''
@@ -435,7 +592,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
   const handleHeaderChange = (e) => setHeaderData({ ...headerData, [e.target.name]: e.target.value });
 
-  const handleLineChange = (id, field, value, type = 'construction') => {
+  const handleLineChange = (groupId, lineId, field, value, type = 'construction') => {
     let finalValue = value;
     if (field === 'amount') {
       let val = value.replace(/[^0-9.]/g, '');
@@ -448,36 +605,56 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       }
       finalValue = val;
     }
-    const setter = type === 'construction' ? setConstructionLines : setMiscLines;
-    setter(lines => lines.map(line => line.id === id ? { ...line, [field]: finalValue } : line));
+    setCostingGroups(groups => groups.map(g => {
+      if (g.id !== groupId) return g;
+      const key = type === 'construction' ? 'constructionLines' : 'miscLines';
+      return { ...g, [key]: g[key].map(line => line.id === lineId ? { ...line, [field]: finalValue } : line) };
+    }));
     if (field === 'category' && finalValue.trim() !== '') {
-      setLineErrors(errors => errors.filter(errId => errId !== id));
+      setLineErrors(errors => errors.filter(errId => errId !== lineId));
     }
   };
 
-  const addLine = (type = 'construction') => {
+  const addLine = (groupId, type = 'construction') => {
     if (isAddingLine) return;
     setIsAddingLine(true);
-    const setter = type === 'construction' ? setConstructionLines : setMiscLines;
-    setter(prev => {
-      const allLines = [...constructionLines, ...miscLines];
+    setCostingGroups(groups => groups.map(g => {
+      if (g.id !== groupId) return g;
+      const allLines = [...g.constructionLines, ...g.miscLines];
       const maxId = allLines.length > 0 ? Math.max(...allLines.map(line => typeof line.id === 'number' ? line.id : 0)) : 0;
-      return [...prev, { id: maxId + 1, category: '', amount: '' }];
-    });
+      const key = type === 'construction' ? 'constructionLines' : 'miscLines';
+      return { ...g, [key]: [...g[key], { id: maxId + 1, category: '', amount: '' }] };
+    }));
     setTimeout(() => setIsAddingLine(false), 300);
   };
 
-  const removeLine = (id, type = 'construction') => {
-    const setter = type === 'construction' ? setConstructionLines : setMiscLines;
-    if (type === 'construction' && constructionLines.length === 1 && miscLines.length === 0) return;
-    setter(prev => prev.filter(line => line.id !== id));
+  const removeLine = (groupId, lineId, type = 'construction') => {
+    setCostingGroups(groups => groups.map(g => {
+      if (g.id !== groupId) return g;
+      const key = type === 'construction' ? 'constructionLines' : 'miscLines';
+      if (g.constructionLines.length + g.miscLines.length <= 1) return g;
+      return { ...g, [key]: g[key].filter(line => line.id !== lineId) };
+    }));
+  };
+
+  const addCostingGroup = () => {
+    const now = Date.now();
+    setCostingGroups(prev => [...prev, makeDefaultGroup(now)]);
+  };
+
+  const removeCostingGroup = (groupId) => {
+    if (costingGroups.length <= 1) return;
+    setCostingGroups(prev => prev.filter(g => g.id !== groupId));
+  };
+
+  const updateGroupTarget = (groupId, targetProject) => {
+    setCostingGroups(groups => groups.map(g => g.id === groupId ? { ...g, targetProject } : g));
   };
 
   const handleSaveDraft = () => {
     localStorage.setItem('disbursement_draft', JSON.stringify({
       headerData,
-      constructionLines,
-      miscLines,
+      costingGroups,
       editingId
     }));
     setShowUnsavedModal(false);
@@ -494,8 +671,19 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     if (draftStr) {
       const draft = JSON.parse(draftStr);
       setHeaderData(draft.headerData);
-      setConstructionLines(draft.constructionLines || []);
-      setMiscLines(draft.miscLines || []);
+
+      // Support both new costingGroups format and old constructionLines/miscLines format
+      if (draft.costingGroups) {
+        setCostingGroups(draft.costingGroups);
+      } else {
+        const now = Date.now();
+        setCostingGroups([{
+          id: now,
+          targetProject: 'all',
+          constructionLines: draft.constructionLines || [{ id: now + 1, category: '', amount: '' }],
+          miscLines: draft.miscLines || [{ id: now + 2, category: '', amount: '' }]
+        }]);
+      }
 
       if (draft.headerData.accts_pay || draft.headerData.input_tax || draft.headerData.output_tax) {
         setShowTaxFields(true);
@@ -505,7 +693,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       setEditingId(draft.editingId || null);
       setInitialFormState({
         headerData: JSON.stringify(draft.headerData),
-        expenseLines: JSON.stringify([...(draft.constructionLines || []), ...(draft.miscLines || [])])
+        costingGroups: JSON.stringify(draft.costingGroups || [])
       });
       setShowDraftModal(false);
       setIsModalOpen(true);
@@ -517,15 +705,14 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     setShowDraftModal(false);
     resetForm();
 
+    const now = Date.now();
     const initHeader = { date: new Date().toISOString().split('T')[0], project_code: '', payee: '', particulars: '', tin: '', cv_no: '', bank: '', check_no: '', or_inv_no: '', accts_pay: '', input_tax: '', output_tax: '', target_cib: '', costing_type: 'normal' };
-    const initC = [{ id: Date.now(), category: '', amount: '' }];
-    const initM = [{ id: Date.now() + 1, category: '', amount: '' }];
+    const initGroups = [makeDefaultGroup(now)];
     setHeaderData(initHeader);
-    setConstructionLines(initC);
-    setMiscLines(initM);
+    setCostingGroups(initGroups);
     setInitialFormState({
       headerData: JSON.stringify(initHeader),
-      expenseLines: JSON.stringify([...initC, ...initM]),
+      costingGroups: JSON.stringify(initGroups),
       isAddStocksChecked: false,
       stocksAmount: ''
     });
@@ -539,15 +726,14 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       setShowDraftModal(true);
     } else {
       resetForm();
+      const now = Date.now();
       const initHeader = { date: new Date().toISOString().split('T')[0], project_code: '', payee: '', particulars: '', tin: '', cv_no: '', bank: '', check_no: '', or_inv_no: '', accts_pay: '', input_tax: '', output_tax: '', target_cib: '', costing_type: 'normal' };
-      const initC = [{ id: Date.now(), category: '', amount: '' }];
-      const initM = [{ id: Date.now() + 1, category: '', amount: '' }];
+      const initGroups = [makeDefaultGroup(now)];
       setHeaderData(initHeader);
-      setConstructionLines(initC);
-      setMiscLines(initM);
+      setCostingGroups(initGroups);
       setInitialFormState({
         headerData: JSON.stringify(initHeader),
-        expenseLines: JSON.stringify([...initC, ...initM]),
+        costingGroups: JSON.stringify(initGroups),
         isAddStocksChecked: false,
         stocksAmount: '',
         stockDescription: ''
@@ -559,6 +745,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   const handleEditRow = (d) => {
     if (!canEdit) return;
     setEditingId(d.id);
+    setEditingUnderlyingRecords(d.underlying_records || [d]);
 
     // Normalize project_code to an array to prevent crashes when older string data or grouped array data is passed
     const projCodes = Array.isArray(d.project_code) 
@@ -600,20 +787,70 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       }
     });
 
-    const expensesWithCommas = loadedExpenses.map(e => ({ ...e, amount: e.amount ? String(e.amount).replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '' }));
-    expensesWithCommas.forEach(exp => {
-      if (inlineMain.has(exp.category)) {
-        cLines.push(exp);
-      } else {
-        mLines.push(exp);
-      }
+    const groupsMap = {};
+    const underlying = d.underlying_records || [d];
+
+    underlying.forEach(record => {
+      const recordExpenses = record.expenses && record.expenses.length > 0 ? record.expenses : [];
+      recordExpenses.forEach(exp => {
+        const gid = exp.groupId || 'old_default_group';
+        if (!groupsMap[gid]) {
+          groupsMap[gid] = {
+            id: gid === 'old_default_group' ? Date.now() + 100 : gid,
+            targetProject: exp.targetProject || 'all',
+            constructionLines: [],
+            miscLines: [],
+            _seenLinesMap: {}
+          };
+        }
+        
+        const group = groupsMap[gid];
+        const lineId = exp.id || (Date.now() + Math.random());
+        let rawAmt = parseFloat(exp.amount) || 0;
+        
+        if (!group._seenLinesMap[lineId]) {
+          group._seenLinesMap[lineId] = { ...exp, amountNum: rawAmt };
+        } else {
+          if (group.targetProject === 'all') {
+            group._seenLinesMap[lineId].amountNum += rawAmt;
+          }
+        }
+      });
     });
 
-    if (cLines.length === 0) cLines.push({ id: Date.now(), category: '', amount: '' });
-    if (mLines.length === 0) mLines.push({ id: Date.now() + 1, category: '', amount: '' });
+    const parsedGroups = Object.values(groupsMap).map(group => {
+      Object.values(group._seenLinesMap).forEach(expData => {
+        const roundedAmt = Math.round(expData.amountNum * 100) / 100;
+        const displayStr = roundedAmt % 1 === 0 ? String(roundedAmt) : roundedAmt.toFixed(2);
+        
+        const expWithCommas = { 
+          ...expData, 
+          amount: roundedAmt ? displayStr.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '' 
+        };
+        
+        if (inlineMain.has(expWithCommas.category)) {
+          group.constructionLines.push(expWithCommas);
+        } else {
+          group.miscLines.push(expWithCommas);
+        }
+      });
+      delete group._seenLinesMap;
+      if (group.constructionLines.length === 0) group.constructionLines.push({ id: Date.now() + Math.random(), category: '', amount: '' });
+      if (group.miscLines.length === 0) group.miscLines.push({ id: Date.now() + Math.random(), category: '', amount: '' });
+      return group;
+    }).sort((a, b) => a.id - b.id);
 
-    setConstructionLines(cLines);
-    setMiscLines(mLines);
+    if (parsedGroups.length === 0) {
+      const now = Date.now();
+      parsedGroups.push({
+        id: now + 100,
+        targetProject: 'all',
+        constructionLines: [{ id: now + 1, category: '', amount: '' }],
+        miscLines: [{ id: now + 2, category: '', amount: '' }]
+      });
+    }
+
+    setCostingGroups(parsedGroups);
     setModalAttachments(d.attachments || []);
 
     if (d.stocks_amount && d.stocks_amount > 0) {
@@ -628,7 +865,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
     setInitialFormState({
       headerData: JSON.stringify(newHeader),
-      expenseLines: JSON.stringify(expensesWithCommas),
+      costingGroups: JSON.stringify(parsedGroups),
       isAddStocksChecked: d.stocks_amount > 0,
       stocksAmount: d.stocks_amount > 0 ? String(d.stocks_amount).replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '',
       stockDescription: d.stock_description || ''
@@ -645,8 +882,9 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       const payloads = Array.isArray(disbursementData) ? disbursementData : [disbursementData];
 
       const promises = payloads.map(data => {
-        const url = editingId ? `${API_URL}/disbursements/${editingId}` : `${API_URL}/disbursements`;
-        const method = editingId ? 'PUT' : 'POST';
+        const isExisting = typeof data.id === 'number' || (typeof data.id === 'string' && !data.id.startsWith('new_'));
+        const url = isExisting ? `${API_URL}/disbursements/${data.id}` : `${API_URL}/disbursements`;
+        const method = isExisting ? 'PUT' : 'POST';
 
         return fetch(url, {
           method: method,
@@ -663,6 +901,19 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
           return res;
         });
       });
+
+      if (editingId && editingUnderlyingRecords) {
+        const payloadIds = payloads.map(p => p.id);
+        const recordsToDelete = editingUnderlyingRecords.filter(r => !payloadIds.includes(r.id));
+        recordsToDelete.forEach(record => {
+          promises.push(
+            fetch(`${API_URL}/disbursements/${record.id}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${token}` }
+            })
+          );
+        });
+      }
 
       await Promise.all(promises);
 
@@ -686,27 +937,6 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     if (isDuplicateOR) { setErrorMessage("May kaparehas na OR/INV#! Paki-palitan bago i-save."); return; }
     if (!isVarianceZero) { setErrorMessage("Hindi pwedeng i-save! Paki-check ang Variance. Kailangang pantay ang Target CIB sa Computed CIB."); return; }
 
-    const combinedLines = [...constructionLines, ...miscLines].filter(
-      line => (line.category && line.category.trim() !== '') || (line.amount && line.amount !== '')
-    ).map(line => ({
-      ...line,
-      amount: line.amount ? String(line.amount).replace(/,/g, '') : '',
-      id: line.id || Date.now() + Math.random()
-    }));
-
-    if (combinedLines.length === 0) {
-      setErrorMessage("Kailangan maglagay ng kahit isang expense item.");
-      return;
-    }
-
-    const invalidLines = combinedLines.filter(line => !line.category || line.category.trim() === '');
-    if (invalidLines.length > 0) {
-      const errorIds = invalidLines.map(line => line.id);
-      setLineErrors(errorIds);
-      setErrorMessage("Paki-pili ang kategorya para sa lahat ng nilagyan ng amount.");
-      return;
-    }
-
     const projectCodes = Array.isArray(headerData.project_code)
       ? headerData.project_code
       : (typeof headerData.project_code === 'string' ? headerData.project_code.split(',').map(c => c.trim()).filter(Boolean) : []);
@@ -721,87 +951,135 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       return;
     }
 
-    if (editingId) {
-      const newDisbursement = {
-        id: editingId,
-        ...headerData,
-        project_code: projectCodes[0],
-        target_cib: String(headerData.target_cib).replace(/,/g, ''),
-        expenses: combinedLines,
-        attachments: modalAttachments,
-        gross_amount: totals.cib_coh,
-        ewt_amount: totals.ewtPayable,
-        net_amount: totals.totalDebit,
-        stocks_amount: isAddStocksChecked ? parseFloat(String(stocksAmount).replace(/,/g, '')) || 0 : 0,
-        stock_description: isAddStocksChecked ? stockDescription.trim() : '',
-        created_at: disbursements.find(d => d.id === editingId)?.created_at || new Date().toISOString()
-      };
-      setPasswordModal({ isOpen: true, action: 'update', payload: newDisbursement });
-    } else {
-      const divisor = projectCodes.length;
-      const payloads = projectCodes.map((projCode, index) => {
-        const splitAmount = (val) => {
-          if (!val) return val;
-          const num = parseFloat(String(val).replace(/,/g, ''));
-          if (isNaN(num)) return val;
-          return Number((num / divisor).toFixed(2));
-        };
+    const numProjects = projectCodes.length;
+    const payloads = projectCodes.map((projCode, index) => {
+      let projectTotalDebit = 0;
+      let projectEwt = 0;
+      const projectExpenses = [];
 
-        const splitExpenses = combinedLines.map(line => ({
-          ...line,
-          amount: splitAmount(line.amount)
-        }));
+      costingGroups.forEach(group => {
+        const groupLines = [...group.constructionLines, ...group.miscLines].filter(
+          line => (line.category && line.category.trim() !== '') || (line.amount && line.amount !== '')
+        );
 
-        return {
-          id: Date.now().toString(36) + Math.floor(Math.random() * 1000).toString() + index,
-          ...headerData,
-          project_code: projCode,
-          target_cib: splitAmount(headerData.target_cib),
-          input_tax: splitAmount(headerData.input_tax),
-          output_tax: splitAmount(headerData.output_tax),
-          accts_pay: splitAmount(headerData.accts_pay),
-          expenses: splitExpenses,
-          attachments: modalAttachments,
-          gross_amount: splitAmount(totals.cib_coh),
-          ewt_amount: splitAmount(totals.ewtPayable),
-          net_amount: splitAmount(totals.totalDebit),
-          stocks_amount: splitAmount(isAddStocksChecked ? stocksAmount : 0),
-          stock_description: isAddStocksChecked ? stockDescription.trim() : '',
-          created_at: new Date().toISOString()
-        };
+        groupLines.forEach(line => {
+          const rawAmt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
+          let amt;
+
+          if (group.targetProject === 'all') {
+            const base = Math.floor((rawAmt / numProjects) * 100) / 100;
+            const remainder = Math.round((rawAmt - (base * numProjects)) * 100) / 100;
+            amt = (index === 0) ? Number((base + remainder).toFixed(2)) : base;
+          } else if (group.targetProject === projCode) {
+            amt = rawAmt;
+          } else {
+            return; // skip — this group targets a different project
+          }
+
+          projectExpenses.push({ 
+            ...line, 
+            amount: amt, 
+            groupId: group.id, 
+            targetProject: group.targetProject 
+          });
+          projectTotalDebit += amt;
+
+          const cat = (line.category || '').toUpperCase();
+          if (cat === 'LABOR /SUBCONTRACTOR' || cat === 'LABOR/PAYROLL') {
+            projectEwt += (amt / 0.98) - amt;
+          }
+        });
       });
+
+      const projNet = Number(projectTotalDebit.toFixed(2));
+      const projEwt = Number(projectEwt.toFixed(2));
+      const getSplitVal = (val) => {
+        const num = parseFloat(String(val).replace(/,/g, ''));
+        if (isNaN(num) || !num) return 0;
+        const base = Math.floor((num / numProjects) * 100) / 100;
+        const remainder = Math.round((num - (base * numProjects)) * 100) / 100;
+        return (index === 0) ? Number((base + remainder).toFixed(2)) : base;
+      };
+
+      const projStocksAmount = isAddStocksChecked
+        ? getSplitVal(stocksAmount)
+        : 0;
+      const projGross = Number((projNet + projEwt + projStocksAmount).toFixed(2));
+
+      return {
+        id: editingId ? (editingUnderlyingRecords[index]?.id || `new_${index}`) : `new_${index}`,
+        ...headerData,
+        project_code: projCode,
+        target_cib: getSplitVal(headerData.target_cib),
+        input_tax: getSplitVal(headerData.input_tax),
+        output_tax: getSplitVal(headerData.output_tax),
+        accts_pay: getSplitVal(headerData.accts_pay),
+        expenses: projectExpenses,
+        attachments: modalAttachments,
+        gross_amount: projGross,
+        ewt_amount: projEwt,
+        net_amount: projNet,
+        stocks_amount: projStocksAmount,
+        stock_description: isAddStocksChecked ? stockDescription.trim() : '',
+        created_at: editingId ? (editingUnderlyingRecords[0]?.created_at || new Date().toISOString()) : new Date().toISOString()
+      };
+    });
+
+    if (editingId) {
+      setPasswordModal({ 
+        isOpen: true, 
+        action: 'update_group', 
+        payload: payloads,
+        oldIds: editingUnderlyingRecords.map(r => r.id)
+      });
+    } else {
       executeSave(payloads);
     }
   };
 
-  const handleDeleteClick = (id) => {
+  const handleDeleteClick = (d) => {
     if (!canEdit) return;
-    setPasswordModal({ isOpen: true, action: 'delete', payload: id });
+    const idsToDelete = (d.underlying_records || [d]).map(r => r.id);
+    setPasswordModal({ isOpen: true, action: 'delete_group', payload: idsToDelete });
   };
 
-  const executeDelete = async (id) => {
+  const executeDeleteGroup = async (ids) => {
     try {
       const token = localStorage.getItem('fbtmcc_token');
-      const response = await fetch(`${API_URL}/disbursements/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        await refreshData();
-      } else {
-        alert("Failed to delete disbursement.");
-      }
+      const deletePromises = ids.map(id => 
+        fetch(`${API_URL}/disbursements/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      );
+      await Promise.all(deletePromises);
+      await refreshData();
     } catch (error) {
       console.error(error);
-      alert("Network Error");
+      alert("Network Error during delete.");
     }
   };
 
-  const handlePasswordConfirm = () => {
+  const handlePasswordConfirm = async () => {
     if (passwordModal.action === 'update') {
       executeSave(passwordModal.payload);
-    } else if (passwordModal.action === 'delete') {
-      executeDelete(passwordModal.payload);
+    } else if (passwordModal.action === 'update_group') {
+      try {
+        const token = localStorage.getItem('fbtmcc_token');
+        const deletePromises = passwordModal.oldIds.map(id => 
+          fetch(`${API_URL}/disbursements/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+        );
+        await Promise.all(deletePromises);
+        executeSave(passwordModal.payload);
+      } catch (error) {
+        console.error(error);
+        alert("Network Error during update.");
+      }
+    } else if (passwordModal.action === 'delete_group') {
+      executeDeleteGroup(passwordModal.payload);
     }
     setPasswordModal({ isOpen: false, action: null, payload: null });
   };
@@ -822,19 +1100,6 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     }
   }, [isModalOpen, showUnsavedModal, showDraftModal, passwordModal.isOpen, postSavePrompt, onModalStateChange]);
 
-  useEffect(() => {
-    if (initialDisbursementId && disbursements.length > 0) {
-      const disbursement = disbursements.find(d => d.id === initialDisbursementId);
-      if (disbursement) {
-        const timer = setTimeout(() => {
-          handleEditRow(disbursement);
-          if (onClearInitialDisbursement) onClearInitialDisbursement();
-        }, 100);
-        return () => clearTimeout(timer);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialDisbursementId, disbursements]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -886,71 +1151,37 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isModalOpen, isFilterOpen, showUnsavedModal, showDraftModal, postSavePrompt, headerData, constructionLines, miscLines, initialFormState, isSaving, totals, disbursements, editingId, canEdit]);
+  }, [isModalOpen, isFilterOpen, showUnsavedModal, showDraftModal, postSavePrompt, headerData, costingGroups, initialFormState, isSaving, totals, disbursements, editingId, canEdit]);
 
 
-  const groupedDisbursements = useMemo(() => {
-    const groups = {};
-    filteredDisbursements.forEach(d => {
-      if (!d.cv_no) {
-        groups[`no_cv_${d.id}`] = { ...d, project_code: [d.project_code] };
-        return;
-      }
 
-      const key = d.cv_no.toLowerCase().trim();
-      if (!groups[key]) {
-        groups[key] = {
-          ...d,
-          project_code: [d.project_code],
-          gross_amount: parseFloat(d.gross_amount) || 0,
-          net_amount: parseFloat(d.net_amount) || 0,
-          ewt_amount: parseFloat(d.ewt_amount) || 0,
-          accts_pay: parseFloat(d.accts_pay) || 0,
-          target_cib: parseFloat(d.target_cib) || 0,
-          input_tax: parseFloat(d.input_tax) || 0,
-          output_tax: parseFloat(d.output_tax) || 0,
-          stocks_amount: parseFloat(d.stocks_amount) || 0,
-          stock_description: d.stock_description || '',
-          expenses: d.expenses ? d.expenses.map(e => ({ ...e, amount: parseFloat(e.amount) || 0 })) : []
-        };
+  useEffect(() => {
+    if (initialDisbursementId && groupedDisbursements.length > 0) {
+      // Find the grouped record that contains this underlying ID
+      const groupedRecord = groupedDisbursements.find(g => 
+        (g.underlying_records || [g]).some(r => r.id === initialDisbursementId)
+      );
+      
+      if (groupedRecord) {
+        const timer = setTimeout(() => {
+          handleEditRow(groupedRecord);
+          if (onClearInitialDisbursement) onClearInitialDisbursement();
+        }, 100);
+        return () => clearTimeout(timer);
       } else {
-        const group = groups[key];
-        if (d.project_code && !group.project_code.includes(d.project_code)) {
-          group.project_code.push(d.project_code);
-        }
-        group.gross_amount += parseFloat(d.gross_amount) || 0;
-        group.net_amount += parseFloat(d.net_amount) || 0;
-        group.ewt_amount += parseFloat(d.ewt_amount) || 0;
-        group.accts_pay += parseFloat(d.accts_pay) || 0;
-        group.target_cib += parseFloat(d.target_cib) || 0;
-        group.input_tax += parseFloat(d.input_tax) || 0;
-        group.output_tax += parseFloat(d.output_tax) || 0;
-        group.stocks_amount += parseFloat(d.stocks_amount) || 0;
-
-        if (d.expenses) {
-          d.expenses.forEach(exp => {
-            const existingExp = group.expenses.find(e => e.category === exp.category);
-            if (existingExp) {
-              existingExp.amount = (parseFloat(existingExp.amount) || 0) + (parseFloat(exp.amount) || 0);
-            } else {
-              group.expenses.push({ ...exp, amount: parseFloat(exp.amount) || 0 });
-            }
-          });
+        // Fallback to raw record just in case it got filtered out
+        const rawRecord = disbursements.find(d => d.id === initialDisbursementId);
+        if (rawRecord) {
+          const timer = setTimeout(() => {
+            handleEditRow(rawRecord);
+            if (onClearInitialDisbursement) onClearInitialDisbursement();
+          }, 100);
+          return () => clearTimeout(timer);
         }
       }
-    });
-
-    const result = [];
-    const seen = new Set();
-    filteredDisbursements.forEach(d => {
-      const key = d.cv_no ? d.cv_no.toLowerCase().trim() : `no_cv_${d.id}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        result.push(groups[key]);
-      }
-    });
-    return result;
-  }, [filteredDisbursements]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDisbursementId, groupedDisbursements]);
 
   // ==========================================
   // RENDER UI
@@ -1256,7 +1487,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                           <button onClick={(e) => { e.stopPropagation(); handleEditRow(d); }} className="p-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/60 border border-blue-100 dark:border-blue-800/50 rounded-lg transition-colors" title="Edit">
                             <Edit2 size={16} />
                           </button>
-                          <button onClick={(e) => { e.stopPropagation(); handleDeleteClick(d.id); }} className="p-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/60 border border-red-100 dark:border-red-800/50 rounded-lg transition-colors" title="Delete">
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteClick(d); }} className="p-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/60 border border-red-100 dark:border-red-800/50 rounded-lg transition-colors" title="Delete">
                             <Trash2 size={16} />
                           </button>
                         </div>
@@ -1494,96 +1725,163 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className={`lg:col-span-2 space-y-6 transition-all duration-300 ${targetCib <= 0 ? 'opacity-40 pointer-events-none grayscale-[50%]' : ''}`}>
 
-                    {/* 2. CONSTRUCTION COST BREAKDOWN */}
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden transition-colors duration-300">
-                      <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100 dark:border-slate-700">
-                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">2. COST MONITORING BREAKDOWN <span className="text-red-500">*</span></h3>
-                        <button type="button" onClick={() => addLine('construction')} disabled={targetCib <= 0 || isAddingLine} className="text-xs bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-md font-medium flex items-center gap-1 transition-colors disabled:opacity-50 min-w-[120px] justify-center">
-                          {isAddingLine ? (
-                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500 animate-bounce"></span> Adding...</span>
-                          ) : (
-                            <><Plus size={14} /> Add Line Item</>
+                    {/* 2. COST BREAKDOWN */}
+                    <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 transition-colors duration-300">
+                      <div className="flex items-start justify-between pb-2 border-b border-slate-100 dark:border-slate-700 mb-4">
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                            2. Cost Breakdown <span className="text-red-500">*</span>
+                          </h3>
+                          {Array.isArray(headerData.project_code) && headerData.project_code.filter(Boolean).length > 1 && (
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium">
+                              Maaari kang gumawa ng maraming costing groups — bawat isa ay maaaring i-assign sa lahat o sa isang specific na project lang.
+                            </p>
                           )}
-                        </button>
+                        </div>
                       </div>
 
-                      <div className="max-h-[250px] overflow-y-auto pr-2 custom-scrollbar space-y-3">
-                        {constructionLines.map((line, index) => (
-                          <div key={line.id} className="flex gap-3 items-start animate-in slide-in-from-top-2">
-                            <div className="w-8 h-9 mt-1 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded flex items-center justify-center text-xs font-bold text-slate-400 dark:text-slate-500 shrink-0 transition-colors">
-                              {index + 1}
+                      <div className="space-y-4">
+                    {costingGroups.map((group, groupIndex) => {
+                      const selectedProjects = Array.isArray(headerData.project_code)
+                        ? headerData.project_code.filter(Boolean)
+                        : (typeof headerData.project_code === 'string' ? headerData.project_code.split(',').map(c => c.trim()).filter(Boolean) : []);
+                      return (
+                        <div key={group.id} className="border-2 border-slate-200 dark:border-slate-600 rounded-xl overflow-hidden shadow-sm animate-in slide-in-from-top-2">
+                          {/* Group Header with Target Selector */}
+                          <div className="bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-700/60 dark:to-slate-700/30 px-4 py-2.5 flex items-center justify-between border-b border-slate-200 dark:border-slate-600">
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-md">
+                                Group {groupIndex + 1}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">→ Apply costs to:</span>
+                                <TargetProjectDropdown
+                                  value={group.targetProject}
+                                  onChange={(val) => updateGroupTarget(group.id, val)}
+                                  disabled={selectedProjects.length <= 1}
+                                  selectedProjects={selectedProjects}
+                                />
+                              </div>
+                              {group.targetProject !== 'all' && (
+                                <span className="text-[9px] font-black bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                  Specific Project
+                                </span>
+                              )}
                             </div>
-                            <div className="flex-1">
-                              <SearchableDropdown
-                                options={mainCategoriesList}
-                                value={line.category}
-                                onChange={(val) => handleLineChange(line.id, 'category', val, 'construction')}
-                                placeholder="-- Find Construction Category --"
-                                hasError={lineErrors.includes(line.id)}
-                              />
-                            </div>
-                            <div className="w-40 relative mt-1">
-                              <span className="absolute left-3 top-2 text-slate-400 dark:text-slate-500 text-sm font-medium">₱</span>
-                              <input type="text" placeholder="0.00"
-                                className="w-full pl-7 p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-right text-slate-800 dark:text-white transition-colors"
-                                value={line.amount} onChange={(e) => handleLineChange(line.id, 'amount', e.target.value, 'construction')} />
-                            </div>
-                            <button type="button" onClick={() => removeLine(line.id, 'construction')} disabled={constructionLines.length === 1 && miscLines.length === 0}
-                              className="p-2 mt-1 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-30 disabled:hover:bg-transparent">
-                              <Trash2 size={18} />
-                            </button>
+                            {costingGroups.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeCostingGroup(group.id)}
+                                className="p-1.5 text-slate-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors shrink-0"
+                                title="Remove this costing group"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                           </div>
-                        ))}
-                      </div>
-                      <div className="mt-4 pt-3 text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700 italic">
-                        * If "Labor /SUBCONTRACTOR" or "LABOR/PAYROLL" is chosen, it will calculate automatically by 2% for the EWT Payable.
-                      </div>
-                    </div>
 
-                    {/* 3. MISCELLANEOUS COST */}
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden transition-colors duration-300">
-                      <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100 dark:border-slate-700">
-                        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">3. MISCELLANEOUS COST</h3>
-                        <button type="button" onClick={() => addLine('misc')} disabled={targetCib <= 0 || isAddingLine} className="text-xs bg-teal-50 dark:bg-teal-900/30 hover:bg-teal-100 dark:hover:bg-teal-900/50 text-teal-700 dark:text-teal-400 px-3 py-1.5 rounded-md font-medium flex items-center gap-1 transition-colors disabled:opacity-50 min-w-[120px] justify-center border border-teal-100 dark:border-teal-800">
-                          {isAddingLine ? (
-                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-teal-400 dark:bg-teal-500 animate-bounce"></span> Adding...</span>
-                          ) : (
-                            <><Plus size={14} /> Add Misc Item</>
-                          )}
-                        </button>
-                      </div>
+                          <div className="p-4 space-y-4 bg-white dark:bg-slate-800/50">
+                            {/* Cost Monitoring Breakdown */}
+                            <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors duration-300">
+                              <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100 dark:border-slate-700">
+                                <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                                  Cost Monitoring Breakdown {groupIndex === 0 && <span className="text-red-500">*</span>}
+                                </h3>
+                                <button type="button" onClick={() => addLine(group.id, 'construction')} disabled={targetCib <= 0 || isAddingLine}
+                                  className="text-xs bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-md font-medium flex items-center gap-1 transition-colors disabled:opacity-50 min-w-[100px] justify-center">
+                                  {isAddingLine ? <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce"></span> Adding...</span> : <><Plus size={13} /> Add Line Item</>}
+                                </button>
+                              </div>
+                              <div className="max-h-[200px] overflow-y-auto pr-2 custom-scrollbar space-y-2">
+                                {group.constructionLines.map((line, index) => (
+                                  <div key={line.id} className="flex gap-2 items-start animate-in slide-in-from-top-2">
+                                    <div className="w-7 h-8 mt-1 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded flex items-center justify-center text-xs font-bold text-slate-400 dark:text-slate-500 shrink-0">
+                                      {index + 1}
+                                    </div>
+                                    <div className="flex-1">
+                                      <SearchableDropdown
+                                        options={mainCategoriesList}
+                                        value={line.category}
+                                        onChange={(val) => handleLineChange(group.id, line.id, 'category', val, 'construction')}
+                                        placeholder="-- Find Construction Category --"
+                                        hasError={lineErrors.includes(line.id)}
+                                      />
+                                    </div>
+                                    <div className="w-36 relative mt-1">
+                                      <span className="absolute left-2.5 top-2 text-slate-400 dark:text-slate-500 text-sm font-medium">₱</span>
+                                      <input type="text" placeholder="0.00"
+                                        className="w-full pl-7 p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-right text-slate-800 dark:text-white transition-colors"
+                                        value={line.amount} onChange={(e) => handleLineChange(group.id, line.id, 'amount', e.target.value, 'construction')} />
+                                    </div>
+                                    <button type="button" onClick={() => removeLine(group.id, line.id, 'construction')}
+                                      disabled={group.constructionLines.length + group.miscLines.length <= 1}
+                                      className="p-2 mt-1 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-30 disabled:hover:bg-transparent">
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="mt-3 pt-2 text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700 italic">
+                                * If "Labor /SUBCONTRACTOR" or "LABOR/PAYROLL" is chosen, it will calculate automatically by 2% for the EWT Payable.
+                              </div>
+                            </div>
 
-                      <div className="max-h-[250px] overflow-y-auto pr-2 custom-scrollbar space-y-3">
-                        {miscLines.length === 0 ? (
-                          <div className="py-8 text-center border-2 border-dashed border-slate-100 dark:border-slate-700 rounded-xl">
-                            <p className="text-slate-400 dark:text-slate-500 text-xs font-medium">Walang miscellaneous cost na idinagdag. I-click ang button sa itaas para mag-add.</p>
+                            {/* Miscellaneous Cost */}
+                            <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors duration-300">
+                              <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100 dark:border-slate-700">
+                                <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Miscellaneous Cost</h3>
+                                <button type="button" onClick={() => addLine(group.id, 'misc')} disabled={targetCib <= 0 || isAddingLine}
+                                  className="text-xs bg-teal-50 dark:bg-teal-900/30 hover:bg-teal-100 dark:hover:bg-teal-900/50 text-teal-700 dark:text-teal-400 px-3 py-1.5 rounded-md font-medium flex items-center gap-1 transition-colors disabled:opacity-50 min-w-[100px] justify-center border border-teal-100 dark:border-teal-800">
+                                  <Plus size={13} /> Add Misc Item
+                                </button>
+                              </div>
+                              <div className="max-h-[200px] overflow-y-auto pr-2 custom-scrollbar space-y-2">
+                                {group.miscLines.length === 0 ? (
+                                  <div className="py-6 text-center border-2 border-dashed border-slate-100 dark:border-slate-700 rounded-xl">
+                                    <p className="text-slate-400 dark:text-slate-500 text-xs font-medium">No miscellaneous cost added.</p>
+                                  </div>
+                                ) : group.miscLines.map((line, index) => (
+                                  <div key={line.id} className="flex gap-2 items-start animate-in slide-in-from-top-2">
+                                    <div className="w-7 h-8 mt-1 bg-teal-50/50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800/50 rounded flex items-center justify-center text-xs font-bold text-teal-600 dark:text-teal-400 shrink-0">
+                                      {index + 1}
+                                    </div>
+                                    <div className="flex-1">
+                                      <SearchableDropdown
+                                        options={miscCategoriesList}
+                                        value={line.category}
+                                        onChange={(val) => handleLineChange(group.id, line.id, 'category', val, 'misc')}
+                                        placeholder="-- Find Miscellaneous Item --"
+                                        hasError={lineErrors.includes(line.id)}
+                                      />
+                                    </div>
+                                    <div className="w-36 relative mt-1">
+                                      <span className="absolute left-2.5 top-2 text-slate-400 dark:text-slate-500 text-sm font-medium">₱</span>
+                                      <input type="text" placeholder="0.00"
+                                        className="w-full pl-7 p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-right text-slate-800 dark:text-white transition-colors"
+                                        value={line.amount} onChange={(e) => handleLineChange(group.id, line.id, 'amount', e.target.value, 'misc')} />
+                                    </div>
+                                    <button type="button" onClick={() => removeLine(group.id, line.id, 'misc')}
+                                      className="p-2 mt-1 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors">
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           </div>
-                        ) : miscLines.map((line, index) => (
-                          <div key={line.id} className="flex gap-3 items-start animate-in slide-in-from-top-2">
-                            <div className="w-8 h-9 mt-1 bg-teal-50/50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800/50 rounded flex items-center justify-center text-xs font-bold text-teal-600 dark:text-teal-400 shrink-0 transition-colors">
-                              {index + 1}
-                            </div>
-                            <div className="flex-1">
-                              <SearchableDropdown
-                                options={miscCategoriesList}
-                                value={line.category}
-                                onChange={(val) => handleLineChange(line.id, 'category', val, 'misc')}
-                                placeholder="-- Find Miscellaneous Item --"
-                                hasError={lineErrors.includes(line.id)}
-                              />
-                            </div>
-                            <div className="w-40 relative mt-1">
-                              <span className="absolute left-3 top-2 text-slate-400 dark:text-slate-500 text-sm font-medium">₱</span>
-                              <input type="text" placeholder="0.00"
-                                className="w-full pl-7 p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-right text-slate-800 dark:text-white transition-colors"
-                                value={line.amount} onChange={(e) => handleLineChange(line.id, 'amount', e.target.value, 'misc')} />
-                            </div>
-                            <button type="button" onClick={() => removeLine(line.id, 'misc')}
-                              className="p-2 mt-1 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors">
-                              <Trash2 size={18} />
-                            </button>
-                          </div>
-                        ))}
+                        </div>
+                      );
+                    })}
+
+                    {/* Add Another Costing Button */}
+                    <button
+                      type="button"
+                      onClick={addCostingGroup}
+                      disabled={targetCib <= 0}
+                      className="w-full py-3 border-2 border-dashed border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-600 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 text-blue-500 dark:text-blue-400 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <Plus size={15} /> Add Another Costing
+                    </button>
                       </div>
                     </div>
 
@@ -1858,13 +2156,13 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                         <button
                           type="submit"
                           onClick={handleSubmit}
-                          disabled={isDuplicateCV || !isVarianceZero || targetCib === 0 || isSaving}
-                          className={`w-full text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all shadow-lg ${(isDuplicateCV || !isVarianceZero || targetCib === 0 || isSaving)
+                          disabled={isDuplicateCV || !isVarianceZero || targetCib === 0 || isSaving || selectedTransactionFilter === 'EWT'}
+                          className={`w-full text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all shadow-lg ${(isDuplicateCV || !isVarianceZero || targetCib === 0 || isSaving || selectedTransactionFilter === 'EWT')
                             ? 'bg-slate-500 dark:bg-slate-700 cursor-not-allowed opacity-50 shadow-none'
                             : 'bg-blue-600 hover:bg-blue-500 dark:bg-blue-700 dark:hover:bg-blue-600 shadow-blue-900/20 dark:shadow-none'
                             }`}
                         >
-                          <Save size={18} /> {isSaving ? 'Saving...' : (editingId ? 'Update Disbursement' : 'Post Disbursement')}
+                          <Save size={18} /> {selectedTransactionFilter === 'EWT' ? 'View Only (Filtered)' : (isSaving ? 'Saving...' : (editingId ? 'Update Disbursement' : 'Post Disbursement'))}
                         </button>
                         <span className="text-center text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest hidden md:block">
                           You can also use <kbd className="px-1.5 py-0.5 bg-slate-700 dark:bg-slate-800 rounded text-slate-300 dark:text-slate-400 border border-slate-600 dark:border-slate-700">CTRL + Enter</kbd>
