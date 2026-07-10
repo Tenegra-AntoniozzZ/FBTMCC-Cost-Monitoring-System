@@ -505,6 +505,12 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   const isDuplicateCV = useMemo(() => {
     if (!headerData.cv_no) return false;
 
+    // Bypass if in Stock Allocation Mode and value matches the source stock's CV#
+    if (isStockAllocationMode && stockAllocationSource &&
+      headerData.cv_no.trim().toLowerCase() === String(stockAllocationSource.cv_no || '').trim().toLowerCase()) {
+      return false;
+    }
+
     // Bypass validation if in edit mode and the CV hasn't changed from its original value
     if (editingId) {
       const originalRecord = disbursements.find(d => d.id === editingId);
@@ -516,10 +522,16 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     return disbursements.some(
       (d) => d.id !== editingId && d.cv_no && d.cv_no.trim().toLowerCase() === headerData.cv_no.trim().toLowerCase()
     );
-  }, [headerData.cv_no, disbursements, editingId]);
+  }, [headerData.cv_no, disbursements, editingId, isStockAllocationMode, stockAllocationSource]);
 
   const isDuplicateOR = useMemo(() => {
     if (!headerData.or_inv_no) return false;
+
+    // Bypass if in Stock Allocation Mode and value matches the source stock's OR/INV#
+    if (isStockAllocationMode && stockAllocationSource &&
+      headerData.or_inv_no.trim().toLowerCase() === String(stockAllocationSource.or_inv_no || '').trim().toLowerCase()) {
+      return false;
+    }
 
     // Bypass validation if in edit mode and the OR/INV hasn't changed from its original value
     if (editingId) {
@@ -532,7 +544,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     return disbursements.some(
       (d) => d.id !== editingId && d.or_inv_no && d.or_inv_no.trim().toLowerCase() === headerData.or_inv_no.trim().toLowerCase()
     );
-  }, [headerData.or_inv_no, disbursements, editingId]);
+  }, [headerData.or_inv_no, disbursements, editingId, isStockAllocationMode, stockAllocationSource]);
 
   // ==========================================
   // 4. HANDLERS
@@ -1197,7 +1209,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   // ==========================================
   useEffect(() => {
     if (initialStockAllocation && !editingId) {
-      const { cv_no, stock_description, stocks_amount } = initialStockAllocation;
+      const { cv_no, or_inv_no, stock_description, stocks_amount } = initialStockAllocation;
       const formattedAmount = stocks_amount
         ? stocks_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })
         : '0.00';
@@ -1206,7 +1218,9 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       setHeaderData(prev => ({
         ...prev,
         target_cib: formattedAmount,
-        particulars: `Stock Allocation from CV# ${cv_no} — ${stock_description || 'N/A'}`
+        particulars: `Stock Allocation from CV# ${cv_no} — ${stock_description || 'N/A'}`,
+        cv_no: cv_no || '',
+        or_inv_no: or_inv_no || ''
       }));
       setIsModalOpen(true);
       if (onClearInitialDisbursement) onClearInitialDisbursement();
@@ -1659,24 +1673,34 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                         value={headerData.date} onChange={handleHeaderChange} required />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">CV # <span className="text-blue-500 font-bold">* (At least one)</span></label>
+                      <label className={`text-xs font-semibold flex items-center justify-between ${
+                        isStockAllocationMode ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
+                      }`}>
+                        <span>CV # <span className="text-blue-500 font-bold">* (At least one)</span></span>
+                        {isStockAllocationMode && <span className="text-[9px] font-black bg-emerald-600 text-white px-1.5 py-0.5 rounded uppercase tracking-wider">LOCKED</span>}
+                      </label>
                       <input
                         type="text"
                         name="cv_no"
                         inputMode="text"
                         pattern="[0-9\-]*"
                         placeholder="Unique CV#"
-                        className={`w-full p-2 rounded-md text-sm outline-none font-bold transition-all duration-200 ${isDuplicateCV
-                          ? 'border-2 border-red-500 dark:border-red-400 text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 focus:ring-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
-                          : 'border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 bg-amber-50 dark:bg-amber-900/10 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400'
-                          }`}
+                        readOnly={isStockAllocationMode}
+                        className={`w-full p-2 rounded-md text-sm outline-none font-bold transition-all duration-200 ${
+                          isStockAllocationMode
+                            ? 'border border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-100 bg-emerald-50 dark:bg-emerald-950/50 cursor-not-allowed'
+                            : isDuplicateCV
+                              ? 'border-2 border-red-500 dark:border-red-400 text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 focus:ring-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
+                              : 'border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 bg-amber-50 dark:bg-amber-900/10 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400'
+                        }`}
                         value={headerData.cv_no}
                         onChange={(e) => {
+                          if (isStockAllocationMode) return;
                           const onlyNums = e.target.value.replace(/[^0-9-]/g, '');
                           handleHeaderChange({ target: { name: 'cv_no', value: onlyNums } });
                         }}
                       />
-                      {isDuplicateCV && (
+                      {!isStockAllocationMode && isDuplicateCV && (
                         <p className="text-[10px] text-red-600 dark:text-red-400 font-bold flex items-center gap-1 animate-in slide-in-from-top-1">
                           <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span> This CV# is already in use!
                         </p>
@@ -1694,14 +1718,28 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                         value={headerData.tin} onChange={handleHeaderChange} />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">OR / INV # <span className="text-blue-500 font-bold">* (At least one)</span></label>
+                      <label className={`text-xs font-semibold flex items-center justify-between ${
+                        isStockAllocationMode ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
+                      }`}>
+                        <span>OR / INV # <span className="text-blue-500 font-bold">* (At least one)</span></span>
+                        {isStockAllocationMode && <span className="text-[9px] font-black bg-emerald-600 text-white px-1.5 py-0.5 rounded uppercase tracking-wider">LOCKED</span>}
+                      </label>
                       <input type="text" name="or_inv_no" placeholder="Receipt No."
-                        className={`w-full p-2 rounded-md text-sm outline-none font-bold transition-all duration-200 ${isDuplicateOR
-                          ? 'border-2 border-red-500 dark:border-red-400 text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 focus:ring-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
-                          : 'border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400'
-                          }`}
-                        value={headerData.or_inv_no} onChange={handleHeaderChange} />
-                      {isDuplicateOR && (
+                        readOnly={isStockAllocationMode}
+                        className={`w-full p-2 rounded-md text-sm outline-none font-bold transition-all duration-200 ${
+                          isStockAllocationMode
+                            ? 'border border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-100 bg-emerald-50 dark:bg-emerald-950/50 cursor-not-allowed'
+                            : isDuplicateOR
+                              ? 'border-2 border-red-500 dark:border-red-400 text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 focus:ring-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
+                              : 'border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400'
+                        }`}
+                        value={headerData.or_inv_no}
+                        onChange={(e) => {
+                          if (isStockAllocationMode) return;
+                          handleHeaderChange(e);
+                        }}
+                      />
+                      {!isStockAllocationMode && isDuplicateOR && (
                         <p className="text-[10px] text-red-600 dark:text-red-400 font-bold flex items-center gap-1 animate-in slide-in-from-top-1">
                           <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span> This OR/INV# is already in use!
                         </p>
