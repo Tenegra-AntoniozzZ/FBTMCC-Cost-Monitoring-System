@@ -698,7 +698,7 @@ app.get('/api/disbursements/export', authenticateToken, async (req, res) => {
 
     // Parse expenses and collect dynamic categories
     const allCategories = new Set();
-    const processedRows = filtered.map(row => {
+    let processedRows = filtered.map(row => {
       let expenses = [];
       try {
         expenses = row.expenses_json ? JSON.parse(row.expenses_json) : [];
@@ -712,6 +712,36 @@ app.get('/api/disbursements/export', authenticateToken, async (req, res) => {
       });
       return { ...row, expenses };
     });
+
+    if (transactionFilter === 'EWT') {
+      processedRows = processedRows.map(row => {
+        let laborNet = 0;
+        let laborEwt = 0;
+        let laborGross = 0;
+
+        row.expenses.forEach(exp => {
+          if (exp.category && exp.category.toUpperCase().includes('LABOR')) {
+            const amt = parseFloat(exp.amount) || 0;
+            laborNet += amt;
+            laborEwt += (amt / 0.98) - amt;
+            laborGross += (amt / 0.98);
+          }
+        });
+
+        return {
+          ...row,
+          net_amount: laborNet,
+          ewt_amount: laborEwt,
+          gross_amount: laborGross,
+          target_cib: laborGross,
+          accts_pay: 0,
+          input_tax: 0,
+          output_tax: 0,
+          stocks_amount: 0,
+          expenses: row.expenses.filter(exp => exp.category && exp.category.toUpperCase().includes('LABOR'))
+        };
+      });
+    }
 
     const dynamicCategories = Array.from(allCategories).sort((a, b) => a.localeCompare(b));
 
