@@ -18,13 +18,13 @@ export default function SearchableDropdown({ options, value, onChange, placehold
         setIsOpen(false);
       }
     }
-    
+
     // Only close on scroll if it's a significant scroll to prevent accidental closes
     // AND if the scroll is NOT coming from within the dropdown itself
     let lastScrollTop = 0;
     function handleScroll(e) {
       if (!isOpen) return;
-      
+
       // If the scroll happened inside the dropdown menu, don't close it
       if (e.target.closest('.dropdown-portal-menu')) return;
 
@@ -37,7 +37,7 @@ export default function SearchableDropdown({ options, value, onChange, placehold
 
     document.addEventListener('mousedown', handleClickOutside);
     window.addEventListener('scroll', handleScroll, true);
-    
+
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       window.removeEventListener('scroll', handleScroll, true);
@@ -52,11 +52,11 @@ export default function SearchableDropdown({ options, value, onChange, placehold
       if (wrapperRef.current) {
         const rect = wrapperRef.current.getBoundingClientRect();
         const spaceBelow = window.innerHeight - rect.bottom;
-        const dropdownHeight = 240; 
-        
+        const dropdownHeight = 240;
+
         const shouldExpandUp = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
         setExpandUp(shouldExpandUp);
-        
+
         setCoords({
           top: rect.top,
           bottom: rect.bottom,
@@ -80,7 +80,7 @@ export default function SearchableDropdown({ options, value, onChange, placehold
       : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500';
 
   const dropdownMenu = (
-    <div 
+    <div
       className="dropdown-portal-menu fixed z-[9999] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-2xl max-h-60 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-100"
       style={{
         top: expandUp ? 'auto' : `${coords.bottom + 4}px`,
@@ -116,20 +116,19 @@ export default function SearchableDropdown({ options, value, onChange, placehold
       </div>
       <div className="overflow-y-auto custom-scrollbar">
         {filteredOptions.length === 0 ? (
-          <div className="p-3 text-sm text-slate-500 dark:text-slate-400 text-center">Walang nahanap na kategorya.</div>
+          <div className="p-3 text-sm text-slate-500 dark:text-slate-400 text-center">No project code found.</div>
         ) : (
           filteredOptions.map((option) => {
             const isDisabled = disabledOptions.includes(option) && option !== value;
             return (
               <div
                 key={option}
-                className={`p-2.5 text-sm transition-colors ${
-                  isDisabled
+                className={`p-2.5 text-sm transition-colors ${isDisabled
                     ? 'text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-60 line-through'
                     : value === option
                       ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 font-semibold cursor-pointer'
                       : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer'
-                }`}
+                  }`}
                 onClick={() => {
                   if (isDisabled) return;
                   onChange(option);
@@ -148,7 +147,7 @@ export default function SearchableDropdown({ options, value, onChange, placehold
   return (
     <div ref={wrapperRef} className="relative w-full">
       <input type="text" required value={value} readOnly className="absolute w-0 h-0 opacity-0 pointer-events-none" />
-      
+
       <div
         className={`w-full flex justify-between items-center cursor-pointer transition-colors ${borderClass} ${hasError ? '' : 'bg-white dark:bg-slate-800'} ${size === 'large' ? 'px-4 py-3 rounded-xl border-2 font-bold' : 'p-2 border rounded-md text-sm'}`}
         onClick={handleToggle}
