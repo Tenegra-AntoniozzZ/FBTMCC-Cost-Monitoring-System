@@ -38,7 +38,7 @@ const TargetProjectDropdown = ({ value, onChange, disabled, selectedProjects }) 
 
   return (
     <div ref={wrapperRef} className="relative">
-      <div 
+      <div
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsOpen(!isOpen); }}
         className="flex items-center justify-between min-w-[140px] gap-2 text-xs font-bold border border-blue-200 dark:border-blue-700/50 rounded-lg px-3 py-1.5 bg-white dark:bg-slate-700 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-slate-600 cursor-pointer transition-all shadow-sm"
       >
@@ -48,14 +48,14 @@ const TargetProjectDropdown = ({ value, onChange, disabled, selectedProjects }) 
 
       {isOpen && (
         <div className="absolute top-full left-0 mt-1 w-full min-w-max bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden z-[100] animate-in fade-in slide-in-from-top-2">
-          <div 
+          <div
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChange('all'); setIsOpen(false); }}
             className={`px-3 py-2 text-xs cursor-pointer transition-colors ${value === 'all' ? 'font-bold bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
           >
             🌐 For All Projects
           </div>
           {selectedProjects.map(pc => (
-            <div 
+            <div
               key={pc}
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChange(pc); setIsOpen(false); }}
               className={`px-3 py-2 text-xs cursor-pointer transition-colors border-t border-slate-100 dark:border-slate-700/50 ${value === pc ? 'font-bold bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
@@ -207,7 +207,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
         let laborNet = 0;
         let laborEwt = 0;
         let laborGross = 0;
-        
+
         if (d.expenses) {
           d.expenses.forEach(exp => {
             if (exp.category && exp.category.toUpperCase().includes('LABOR')) {
@@ -218,7 +218,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
             }
           });
         }
-        
+
         return {
           ...d,
           net_amount: laborNet,
@@ -236,8 +236,8 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
     if (searchQuery.trim() !== '') {
       const query = searchQuery.toLowerCase().trim();
-      result = result.filter(d => 
-        (d.cv_no && d.cv_no.toLowerCase().includes(query)) || 
+      result = result.filter(d =>
+        (d.cv_no && d.cv_no.toLowerCase().includes(query)) ||
         (d.or_inv_no && d.or_inv_no.toLowerCase().includes(query))
       );
     }
@@ -502,7 +502,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
   const isDuplicateCV = useMemo(() => {
     if (!headerData.cv_no) return false;
-    
+
     // Bypass validation if in edit mode and the CV hasn't changed from its original value
     if (editingId) {
       const originalRecord = disbursements.find(d => d.id === editingId);
@@ -518,7 +518,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
   const isDuplicateOR = useMemo(() => {
     if (!headerData.or_inv_no) return false;
-    
+
     // Bypass validation if in edit mode and the OR/INV hasn't changed from its original value
     if (editingId) {
       const originalRecord = disbursements.find(d => d.id === editingId);
@@ -748,8 +748,8 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     setEditingUnderlyingRecords(d.underlying_records || [d]);
 
     // Normalize project_code to an array to prevent crashes when older string data or grouped array data is passed
-    const projCodes = Array.isArray(d.project_code) 
-      ? d.project_code 
+    const projCodes = Array.isArray(d.project_code)
+      ? d.project_code
       : (d.project_code ? String(d.project_code).split(',').map(c => c.trim()).filter(Boolean) : []);
 
     const newHeader = {
@@ -803,11 +803,11 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
             _seenLinesMap: {}
           };
         }
-        
+
         const group = groupsMap[gid];
         const lineId = exp.id || (Date.now() + Math.random());
         let rawAmt = parseFloat(exp.amount) || 0;
-        
+
         if (!group._seenLinesMap[lineId]) {
           group._seenLinesMap[lineId] = { ...exp, amountNum: rawAmt };
         } else {
@@ -822,12 +822,12 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       Object.values(group._seenLinesMap).forEach(expData => {
         const roundedAmt = Math.round(expData.amountNum * 100) / 100;
         const displayStr = roundedAmt % 1 === 0 ? String(roundedAmt) : roundedAmt.toFixed(2);
-        
-        const expWithCommas = { 
-          ...expData, 
-          amount: roundedAmt ? displayStr.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '' 
+
+        const expWithCommas = {
+          ...expData,
+          amount: roundedAmt ? displayStr.replace(/\B(?=(\d{3})+(?!\d))/g, ',') : ''
         };
-        
+
         if (inlineMain.has(expWithCommas.category)) {
           group.constructionLines.push(expWithCommas);
         } else {
@@ -976,11 +976,11 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
             return; // skip — this group targets a different project
           }
 
-          projectExpenses.push({ 
-            ...line, 
-            amount: amt, 
-            groupId: group.id, 
-            targetProject: group.targetProject 
+          projectExpenses.push({
+            ...line,
+            amount: amt,
+            groupId: group.id,
+            targetProject: group.targetProject
           });
           projectTotalDebit += amt;
 
@@ -1026,9 +1026,9 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     });
 
     if (editingId) {
-      setPasswordModal({ 
-        isOpen: true, 
-        action: 'update_group', 
+      setPasswordModal({
+        isOpen: true,
+        action: 'update_group',
         payload: payloads,
         oldIds: editingUnderlyingRecords.map(r => r.id)
       });
@@ -1046,7 +1046,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   const executeDeleteGroup = async (ids) => {
     try {
       const token = localStorage.getItem('fbtmcc_token');
-      const deletePromises = ids.map(id => 
+      const deletePromises = ids.map(id =>
         fetch(`${API_URL}/disbursements/${id}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
@@ -1066,7 +1066,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     } else if (passwordModal.action === 'update_group') {
       try {
         const token = localStorage.getItem('fbtmcc_token');
-        const deletePromises = passwordModal.oldIds.map(id => 
+        const deletePromises = passwordModal.oldIds.map(id =>
           fetch(`${API_URL}/disbursements/${id}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
@@ -1135,7 +1135,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
         const originalRecord = editingId ? disbursements.find(d => d.id === editingId) : null;
         const isSameAsOriginalCV = originalRecord && originalRecord.cv_no && originalRecord.cv_no.trim().toLowerCase() === headerData.cv_no.trim().toLowerCase();
         const isDupCV = !isSameAsOriginalCV && headerData.cv_no && disbursements.some((d) => d.id !== editingId && d.cv_no && d.cv_no.trim().toLowerCase() === headerData.cv_no.trim().toLowerCase());
-        
+
         const isSameAsOriginalOR = originalRecord && originalRecord.or_inv_no && originalRecord.or_inv_no.trim().toLowerCase() === headerData.or_inv_no.trim().toLowerCase();
         const isDupOR = !isSameAsOriginalOR && headerData.or_inv_no && disbursements.some((d) => d.id !== editingId && d.or_inv_no && d.or_inv_no.trim().toLowerCase() === headerData.or_inv_no.trim().toLowerCase());
 
@@ -1158,10 +1158,10 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   useEffect(() => {
     if (initialDisbursementId && groupedDisbursements.length > 0) {
       // Find the grouped record that contains this underlying ID
-      const groupedRecord = groupedDisbursements.find(g => 
+      const groupedRecord = groupedDisbursements.find(g =>
         (g.underlying_records || [g]).some(r => r.id === initialDisbursementId)
       );
-      
+
       if (groupedRecord) {
         const timer = setTimeout(() => {
           handleEditRow(groupedRecord);
@@ -1653,7 +1653,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">OR / INV # <span className="text-blue-500 font-bold">* (At least one)</span></label>
-                      <input type="text" name="or_inv_no" placeholder="Receipt No." 
+                      <input type="text" name="or_inv_no" placeholder="Receipt No."
                         className={`w-full p-2 rounded-md text-sm outline-none font-bold transition-all duration-200 ${isDuplicateOR
                           ? 'border-2 border-red-500 dark:border-red-400 text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 focus:ring-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
                           : 'border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400'
@@ -1744,149 +1744,149 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                       </div>
 
                       <div className="space-y-4">
-                    {costingGroups.map((group, groupIndex) => {
-                      const selectedProjects = Array.isArray(headerData.project_code)
-                        ? headerData.project_code.filter(Boolean)
-                        : (typeof headerData.project_code === 'string' ? headerData.project_code.split(',').map(c => c.trim()).filter(Boolean) : []);
-                      return (
-                        <div key={group.id} className="border-2 border-slate-200 dark:border-slate-600 rounded-xl overflow-hidden shadow-sm animate-in slide-in-from-top-2">
-                          {/* Group Header with Target Selector */}
-                          <div className="bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-700/60 dark:to-slate-700/30 px-4 py-2.5 flex items-center justify-between border-b border-slate-200 dark:border-slate-600">
-                            <div className="flex items-center gap-3 flex-wrap">
-                              <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-md">
-                                Group {groupIndex + 1}
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">→ Apply costs to:</span>
-                                <TargetProjectDropdown
-                                  value={group.targetProject}
-                                  onChange={(val) => updateGroupTarget(group.id, val)}
-                                  disabled={selectedProjects.length <= 1}
-                                  selectedProjects={selectedProjects}
-                                />
+                        {costingGroups.map((group, groupIndex) => {
+                          const selectedProjects = Array.isArray(headerData.project_code)
+                            ? headerData.project_code.filter(Boolean)
+                            : (typeof headerData.project_code === 'string' ? headerData.project_code.split(',').map(c => c.trim()).filter(Boolean) : []);
+                          return (
+                            <div key={group.id} className="border-2 border-slate-200 dark:border-slate-600 rounded-xl overflow-hidden shadow-sm animate-in slide-in-from-top-2">
+                              {/* Group Header with Target Selector */}
+                              <div className="bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-700/60 dark:to-slate-700/30 px-4 py-2.5 flex items-center justify-between border-b border-slate-200 dark:border-slate-600">
+                                <div className="flex items-center gap-3 flex-wrap">
+                                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-md">
+                                    Group {groupIndex + 1}
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">→ Apply costs to:</span>
+                                    <TargetProjectDropdown
+                                      value={group.targetProject}
+                                      onChange={(val) => updateGroupTarget(group.id, val)}
+                                      disabled={selectedProjects.length <= 1}
+                                      selectedProjects={selectedProjects}
+                                    />
+                                  </div>
+                                  {group.targetProject !== 'all' && (
+                                    <span className="text-[9px] font-black bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                      Specific Project
+                                    </span>
+                                  )}
+                                </div>
+                                {costingGroups.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeCostingGroup(group.id)}
+                                    className="p-1.5 text-slate-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors shrink-0"
+                                    title="Remove this costing group"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
                               </div>
-                              {group.targetProject !== 'all' && (
-                                <span className="text-[9px] font-black bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                  Specific Project
-                                </span>
-                              )}
-                            </div>
-                            {costingGroups.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => removeCostingGroup(group.id)}
-                                className="p-1.5 text-slate-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors shrink-0"
-                                title="Remove this costing group"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            )}
-                          </div>
 
-                          <div className="p-4 space-y-4 bg-white dark:bg-slate-800/50">
-                            {/* Cost Monitoring Breakdown */}
-                            <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors duration-300">
-                              <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100 dark:border-slate-700">
-                                <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-                                  Cost Monitoring Breakdown {groupIndex === 0 && <span className="text-red-500">*</span>}
-                                </h3>
-                                <button type="button" onClick={() => addLine(group.id, 'construction')} disabled={targetCib <= 0 || isAddingLine}
-                                  className="text-xs bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-md font-medium flex items-center gap-1 transition-colors disabled:opacity-50 min-w-[100px] justify-center">
-                                  {isAddingLine ? <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce"></span> Adding...</span> : <><Plus size={13} /> Add Line Item</>}
-                                </button>
-                              </div>
-                              <div className="max-h-[200px] overflow-y-auto pr-2 custom-scrollbar space-y-2">
-                                {group.constructionLines.map((line, index) => (
-                                  <div key={line.id} className="flex gap-2 items-start animate-in slide-in-from-top-2">
-                                    <div className="w-7 h-8 mt-1 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded flex items-center justify-center text-xs font-bold text-slate-400 dark:text-slate-500 shrink-0">
-                                      {index + 1}
-                                    </div>
-                                    <div className="flex-1">
-                                      <SearchableDropdown
-                                        options={mainCategoriesList}
-                                        value={line.category}
-                                        onChange={(val) => handleLineChange(group.id, line.id, 'category', val, 'construction')}
-                                        placeholder="-- Find Construction Category --"
-                                        hasError={lineErrors.includes(line.id)}
-                                        disabledOptions={usedMainCategories}
-                                      />
-                                    </div>
-                                    <div className="w-36 relative mt-1">
-                                      <span className="absolute left-2.5 top-2 text-slate-400 dark:text-slate-500 text-sm font-medium">₱</span>
-                                      <input type="text" placeholder="0.00"
-                                        className="w-full pl-7 p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-right text-slate-800 dark:text-white transition-colors"
-                                        value={line.amount} onChange={(e) => handleLineChange(group.id, line.id, 'amount', e.target.value, 'construction')} />
-                                    </div>
-                                    <button type="button" onClick={() => removeLine(group.id, line.id, 'construction')}
-                                      disabled={group.constructionLines.length + group.miscLines.length <= 1}
-                                      className="p-2 mt-1 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-30 disabled:hover:bg-transparent">
-                                      <Trash2 size={16} />
+                              <div className="p-4 space-y-4 bg-white dark:bg-slate-800/50">
+                                {/* Cost Monitoring Breakdown */}
+                                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors duration-300">
+                                  <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100 dark:border-slate-700">
+                                    <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                                      Main Categories Breakdown {groupIndex === 0 && <span className="text-red-500">*</span>}
+                                    </h3>
+                                    <button type="button" onClick={() => addLine(group.id, 'construction')} disabled={targetCib <= 0 || isAddingLine}
+                                      className="text-xs bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-md font-medium flex items-center gap-1 transition-colors disabled:opacity-50 min-w-[100px] justify-center">
+                                      {isAddingLine ? <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce"></span> Adding...</span> : <><Plus size={13} /> Add Line Item</>}
                                     </button>
                                   </div>
-                                ))}
-                              </div>
-                              <div className="mt-3 pt-2 text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700 italic">
-                                * If "Labor /SUBCONTRACTOR" or "LABOR/PAYROLL" is chosen, it will calculate automatically by 2% for the EWT Payable.
-                              </div>
-                            </div>
-
-                            {/* Miscellaneous Cost */}
-                            <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors duration-300">
-                              <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100 dark:border-slate-700">
-                                <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Miscellaneous Cost</h3>
-                                <button type="button" onClick={() => addLine(group.id, 'misc')} disabled={targetCib <= 0 || isAddingLine}
-                                  className="text-xs bg-teal-50 dark:bg-teal-900/30 hover:bg-teal-100 dark:hover:bg-teal-900/50 text-teal-700 dark:text-teal-400 px-3 py-1.5 rounded-md font-medium flex items-center gap-1 transition-colors disabled:opacity-50 min-w-[100px] justify-center border border-teal-100 dark:border-teal-800">
-                                  <Plus size={13} /> Add Misc Item
-                                </button>
-                              </div>
-                              <div className="max-h-[200px] overflow-y-auto pr-2 custom-scrollbar space-y-2">
-                                {group.miscLines.length === 0 ? (
-                                  <div className="py-6 text-center border-2 border-dashed border-slate-100 dark:border-slate-700 rounded-xl">
-                                    <p className="text-slate-400 dark:text-slate-500 text-xs font-medium">No miscellaneous cost added.</p>
+                                  <div className="max-h-[200px] overflow-y-auto pr-2 custom-scrollbar space-y-2">
+                                    {group.constructionLines.map((line, index) => (
+                                      <div key={line.id} className="flex gap-2 items-start animate-in slide-in-from-top-2">
+                                        <div className="w-7 h-8 mt-1 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded flex items-center justify-center text-xs font-bold text-slate-400 dark:text-slate-500 shrink-0">
+                                          {index + 1}
+                                        </div>
+                                        <div className="flex-1">
+                                          <SearchableDropdown
+                                            options={mainCategoriesList}
+                                            value={line.category}
+                                            onChange={(val) => handleLineChange(group.id, line.id, 'category', val, 'construction')}
+                                            placeholder="-- Find Construction Category --"
+                                            hasError={lineErrors.includes(line.id)}
+                                            disabledOptions={usedMainCategories}
+                                          />
+                                        </div>
+                                        <div className="w-36 relative mt-1">
+                                          <span className="absolute left-2.5 top-2 text-slate-400 dark:text-slate-500 text-sm font-medium">₱</span>
+                                          <input type="text" placeholder="0.00"
+                                            className="w-full pl-7 p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-right text-slate-800 dark:text-white transition-colors"
+                                            value={line.amount} onChange={(e) => handleLineChange(group.id, line.id, 'amount', e.target.value, 'construction')} />
+                                        </div>
+                                        <button type="button" onClick={() => removeLine(group.id, line.id, 'construction')}
+                                          disabled={group.constructionLines.length + group.miscLines.length <= 1}
+                                          className="p-2 mt-1 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-30 disabled:hover:bg-transparent">
+                                          <Trash2 size={16} />
+                                        </button>
+                                      </div>
+                                    ))}
                                   </div>
-                                ) : group.miscLines.map((line, index) => (
-                                  <div key={line.id} className="flex gap-2 items-start animate-in slide-in-from-top-2">
-                                    <div className="w-7 h-8 mt-1 bg-teal-50/50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800/50 rounded flex items-center justify-center text-xs font-bold text-teal-600 dark:text-teal-400 shrink-0">
-                                      {index + 1}
-                                    </div>
-                                    <div className="flex-1">
-                                      <SearchableDropdown
-                                        options={miscCategoriesList}
-                                        value={line.category}
-                                        onChange={(val) => handleLineChange(group.id, line.id, 'category', val, 'misc')}
-                                        placeholder="-- Find Miscellaneous Item --"
-                                        hasError={lineErrors.includes(line.id)}
-                                        disabledOptions={usedMiscCategories}
-                                      />
-                                    </div>
-                                    <div className="w-36 relative mt-1">
-                                      <span className="absolute left-2.5 top-2 text-slate-400 dark:text-slate-500 text-sm font-medium">₱</span>
-                                      <input type="text" placeholder="0.00"
-                                        className="w-full pl-7 p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-right text-slate-800 dark:text-white transition-colors"
-                                        value={line.amount} onChange={(e) => handleLineChange(group.id, line.id, 'amount', e.target.value, 'misc')} />
-                                    </div>
-                                    <button type="button" onClick={() => removeLine(group.id, line.id, 'misc')}
-                                      className="p-2 mt-1 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors">
-                                      <Trash2 size={16} />
+                                  <div className="mt-3 pt-2 text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700 italic">
+                                    * If "Labor /SUBCONTRACTOR" or "LABOR/PAYROLL" is chosen, it will calculate automatically by 2% for the EWT Payable.
+                                  </div>
+                                </div>
+
+                                {/* Miscellaneous Cost */}
+                                <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors duration-300">
+                                  <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100 dark:border-slate-700">
+                                    <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">Miscellaneous Cost</h3>
+                                    <button type="button" onClick={() => addLine(group.id, 'misc')} disabled={targetCib <= 0 || isAddingLine}
+                                      className="text-xs bg-teal-50 dark:bg-teal-900/30 hover:bg-teal-100 dark:hover:bg-teal-900/50 text-teal-700 dark:text-teal-400 px-3 py-1.5 rounded-md font-medium flex items-center gap-1 transition-colors disabled:opacity-50 min-w-[100px] justify-center border border-teal-100 dark:border-teal-800">
+                                      <Plus size={13} /> Add Misc Item
                                     </button>
                                   </div>
-                                ))}
+                                  <div className="max-h-[200px] overflow-y-auto pr-2 custom-scrollbar space-y-2">
+                                    {group.miscLines.length === 0 ? (
+                                      <div className="py-6 text-center border-2 border-dashed border-slate-100 dark:border-slate-700 rounded-xl">
+                                        <p className="text-slate-400 dark:text-slate-500 text-xs font-medium">No miscellaneous cost added.</p>
+                                      </div>
+                                    ) : group.miscLines.map((line, index) => (
+                                      <div key={line.id} className="flex gap-2 items-start animate-in slide-in-from-top-2">
+                                        <div className="w-7 h-8 mt-1 bg-teal-50/50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800/50 rounded flex items-center justify-center text-xs font-bold text-teal-600 dark:text-teal-400 shrink-0">
+                                          {index + 1}
+                                        </div>
+                                        <div className="flex-1">
+                                          <SearchableDropdown
+                                            options={miscCategoriesList}
+                                            value={line.category}
+                                            onChange={(val) => handleLineChange(group.id, line.id, 'category', val, 'misc')}
+                                            placeholder="-- Find Miscellaneous Item --"
+                                            hasError={lineErrors.includes(line.id)}
+                                            disabledOptions={usedMiscCategories}
+                                          />
+                                        </div>
+                                        <div className="w-36 relative mt-1">
+                                          <span className="absolute left-2.5 top-2 text-slate-400 dark:text-slate-500 text-sm font-medium">₱</span>
+                                          <input type="text" placeholder="0.00"
+                                            className="w-full pl-7 p-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-right text-slate-800 dark:text-white transition-colors"
+                                            value={line.amount} onChange={(e) => handleLineChange(group.id, line.id, 'amount', e.target.value, 'misc')} />
+                                        </div>
+                                        <button type="button" onClick={() => removeLine(group.id, line.id, 'misc')}
+                                          className="p-2 mt-1 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors">
+                                          <Trash2 size={16} />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                          );
+                        })}
 
-                    {/* Add Another Costing Button */}
-                    <button
-                      type="button"
-                      onClick={addCostingGroup}
-                      disabled={targetCib <= 0}
-                      className="w-full py-3 border-2 border-dashed border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-600 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 text-blue-500 dark:text-blue-400 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                    >
-                      <Plus size={15} /> Add Another Costing
-                    </button>
+                        {/* Add Another Costing Button */}
+                        <button
+                          type="button"
+                          onClick={addCostingGroup}
+                          disabled={targetCib <= 0}
+                          className="w-full py-3 border-2 border-dashed border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-600 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 text-blue-500 dark:text-blue-400 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          <Plus size={15} /> Add Another Costing
+                        </button>
                       </div>
                     </div>
 
