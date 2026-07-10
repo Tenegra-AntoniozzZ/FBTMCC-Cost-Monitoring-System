@@ -69,7 +69,7 @@ const TargetProjectDropdown = ({ value, onChange, disabled, selectedProjects }) 
   );
 };
 
-export default function DisbursementScreen({ projects, categories, categoryObjects, disbursements, refreshData, isLoading, userRole, initialSearchQuery, initialDisbursementId, onClearInitialDisbursement, onModalStateChange }) {
+export default function DisbursementScreen({ projects, categories, categoryObjects, disbursements, refreshData, isLoading, userRole, initialSearchQuery, initialDisbursementId, initialStockAllocation, onClearInitialDisbursement, onModalStateChange }) {
   const canEdit = userRole === 'encoder';
 
   // ==========================================
@@ -95,6 +95,8 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
   const [passwordModal, setPasswordModal] = useState({ isOpen: false, action: null, payload: null });
   const [isAddingLine, setIsAddingLine] = useState(false);
+  const [isStockAllocationMode, setIsStockAllocationMode] = useState(false);
+  const [stockAllocationSource, setStockAllocationSource] = useState(null);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery || '');
@@ -547,6 +549,8 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     setIsAddStocksChecked(false);
     setStocksAmount('');
     setStockDescription('');
+    setIsStockAllocationMode(false);
+    setStockAllocationSource(null);
   };
 
   const closeAndResetModal = () => {
@@ -1021,7 +1025,12 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
         net_amount: projNet,
         stocks_amount: projStocksAmount,
         stock_description: isAddStocksChecked ? stockDescription.trim() : '',
-        created_at: editingId ? (editingUnderlyingRecords[0]?.created_at || new Date().toISOString()) : new Date().toISOString()
+        created_at: editingId ? (editingUnderlyingRecords[0]?.created_at || new Date().toISOString()) : new Date().toISOString(),
+        // Stock Allocation Mode flags
+        ...(isStockAllocationMode && stockAllocationSource ? {
+          is_stock_allocation: true,
+          source_stock_cv: stockAllocationSource.cv_no
+        } : {})
       };
     });
 
@@ -1184,8 +1193,26 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   }, [initialDisbursementId, groupedDisbursements]);
 
   // ==========================================
-  // RENDER UI
+  // STOCK ALLOCATION MODE — auto-open and pre-fill
   // ==========================================
+  useEffect(() => {
+    if (initialStockAllocation && !editingId) {
+      const { cv_no, stock_description, stocks_amount } = initialStockAllocation;
+      const formattedAmount = stocks_amount
+        ? stocks_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })
+        : '0.00';
+      setIsStockAllocationMode(true);
+      setStockAllocationSource(initialStockAllocation);
+      setHeaderData(prev => ({
+        ...prev,
+        target_cib: formattedAmount,
+        particulars: `Stock Allocation from CV# ${cv_no} — ${stock_description || 'N/A'}`
+      }));
+      setIsModalOpen(true);
+      if (onClearInitialDisbursement) onClearInitialDisbursement();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialStockAllocation]);
   const usedMainCategories = costingGroups.flatMap(g => g.constructionLines.map(l => l.category)).filter(Boolean);
   const usedMiscCategories = costingGroups.flatMap(g => g.miscLines.map(l => l.category)).filter(Boolean);
 
@@ -1569,10 +1596,12 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-slate-800 dark:text-white leading-tight">
-                    {editingId ? 'Edit Disbursement Voucher' : 'Disbursement Voucher Entry'}
+                    {isStockAllocationMode ? 'Stock Allocation Entry' : editingId ? 'Edit Disbursement Voucher' : 'Disbursement Voucher Entry'}
                   </h2>
                   <p className="text-slate-500 dark:text-slate-400 text-xs">
-                    {editingId ? 'Update the fund details and save.' : 'Complete all required fund details below.'}
+                    {isStockAllocationMode
+                      ? `Allocating stock from CV# ${stockAllocationSource?.cv_no} — categorize where this stock will be used.`
+                      : editingId ? 'Update the fund details and save.' : 'Complete all required fund details below.'}
                   </p>
                 </div>
               </div>
@@ -1588,6 +1617,19 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                   <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 text-red-700 dark:text-red-400 p-4 rounded-xl text-sm font-medium animate-in fade-in flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-red-600 dark:bg-red-500 animate-pulse"></span>
                     {errorMessage}
+                  </div>
+                )}
+
+                {isStockAllocationMode && stockAllocationSource && (
+                  <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-xl p-4 flex items-start gap-3 animate-in fade-in">
+                    <span className="text-2xl">📦</span>
+                    <div>
+                      <p className="text-sm font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">Stock Allocation Mode Active</p>
+                      <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium mt-0.5">
+                        You are allocating <span className="font-black">₱{stockAllocationSource.stocks_amount?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> of stock from <span className="font-black">CV# {stockAllocationSource.cv_no}</span> ({stockAllocationSource.stock_description || 'N/A'}).
+                        The Target CIB is locked to the available stock amount.
+                      </p>
+                    </div>
                   </div>
                 )}
 
@@ -1678,13 +1720,28 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                         value={headerData.check_no} onChange={handleHeaderChange} />
                     </div>
 
-                    <div className="space-y-1 bg-blue-50 dark:bg-blue-900/20 p-2 -mt-2 -mb-2 rounded-md border border-blue-100 dark:border-blue-800 flex flex-col justify-center shadow-inner transition-colors duration-300">
-                      <label className="text-xs font-bold text-blue-800 dark:text-blue-300 uppercase flex items-center justify-between">
+                    <div className={`space-y-1 p-2 -mt-2 -mb-2 rounded-md border flex flex-col justify-center shadow-inner transition-colors duration-300 ${
+                        isStockAllocationMode
+                          ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800'
+                          : 'bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800'
+                      }`}>
+                      <label className={`text-xs font-bold uppercase flex items-center justify-between ${
+                        isStockAllocationMode ? 'text-emerald-800 dark:text-emerald-300' : 'text-blue-800 dark:text-blue-300'
+                      }`}>
                         <span>Target CIB/COH (₱) <span className="text-red-500">*</span></span>
+                        {isStockAllocationMode && (
+                          <span className="text-[9px] font-black bg-emerald-600 text-white px-1.5 py-0.5 rounded uppercase tracking-wider">LOCKED</span>
+                        )}
                       </label>
                       <input type="text" name="target_cib" placeholder="0.00"
-                        className="w-full p-1.5 border border-blue-200 dark:border-blue-700 rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none font-black text-blue-900 dark:text-blue-100 bg-white dark:bg-slate-800 transition-colors"
+                        readOnly={isStockAllocationMode}
+                        className={`w-full p-1.5 border rounded-md text-sm focus:ring-2 outline-none font-black transition-colors ${
+                          isStockAllocationMode
+                            ? 'border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-100 bg-emerald-50 dark:bg-emerald-950/50 focus:ring-emerald-400 cursor-not-allowed'
+                            : 'border-blue-200 dark:border-blue-700 text-blue-900 dark:text-blue-100 bg-white dark:bg-slate-800 focus:ring-blue-500'
+                        }`}
                         value={headerData.target_cib} onChange={(e) => {
+                          if (isStockAllocationMode) return;
                           let val = e.target.value.replace(/[^0-9.]/g, '');
                           const parts = val.split('.');
                           if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');

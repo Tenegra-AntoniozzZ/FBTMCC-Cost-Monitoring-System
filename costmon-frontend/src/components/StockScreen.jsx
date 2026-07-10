@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Loader2, Search, Edit } from 'lucide-react';
+import { Package, Loader2, Search, Edit, ShoppingCart } from 'lucide-react';
 import { API_URL } from '../utils/Constants';
 
-export default function StocksScreen({ onNavigateToDisbursement }) {
+export default function StocksScreen({ onNavigateToDisbursement, onUseStock }) {
     const [disbursements, setDisbursements] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
@@ -72,7 +72,7 @@ export default function StocksScreen({ onNavigateToDisbursement }) {
                                     <th className="px-6 py-4 whitespace-nowrap">Invoice #</th>
                                     <th className="px-6 py-4 whitespace-nowrap">Item Description</th>
                                     <th className="px-6 py-4 whitespace-nowrap text-right">Stocks Amount</th>
-                                    <th className="px-6 py-4 whitespace-nowrap text-center w-24">Action</th>
+                                    <th className="px-6 py-4 whitespace-nowrap text-center w-40">Action</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -112,14 +112,27 @@ export default function StocksScreen({ onNavigateToDisbursement }) {
                                             <td className="px-6 py-4 text-right font-mono font-black text-slate-900 dark:text-white w-48 border-r border-slate-100 dark:border-slate-700">
                                                 ₱ {parseFloat(record.stocks_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                             </td>
-                                            <td className="px-6 py-4 text-center w-24">
-                                                <button
-                                                    onClick={() => onNavigateToDisbursement && onNavigateToDisbursement(record.cv_no, record.id)}
-                                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 dark:text-blue-400 font-bold text-xs rounded-lg transition-colors shadow-sm"
-                                                    title="Edit Disbursement"
-                                                >
-                                                    <Edit size={14} /> Edit
-                                                </button>
+                                            <td className="px-6 py-4 text-center w-40">
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <button
+                                                        onClick={() => onNavigateToDisbursement && onNavigateToDisbursement(record.cv_no, record.id)}
+                                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 dark:text-blue-400 font-bold text-xs rounded-lg transition-colors shadow-sm"
+                                                        title="Edit Disbursement"
+                                                    >
+                                                        <Edit size={14} /> Edit
+                                                    </button>
+                                                    <button
+                                                        onClick={() => onUseStock && onUseStock({
+                                                            cv_no: record.cv_no,
+                                                            stock_description: record.stock_description,
+                                                            stocks_amount: parseFloat(record.stocks_amount)
+                                                        })}
+                                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 dark:text-emerald-400 font-bold text-xs rounded-lg transition-colors shadow-sm border border-emerald-200 dark:border-emerald-800"
+                                                        title="Allocate / Use this Stock"
+                                                    >
+                                                        <ShoppingCart size={14} /> Use Stock
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))

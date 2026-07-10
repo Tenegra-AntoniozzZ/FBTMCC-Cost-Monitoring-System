@@ -26,6 +26,7 @@ export default function App() {
   const [initialCostMonitoringProjectId, setInitialCostMonitoringProjectId] = useState(null);
   const [initialDisbursementSearch, setInitialDisbursementSearch] = useState('');
   const [initialDisbursementId, setInitialDisbursementId] = useState(null);
+  const [initialStockAllocationData, setInitialStockAllocationData] = useState(null);
 
   const [projects, setProjects] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -269,6 +270,14 @@ export default function App() {
   const navigateToDisbursement = (cvNo, disbursementId = null) => {
     setInitialDisbursementSearch(cvNo || '');
     setInitialDisbursementId(disbursementId);
+    setInitialStockAllocationData(null);
+    handleNavigation('/disbursements');
+  };
+
+  const navigateToNewDisbursementWithStock = (stockData) => {
+    setInitialDisbursementSearch('');
+    setInitialDisbursementId(null);
+    setInitialStockAllocationData(stockData);
     handleNavigation('/disbursements');
   };
 
@@ -375,9 +384,11 @@ export default function App() {
                 userRole={userRole} 
                 initialSearchQuery={initialDisbursementSearch} 
                 initialDisbursementId={initialDisbursementId}
+                initialStockAllocation={initialStockAllocationData}
                 onClearInitialDisbursement={() => {
                   setInitialDisbursementSearch('');
                   setInitialDisbursementId(null);
+                  setInitialStockAllocationData(null);
                 }}
                 onModalStateChange={setIsAnyModalOpen} 
               />
@@ -443,7 +454,10 @@ export default function App() {
           <Route 
             path="/stocks" 
             element={
-              <StocksScreen onNavigateToDisbursement={navigateToDisbursement} />
+              <StocksScreen 
+                onNavigateToDisbursement={navigateToDisbursement}
+                onUseStock={navigateToNewDisbursementWithStock}
+              />
             } 
           />
         </Routes>
