@@ -612,7 +612,7 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
             monthlyMap[key] = (monthlyMap[key] || 0) + (d.gross_amount || 0);
           });
           const monthlyData = Object.entries(monthlyMap).sort(([a], [b]) => a.localeCompare(b)).slice(-12).map(([month, total]) => ({
-            month: new Date(month + '-01').toLocaleString('en-US', { month: 'short', year: '2-digit' }),
+            month: new Date(month + '-01').toLocaleString('en-US', { month: 'long', year: 'numeric' }),
             total: Math.round(total)
           }));
 
