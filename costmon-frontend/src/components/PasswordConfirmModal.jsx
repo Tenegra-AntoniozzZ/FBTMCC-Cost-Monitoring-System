@@ -27,8 +27,8 @@ export default function PasswordConfirmModal({ isOpen, onClose, onConfirm, actio
     setError('');
     setIsVerifying(true);
 
-    const username = localStorage.getItem('fbtmcc_username');
-    const token = localStorage.getItem('fbtmcc_token'); 
+    const username = sessionStorage.getItem('fbtmcc_username');
+    const token = sessionStorage.getItem('fbtmcc_token'); 
 
     try {
       const res = await fetch(`${API_URL}/verify-password`, {

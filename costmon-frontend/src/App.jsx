@@ -21,8 +21,8 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [userRole, setUserRole] = useState(() => localStorage.getItem('fbtmcc_role'));
-  const [activeUsername, setActiveUsername] = useState(() => localStorage.getItem('fbtmcc_username') || '');
+  const [userRole, setUserRole] = useState(() => sessionStorage.getItem('fbtmcc_role'));
+  const [activeUsername, setActiveUsername] = useState(() => sessionStorage.getItem('fbtmcc_username') || '');
   const [initialCostMonitoringProjectId, setInitialCostMonitoringProjectId] = useState(null);
   const [initialDisbursementSearch, setInitialDisbursementSearch] = useState('');
   const [initialDisbursementId, setInitialDisbursementId] = useState(null);
@@ -124,7 +124,7 @@ export default function App() {
 
   const fetchAllData = useCallback(async () => {
     setIsLoading(true);
-    const token = localStorage.getItem('fbtmcc_token');
+    const token = sessionStorage.getItem('fbtmcc_token');
     const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
     try {
       const [disbRes, projRes, catRes] = await Promise.all([
@@ -191,7 +191,7 @@ export default function App() {
       method: 'PUT',
       headers: { 
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
+        'Authorization': `Bearer ${sessionStorage.getItem('fbtmcc_token')}`
       },
       body: JSON.stringify(cleanValues)
     });
@@ -220,18 +220,18 @@ export default function App() {
   };
 
   const handleLogin = (role, username, token) => {
-    localStorage.setItem('fbtmcc_token', token);
-    localStorage.setItem('fbtmcc_role', role);
-    localStorage.setItem('fbtmcc_username', username);
+    sessionStorage.setItem('fbtmcc_token', token);
+    sessionStorage.setItem('fbtmcc_role', role);
+    sessionStorage.setItem('fbtmcc_username', username);
     setUserRole(role);
     setActiveUsername(username);
     navigate('/dashboard');
   };
 
   const executeLogout = () => {
-    localStorage.removeItem('fbtmcc_token');
-    localStorage.removeItem('fbtmcc_role');
-    localStorage.removeItem('fbtmcc_username');
+    sessionStorage.removeItem('fbtmcc_token');
+    sessionStorage.removeItem('fbtmcc_role');
+    sessionStorage.removeItem('fbtmcc_username');
     
     setInitialDisbursementSearch('');
     setInitialCostMonitoringProjectId(null);
@@ -425,7 +425,7 @@ export default function App() {
             path="/admin" 
             element={
               userRole === 'ceo' ? (
-                <AdminScreen currentUser={{ id: localStorage.getItem('fbtmcc_user_id'), username: activeUsername }} isDark={isDarkMode} />
+                <AdminScreen currentUser={{ id: sessionStorage.getItem('fbtmcc_user_id'), username: activeUsername }} isDark={isDarkMode} />
               ) : (
                 <Navigate to="/dashboard" replace />
               )

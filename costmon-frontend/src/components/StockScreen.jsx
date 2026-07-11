@@ -10,7 +10,7 @@ export default function StocksScreen({ onNavigateToDisbursement, onUseStock }) {
     useEffect(() => {
         const fetchDisbursements = async () => {
             try {
-                const token = localStorage.getItem('fbtmcc_token');
+                const token = sessionStorage.getItem('fbtmcc_token');
                 const res = await fetch(`${API_URL}/disbursements`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });

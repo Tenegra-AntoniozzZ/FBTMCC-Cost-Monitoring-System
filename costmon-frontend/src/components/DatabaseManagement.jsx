@@ -307,7 +307,7 @@ export default function DatabaseManagement() {
     setPendingAction(null);
   };
 
-  const getAuthHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('fbtmcc_token')}` });
+  const getAuthHeaders = () => ({ Authorization: `Bearer ${sessionStorage.getItem('fbtmcc_token')}` });
 
   // ── Export ──────────────────────────────────────────────────
   const handleExportConfirm = async (password) => {

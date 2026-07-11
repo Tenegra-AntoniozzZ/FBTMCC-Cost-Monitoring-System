@@ -69,7 +69,7 @@ export default function AuditLogScreen({ isDark }) {
   const [filterStart,    setFilterStart]    = useState('');
   const [filterEnd,      setFilterEnd]      = useState('');
 
-  const token = localStorage.getItem('fbtmcc_token');
+  const token = sessionStorage.getItem('fbtmcc_token');
 
   const fetchLogs = async (pg = 1) => {
     setIsLoading(true);

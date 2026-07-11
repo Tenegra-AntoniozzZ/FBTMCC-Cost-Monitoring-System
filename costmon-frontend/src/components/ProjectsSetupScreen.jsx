@@ -104,7 +104,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
+          'Authorization': `Bearer ${sessionStorage.getItem('fbtmcc_token')}`
         },
         body: JSON.stringify({
           ...newProject,
@@ -133,7 +133,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
+          'Authorization': `Bearer ${sessionStorage.getItem('fbtmcc_token')}`
         },
         body: JSON.stringify({
           ...editingProject,
@@ -163,7 +163,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
       const response = await fetch(`${API_URL}/projects/${project.id}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
+          'Authorization': `Bearer ${sessionStorage.getItem('fbtmcc_token')}`
         }
       });
       if (response.ok) {
@@ -203,7 +203,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
+          'Authorization': `Bearer ${sessionStorage.getItem('fbtmcc_token')}`
         },
         body: JSON.stringify({ name: finalName })
       });
@@ -235,7 +235,7 @@ export default function ProjectsSetupScreen({ projects, categories, refreshData,
       const response = await fetch(`${API_URL}/categories/${category.id}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('fbtmcc_token')}`
+          'Authorization': `Bearer ${sessionStorage.getItem('fbtmcc_token')}`
         }
       });
       if (response.ok) {

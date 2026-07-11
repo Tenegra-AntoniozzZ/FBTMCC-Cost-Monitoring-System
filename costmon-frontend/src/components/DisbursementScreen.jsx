@@ -370,7 +370,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       if (selectedYears.length > 0) params.append('years', selectedYears.join(','));
       if (selectedTransactionFilter !== 'All') params.append('transactionFilter', selectedTransactionFilter);
 
-      const token = localStorage.getItem('fbtmcc_token');
+      const token = sessionStorage.getItem('fbtmcc_token');
       const response = await fetch(`${API_URL}/disbursements/export?${params}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -895,7 +895,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   const executeSave = async (disbursementData) => {
     setIsSaving(true);
     try {
-      const token = localStorage.getItem('fbtmcc_token');
+      const token = sessionStorage.getItem('fbtmcc_token');
       const payloads = Array.isArray(disbursementData) ? disbursementData : [disbursementData];
 
       const newPayloads = payloads.filter(data => !(typeof data.id === 'number' || (typeof data.id === 'string' && !data.id.startsWith('new_'))));
@@ -1131,7 +1131,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
   const executeDeleteGroup = async (ids) => {
     try {
-      const token = localStorage.getItem('fbtmcc_token');
+      const token = sessionStorage.getItem('fbtmcc_token');
       const deletePromises = ids.map(id =>
         fetch(`${API_URL}/disbursements/${id}`, {
           method: 'DELETE',
@@ -1151,7 +1151,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       executeSave(passwordModal.payload);
     } else if (passwordModal.action === 'update_group') {
       try {
-        const token = localStorage.getItem('fbtmcc_token');
+        const token = sessionStorage.getItem('fbtmcc_token');
         const deletePromises = passwordModal.oldIds.map(id =>
           fetch(`${API_URL}/disbursements/${id}`, {
             method: 'DELETE',
@@ -2149,7 +2149,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                               try {
                                 const formData = new FormData();
                                 formData.append('receipt', file);
-                                const token = localStorage.getItem('fbtmcc_token');
+                                const token = sessionStorage.getItem('fbtmcc_token');
                                 const res = await fetch(`${API_URL}/disbursements/${editingId}/upload`, {
                                   method: 'POST',
                                   headers: { Authorization: `Bearer ${token}` },
@@ -2180,7 +2180,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                               try {
                                 const formData = new FormData();
                                 formData.append('receipt', file);
-                                const token = localStorage.getItem('fbtmcc_token');
+                                const token = sessionStorage.getItem('fbtmcc_token');
                                 const res = await fetch(`${API_URL}/disbursements/${editingId}/upload`, {
                                   method: 'POST',
                                   headers: { Authorization: `Bearer ${token}` },
@@ -2246,7 +2246,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                                       }
                                       if (!editingId) { setModalAttachments(prev => prev.filter((_, i) => i !== idx)); return; }
                                       try {
-                                        const token = localStorage.getItem('fbtmcc_token');
+                                        const token = sessionStorage.getItem('fbtmcc_token');
                                         await fetch(`${API_URL}/disbursements/${editingId}/attachments/${att.filename}`, {
                                           method: 'DELETE',
                                           headers: { Authorization: `Bearer ${token}` }

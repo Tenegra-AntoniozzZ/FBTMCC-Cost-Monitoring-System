@@ -258,7 +258,7 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
     if (passwordModal.action === 'delete_additional') {
       setIsSaving(true);
       try {
-        const token = localStorage.getItem('fbtmcc_token');
+        const token = sessionStorage.getItem('fbtmcc_token');
         const response = await fetch(`${API_URL}/disbursements/${passwordModal.payload}`, {
           method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -1333,7 +1333,7 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
   const executeSave = async (dataToSave) => {
     setIsSaving(true);
     try {
-      const token = localStorage.getItem('fbtmcc_token');
+      const token = sessionStorage.getItem('fbtmcc_token');
       const url = editingData ? `${API_URL}/disbursements/${editingData.id}` : `${API_URL}/disbursements`;
       const method = editingData ? 'PUT' : 'POST';
 

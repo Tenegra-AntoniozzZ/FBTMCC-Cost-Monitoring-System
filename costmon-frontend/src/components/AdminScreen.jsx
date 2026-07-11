@@ -58,7 +58,7 @@ function UserFormModal({ isOpen, onClose, onSave, editUser = null }) {
     if (Object.keys(e).length > 0) { setErrors(e); return; }
     setIsSaving(true);
     try {
-      const token = localStorage.getItem('fbtmcc_token');
+      const token = sessionStorage.getItem('fbtmcc_token');
       let payload, url, method;
       if (editUser) {
         payload = { username: form.username, role: form.role, security_question: form.security_question };
@@ -228,7 +228,7 @@ export default function AdminScreen({ currentUser, isDark }) {
   const [changePassSuccess,  setChangePassSuccess]  = useState(false);
   const [isChangingPass,     setIsChangingPass]     = useState(false);
 
-  const token = localStorage.getItem('fbtmcc_token');
+  const token = sessionStorage.getItem('fbtmcc_token');
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
