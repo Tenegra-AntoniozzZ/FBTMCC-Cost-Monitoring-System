@@ -277,8 +277,16 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
     const normalExpenses = projectExpenses.filter(d => d.costing_type === 'normal' || !d.costing_type);
     const additionalExpenses = projectExpenses.filter(d => d.costing_type === 'additional');
 
-    const totalNormalExpenses = normalExpenses.reduce((sum, d) => sum + (d.expenses || []).reduce((s, exp) => s + (parseFloat(exp.amount) || 0), 0), 0);
-    const totalAdditionalExpenses = additionalExpenses.reduce((sum, d) => sum + (d.expenses || []).reduce((s, exp) => s + (parseFloat(exp.amount) || 0), 0), 0);
+    const totalNormalExpenses = normalExpenses.reduce((sum, d) => sum + (d.expenses || []).reduce((s, exp) => {
+      const amt = parseFloat(exp.amount) || 0;
+      const isLabor = (exp.category || '').toUpperCase().includes('LABOR');
+      return s + (isLabor ? amt / 0.98 : amt);
+    }, 0), 0);
+    const totalAdditionalExpenses = additionalExpenses.reduce((sum, d) => sum + (d.expenses || []).reduce((s, exp) => {
+      const amt = parseFloat(exp.amount) || 0;
+      const isLabor = (exp.category || '').toUpperCase().includes('LABOR');
+      return s + (isLabor ? amt / 0.98 : amt);
+    }, 0), 0);
 
     const vatNormal = contractCost * (1 - (1 / 1.12));
     const budgetCostNormal = contractCost - vatNormal;
@@ -344,6 +352,17 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
           if (!grouped[targetCat]) grouped[targetCat] = [];
 
           const amount = parseFloat(exp.amount) || 0;
+          const isLabor = catUpper.includes('LABOR');
+          
+          const laborLess = isLabor ? amount : 0;
+          const laborTotal = isLabor ? amount / 0.98 : 0;
+          const laborEwt = isLabor ? laborTotal - laborLess : 0;
+          
+          const matlTotal = isLabor ? 0 : amount;
+          const totalMatlCost = isLabor ? 0 : amount;
+          const totalLaborCost = isLabor ? laborTotal : 0;
+          const grossAmount = isLabor ? laborTotal : amount;
+
           // For misc items, prefix with the original category so the user can tell them apart
           const itemDesc = (targetCat === MISC_KEY && !miscCategorySet.has(catUpper))
             ? `[${originalCat}] ${exp.particulars || ''}`
@@ -351,11 +370,11 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
 
           grouped[targetCat].push({
             id: d.id, lineId: exp.id, date: d.date, cv_no: d.cv_no, or_inv_no: d.or_inv_no,
-            payee: d.payee, particulars: itemDesc, amount: amount,
+            payee: d.payee, particulars: itemDesc, amount: amount, grossAmount: grossAmount,
             // miscCategory holds the original category name for display in the Misc table
             miscCategory: targetCat === MISC_KEY ? originalCat : '',
-            laborLess: 0, laborEwt: 0, laborTotal: 0, matlQty: 0, matlUnitCost: 0,
-            matlTotal: amount, totalMatlCost: amount, totalLaborCost: 0
+            laborLess, laborEwt, laborTotal, matlQty: 0, matlUnitCost: 0,
+            matlTotal, totalMatlCost, totalLaborCost
           });
         });
       }
@@ -402,11 +421,23 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
       if (d.costing_type === 'additional' && d.expenses && d.expenses.length > 0) {
         d.expenses.forEach(exp => {
           const amount = parseFloat(exp.amount) || 0;
+          const catUpper = (exp.category || '').toUpperCase();
+          const isLabor = catUpper.includes('LABOR');
+          
+          const laborLess = isLabor ? amount : 0;
+          const laborTotal = isLabor ? amount / 0.98 : 0;
+          const laborEwt = isLabor ? laborTotal - laborLess : 0;
+          
+          const matlTotal = isLabor ? 0 : amount;
+          const totalMatlCost = isLabor ? 0 : amount;
+          const totalLaborCost = isLabor ? laborTotal : 0;
+          const grossAmount = isLabor ? laborTotal : amount;
+
           list.push({
             id: d.id, lineId: exp.id, date: d.date, cv_no: d.cv_no, or_inv_no: d.or_inv_no,
             payee: d.payee, particulars: exp.particulars, itemName: exp.category || 'Uncategorized',
-            amount: amount, laborLess: 0, laborEwt: 0, laborTotal: 0, matlQty: 0,
-            matlUnitCost: 0, matlTotal: amount, totalMatlCost: amount, totalLaborCost: 0
+            amount: amount, grossAmount: grossAmount, laborLess, laborEwt, laborTotal, matlQty: 0,
+            matlUnitCost: 0, matlTotal, totalMatlCost, totalLaborCost
           });
         });
       }
@@ -564,10 +595,10 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
                 <div className="uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 font-black">Contract Labor Cost</div>
                 <div className="space-y-2 pl-4 border-l-2 border-slate-400 dark:border-slate-600 ml-2">
                   <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
-                    <span>Labor / Payroll:</span><span className="font-mono font-bold">{formatMoney(expensesByCategory["LABOR/PAYROLL"]?.reduce((sum, item) => sum + item.amount, 0) || 0)}</span>
+                    <span>Labor / Payroll:</span><span className="font-mono font-bold">{formatMoney(expensesByCategory["LABOR/PAYROLL"]?.reduce((sum, item) => sum + item.grossAmount, 0) || 0)}</span>
                   </div>
                   <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
-                    <span>SSS/Pag-ibig/PhilHealth:</span><span className="font-mono font-bold">{formatMoney(expensesByCategory["SSS/PAG-IBIG / PHILHEALTH"]?.reduce((sum, item) => sum + item.amount, 0) || 0)}</span>
+                    <span>SSS/Pag-ibig/PhilHealth:</span><span className="font-mono font-bold">{formatMoney(expensesByCategory["SSS/PAG-IBIG / PHILHEALTH"]?.reduce((sum, item) => sum + item.grossAmount, 0) || 0)}</span>
                   </div>
                 </div>
 
@@ -582,7 +613,7 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
                 <div className="grid grid-cols-[140px_1fr] items-center py-1 mb-4">
                   <span className="uppercase tracking-wider text-slate-500 dark:text-slate-400 font-black">Labor cost:</span>
                   <div className="flex justify-end gap-2 items-end">
-                    <span className="font-mono text-sm text-slate-900 dark:text-white font-bold">{formatMoney(expensesByCategory["LABOR/PAYROLL"]?.reduce((sum, item) => sum + item.amount, 0) || 0)}</span><span className="text-[10px] text-slate-500 pb-0.5">PHP</span>
+                    <span className="font-mono text-sm text-slate-900 dark:text-white font-bold">{formatMoney(expensesByCategory["LABOR/PAYROLL"]?.reduce((sum, item) => sum + item.grossAmount, 0) || 0)}</span><span className="text-[10px] text-slate-500 pb-0.5">PHP</span>
                   </div>
                 </div>
 
@@ -606,14 +637,14 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
                           <div className="flex justify-between border-b border-slate-300 dark:border-slate-600 pb-2">
                             <span className="truncate pr-2 text-slate-800 dark:text-slate-200">Miscellaneous Cost:</span>
                             <span className="font-mono font-black text-slate-900 dark:text-white">
-                              {formatMoney(expensesByCategory[MISC_KEY].reduce((sum, item) => sum + item.amount, 0))}
+                              {formatMoney(expensesByCategory[MISC_KEY].reduce((sum, item) => sum + item.grossAmount, 0))}
                             </span>
                           </div>
                         )}
 
                         {/* DYNAMIC CATEGORIES */}
                         {displayedCategories.filter(cat => cat !== MISC_KEY).map(cat => {
-                          const catTotal = expensesByCategory[cat]?.reduce((sum, item) => sum + item.amount, 0) || 0;
+                          const catTotal = expensesByCategory[cat]?.reduce((sum, item) => sum + item.grossAmount, 0) || 0;
                           if (catTotal === 0) return null;
                           return (
                             <div key={cat} className="flex justify-between border-b border-slate-300 dark:border-slate-600 pb-2">
@@ -840,7 +871,7 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
                             <>
                               <tr className={`${headerColor} border-b-2 border-slate-800 dark:border-slate-600`}><th colSpan={canEdit ? 14 : 13} className="text-center py-3.5 font-black text-white uppercase tracking-[0.15em] text-sm">{category}</th></tr>
                               <tr className="bg-slate-200 dark:bg-slate-700 border-b-2 border-slate-800 dark:border-slate-600 text-[10px] font-black text-slate-800 dark:text-slate-200 text-center uppercase tracking-wider leading-tight">
-                                <th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Date</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">C.V.#</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Invoice</th><th className="py-3 px-2 w-[15%] text-left border-r border-slate-800 dark:border-slate-600">Supplier / Particulars</th><th className="py-3 px-2 w-[15%] text-left border-r border-slate-800 dark:border-slate-600">Item Description</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Less</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Ewt</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Total</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l QTY</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l Unit Cost</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l Total</th><th className="py-3 px-2 w-[8%] border-r border-slate-800 dark:border-slate-600">Total Mat'l Cost</th><th className="py-3 px-2 w-[8%] border-r border-slate-800 dark:border-slate-600 text-right pr-4">Total Labor Cost</th>{canEdit && <th className="py-3 px-2 w-[4%]">Act</th>}
+                                <th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Date</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">C.V.#</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Invoice</th><th className="py-3 px-2 w-[15%] text-left border-r border-slate-800 dark:border-slate-600">Supplier / Particulars</th><th className="py-3 px-2 w-[15%] text-left border-r border-slate-800 dark:border-slate-600">Item Description</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Less</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Ewt</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Total</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l QTY</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l Unit Cost</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Item Amount</th><th className="py-3 px-2 w-[8%] border-r border-slate-800 dark:border-slate-600">Total Material Cost</th><th className="py-3 px-2 w-[8%] border-r border-slate-800 dark:border-slate-600 text-right pr-4">Total Labor Cost</th>{canEdit && <th className="py-3 px-2 w-[4%]">Act</th>}
                               </tr>
                             </>
                           ) : (
@@ -848,7 +879,7 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
                             <>
                               <tr className={`${headerColor} border-b-2 border-slate-800 dark:border-slate-600`}><th colSpan={canEdit ? 13 : 12} className="text-center py-3.5 font-black text-white uppercase tracking-[0.15em] text-sm">{category}</th></tr>
                               <tr className="bg-slate-200 dark:bg-slate-700 border-b-2 border-slate-800 dark:border-slate-600 text-[10px] font-black text-slate-800 dark:text-slate-200 text-center uppercase tracking-wider leading-tight">
-                                <th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Date</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">C.V.#</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Invoice</th><th className="py-3 px-2 w-[20%] text-left border-r border-slate-800 dark:border-slate-600">Supplier / Particulars</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Less</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Ewt</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Total</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l QTY</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l Unit Cost</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l Total</th><th className="py-3 px-2 w-[9%] border-r border-slate-800 dark:border-slate-600">Total Mat'l Cost</th><th className="py-3 px-2 w-[9%] border-r border-slate-800 dark:border-slate-600 text-right pr-4">Total Labor Cost</th>{canEdit && <th className="py-3 px-2 w-[4%]">Act</th>}
+                                <th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Date</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">C.V.#</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Invoice</th><th className="py-3 px-2 w-[20%] text-left border-r border-slate-800 dark:border-slate-600">Supplier / Particulars</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Less</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Ewt</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Total</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l QTY</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l Unit Cost</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Item Amount</th><th className="py-3 px-2 w-[9%] border-r border-slate-800 dark:border-slate-600">Total Material Cost</th><th className="py-3 px-2 w-[9%] border-r border-slate-800 dark:border-slate-600 text-right pr-4">Total Labor Cost</th>{canEdit && <th className="py-3 px-2 w-[4%]">Act</th>}
                               </tr>
                             </>
                           )}
