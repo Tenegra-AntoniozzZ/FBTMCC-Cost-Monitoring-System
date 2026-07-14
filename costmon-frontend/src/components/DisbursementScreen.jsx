@@ -1893,6 +1893,11 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                           const selectedProjects = Array.isArray(headerData.project_code)
                             ? headerData.project_code.filter(Boolean)
                             : (typeof headerData.project_code === 'string' ? headerData.project_code.split(',').map(c => c.trim()).filter(Boolean) : []);
+
+                          // Scoped per-group: only disable categories already selected within THIS group
+                          const usedMainCategories = group.constructionLines.map(item => item.category).filter(Boolean);
+                          const usedMiscCategories = group.miscLines.map(item => item.category).filter(Boolean);
+
                           return (
                             <div key={group.id} className="border-2 border-slate-200 dark:border-slate-600 rounded-xl overflow-hidden shadow-sm animate-in slide-in-from-top-2">
                               {/* Group Header with Target Selector */}
