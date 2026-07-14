@@ -255,7 +255,7 @@ export default function LoginScreen({ onLogin, isDarkMode, toggleTheme }) {
                   <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Username</label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
-                    <input type="text" required value={username} onChange={e => setUsername(e.target.value)}
+                    <input type="text" required autoFocus value={username} onChange={e => setUsername(e.target.value)}
                       className={`w-full pl-10 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-800 focus:ring-2 ${t.ring} outline-none font-bold text-slate-700 dark:text-slate-200 transition-all`}
                       placeholder="Enter username" />
                   </div>
@@ -294,7 +294,7 @@ export default function LoginScreen({ onLogin, isDarkMode, toggleTheme }) {
                 <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mb-4 text-center">Enter your username to retrieve your Security Question.</p>
                 <div className="space-y-1">
                   <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Username</label>
-                  <input type="text" required value={resetUsername} onChange={e => setResetUsername(e.target.value)}
+                  <input type="text" required autoFocus value={resetUsername} onChange={e => setResetUsername(e.target.value)}
                     className={`w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-800 focus:ring-2 ${t.ring} outline-none font-bold text-slate-700 dark:text-slate-200`}
                     placeholder="e.g. encoder1" />
                 </div>
