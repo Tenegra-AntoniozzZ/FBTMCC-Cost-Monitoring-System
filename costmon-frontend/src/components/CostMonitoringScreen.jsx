@@ -1422,11 +1422,15 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
         }
       } else {
         const errData = await response.json().catch(() => ({}));
-        setErrorMessage(errData.error || 'Hindi ma-save ang data.');
+        const errMsg = errData.error || errData.message || 'Hindi ma-save ang data.';
+        setErrorMessage(errMsg);
+        alert(errMsg);
       }
     } catch (err) {
       console.error('Additional costing save error:', err);
-      setErrorMessage('Network Error. Check your connection.');
+      const errMsg = 'Network Error. Check your connection.';
+      setErrorMessage(errMsg);
+      alert(errMsg);
     } finally {
       setIsSaving(false);
     }
@@ -1448,11 +1452,16 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
 
     const editing = isEditingRef.current ? editingDataRef.current : null;
 
+    const sanitize = (val) => val && val.trim() !== '' ? val.trim() : null;
+
     const payload = {
       ...headerData,
+      payee: sanitize(headerData.payee),
+      or_inv_no: sanitize(headerData.or_inv_no),
+      particulars: sanitize(headerData.particulars),
       id: editing ? editing.id : Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(),
       target_cib: String(headerData.target_cib).replace(/,/g, ''),
-      cv_no: editing ? (editing.cv_no || '') : '',
+      cv_no: editing ? (editing.cv_no || `ADDL-${Date.now()}`) : `ADDL-${Date.now()}`,
       expenses: validLines,
       gross_amount: totals.cib_coh,
       ewt_amount: totals.ewtPayable,

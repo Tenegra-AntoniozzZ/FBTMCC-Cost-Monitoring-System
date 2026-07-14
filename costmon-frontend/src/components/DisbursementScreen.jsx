@@ -13,6 +13,8 @@ const TargetProjectDropdown = ({ value, onChange, disabled, selectedProjects }) 
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef(null);
 
+  const currentValues = Array.isArray(value) ? value : (value ? [value] : ['all']);
+
   useEffect(() => {
     function handleClickOutside(event) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
@@ -32,8 +34,24 @@ const TargetProjectDropdown = ({ value, onChange, disabled, selectedProjects }) 
   }
 
   const getDisplayValue = () => {
-    if (value === 'all') return '🌐 For All Projects';
-    return `📁 ${value} only`;
+    if (currentValues.includes('all')) return '🌐 For All Projects';
+    if (currentValues.length === 1) return `📁 ${currentValues[0]} only`;
+    return `📁 ${currentValues.length} Projects Selected`;
+  };
+
+  const toggleSelection = (pc) => {
+    if (pc === 'all') {
+      onChange(['all']);
+    } else {
+      let newVals = currentValues.filter(v => v !== 'all');
+      if (newVals.includes(pc)) {
+        newVals = newVals.filter(v => v !== pc);
+        if (newVals.length === 0) newVals = ['all'];
+      } else {
+        newVals.push(pc);
+      }
+      onChange(newVals);
+    }
   };
 
   return (
@@ -49,20 +67,29 @@ const TargetProjectDropdown = ({ value, onChange, disabled, selectedProjects }) 
       {isOpen && (
         <div className="absolute top-full left-0 mt-1 w-full min-w-max bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden z-[100] animate-in fade-in slide-in-from-top-2">
           <div
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChange('all'); setIsOpen(false); }}
-            className={`px-3 py-2 text-xs cursor-pointer transition-colors ${value === 'all' ? 'font-bold bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSelection('all'); }}
+            className={`px-3 py-2 text-xs flex items-center gap-2 cursor-pointer transition-colors ${currentValues.includes('all') ? 'font-bold bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
           >
+            <div className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center shrink-0 ${currentValues.includes('all') ? 'bg-blue-600 border-blue-600' : 'border-slate-300 dark:border-slate-600'}`}>
+              {currentValues.includes('all') && <span className="text-white text-[10px] font-black leading-none">✓</span>}
+            </div>
             🌐 For All Projects
           </div>
-          {selectedProjects.map(pc => (
-            <div
-              key={pc}
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChange(pc); setIsOpen(false); }}
-              className={`px-3 py-2 text-xs cursor-pointer transition-colors border-t border-slate-100 dark:border-slate-700/50 ${value === pc ? 'font-bold bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-            >
-              📁 {pc} only
-            </div>
-          ))}
+          {selectedProjects.map(pc => {
+            const isSelected = currentValues.includes(pc);
+            return (
+              <div
+                key={pc}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSelection(pc); }}
+                className={`px-3 py-2 text-xs flex items-center gap-2 cursor-pointer transition-colors border-t border-slate-100 dark:border-slate-700/50 ${isSelected ? 'font-bold bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
+              >
+                <div className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center shrink-0 ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-slate-300 dark:border-slate-600'}`}>
+                  {isSelected && <span className="text-white text-[10px] font-black leading-none">✓</span>}
+                </div>
+                📁 {pc} only
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -137,7 +164,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
   const makeDefaultGroup = (baseId) => ({
     id: baseId,
-    targetProject: 'all',
+    targetProject: ['all'],
     constructionLines: [{ id: baseId + 1, category: '', amount: '' }],
     miscLines: [{ id: baseId + 2, category: '', amount: '' }]
   });
@@ -273,13 +300,15 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
   const groupedDisbursements = useMemo(() => {
     const groups = {};
-    filteredDisbursements.forEach(d => {
-      if (!d.cv_no) {
-        groups[`no_cv_${d.id}`] = { ...d, project_code: [d.project_code], underlying_records: [d] };
-        return;
-      }
 
-      const key = d.cv_no.toLowerCase().trim();
+    const getKey = (d) => {
+      if (d.cv_no && d.cv_no.trim() !== '') return `cv_${d.cv_no.toLowerCase().trim()}`;
+      if (d.or_inv_no && d.or_inv_no.trim() !== '') return `or_${d.or_inv_no.toLowerCase().trim()}`;
+      return `solo_${d.id}`;
+    };
+
+    filteredDisbursements.forEach(d => {
+      const key = getKey(d);
       if (!groups[key]) {
         groups[key] = {
           ...d,
@@ -327,7 +356,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     const result = [];
     const seen = new Set();
     filteredDisbursements.forEach(d => {
-      const key = d.cv_no ? d.cv_no.toLowerCase().trim() : `no_cv_${d.id}`;
+      const key = getKey(d);
       if (!seen.has(key)) {
         seen.add(key);
         result.push(groups[key]);
@@ -335,6 +364,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     });
     return result;
   }, [filteredDisbursements]);
+
 
   const handleToggleMonth = (val) => {
     setTempSelectedMonths(prev => prev.includes(val) ? prev.filter(m => m !== val) : [...prev, val]);
@@ -828,9 +858,8 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
         if (!group._seenLinesMap[lineId]) {
           group._seenLinesMap[lineId] = { ...exp, amountNum: rawAmt };
         } else {
-          if (group.targetProject === 'all') {
-            group._seenLinesMap[lineId].amountNum += rawAmt;
-          }
+          // Unconditionally sum identical line items across grouped records
+          group._seenLinesMap[lineId].amountNum += rawAmt;
         }
       });
     });
@@ -1010,7 +1039,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
     const projectCodes = Array.isArray(finalHeaderData.project_code)
       ? finalHeaderData.project_code
-      : (typeof finalHeaderData.project_code === 'string' ? finalHeaderData.project_code.split(',').map(c => c.trim()).filter(Boolean) : []);
+      : (typeof finalHeaderData.project_code === 'string' ? finalHeaderData.project_code.split(',').filter(Boolean) : []);
 
     if (!isPureStock && projectCodes.length === 0) {
       setErrorMessage("Kailangan pumili ng Project Code.");
@@ -1042,12 +1071,18 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
           const rawAmt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
           let amt;
 
-          if (group.targetProject === 'all') {
+          const targetProjects = Array.isArray(group.targetProject) ? group.targetProject : [group.targetProject];
+
+          if (targetProjects.includes('all')) {
             const base = Math.floor((rawAmt / numProjects) * 100) / 100;
             const remainder = Math.round((rawAmt - (base * numProjects)) * 100) / 100;
             amt = (index === 0) ? Number((base + remainder).toFixed(2)) : base;
-          } else if (group.targetProject === projCode) {
-            amt = rawAmt;
+          } else if (targetProjects.includes(projCode)) {
+            const numTargets = targetProjects.length;
+            const targetIndex = targetProjects.indexOf(projCode);
+            const base = Math.floor((rawAmt / numTargets) * 100) / 100;
+            const remainder = Math.round((rawAmt - (base * numTargets)) * 100) / 100;
+            amt = (targetIndex === 0) ? Number((base + remainder).toFixed(2)) : base;
           } else {
             return; // skip — this group targets a different project
           }
@@ -1892,7 +1927,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                         {costingGroups.map((group, groupIndex) => {
                           const selectedProjects = Array.isArray(headerData.project_code)
                             ? headerData.project_code.filter(Boolean)
-                            : (typeof headerData.project_code === 'string' ? headerData.project_code.split(',').map(c => c.trim()).filter(Boolean) : []);
+                            : (typeof headerData.project_code === 'string' ? headerData.project_code.split(',').filter(Boolean) : []);
 
                           // Scoped per-group: only disable categories already selected within THIS group
                           const usedMainCategories = group.constructionLines.map(item => item.category).filter(Boolean);

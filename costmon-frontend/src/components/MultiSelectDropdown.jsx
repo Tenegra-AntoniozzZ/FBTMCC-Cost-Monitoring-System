@@ -10,10 +10,10 @@ export default function MultiSelectDropdown({ options, value, onChange, placehol
   const wrapperRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Convert to array safely whether it's an array or a comma-separated string
+  // Use an array to strictly preserve exact strings (like those with trailing spaces)
   const selectedValues = Array.isArray(value) 
     ? value 
-    : (value ? String(value).split(',').map(s => s.trim()).filter(Boolean) : []);
+    : (value ? [value] : []);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -76,7 +76,7 @@ export default function MultiSelectDropdown({ options, value, onChange, placehol
 
   const handleSelect = (option) => {
     const newSelected = [...selectedValues, option];
-    onChange(newSelected.join(', '));
+    onChange(newSelected);
     // 1. Auto-Close Dropdown
     setIsOpen(false);
     setSearchTerm('');
@@ -85,7 +85,7 @@ export default function MultiSelectDropdown({ options, value, onChange, placehol
   const removeOption = (e, option) => {
     if (e) e.stopPropagation();
     const newSelected = selectedValues.filter(v => v !== option);
-    onChange(newSelected.join(', '));
+    onChange(newSelected);
     inputRef.current?.focus();
   };
 
