@@ -1712,7 +1712,6 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                         isStockAllocationMode ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
                       }`}>
                         <span>CV # <span className="text-blue-500 font-bold">* (At least one)</span></span>
-                        {isStockAllocationMode && <span className="text-[9px] font-black bg-emerald-600 text-white px-1.5 py-0.5 rounded uppercase tracking-wider">LOCKED</span>}
                       </label>
                       <input
                         type="text"
@@ -1720,22 +1719,18 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                         inputMode="text"
                         pattern="[0-9\-]*"
                         placeholder="Unique CV#"
-                        readOnly={isStockAllocationMode}
                         className={`w-full p-2 rounded-md text-sm outline-none font-bold transition-all duration-200 ${
-                          isStockAllocationMode
-                            ? 'border border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-100 bg-emerald-50 dark:bg-emerald-950/50 cursor-not-allowed'
-                            : isDuplicateCV
-                              ? 'border-2 border-red-500 dark:border-red-400 text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 focus:ring-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
-                              : 'border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 bg-amber-50 dark:bg-amber-900/10 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400'
+                          isDuplicateCV
+                            ? 'border-2 border-red-500 dark:border-red-400 text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 focus:ring-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
+                            : 'border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 bg-amber-50 dark:bg-amber-900/10 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400'
                         }`}
                         value={headerData.cv_no}
                         onChange={(e) => {
-                          if (isStockAllocationMode) return;
                           const onlyNums = e.target.value.replace(/[^0-9-]/g, '');
                           handleHeaderChange({ target: { name: 'cv_no', value: onlyNums } });
                         }}
                       />
-                      {!isStockAllocationMode && isDuplicateCV && (
+                      {isDuplicateCV && (
                         <p className="text-[10px] text-red-600 dark:text-red-400 font-bold flex items-center gap-1 animate-in slide-in-from-top-1">
                           <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span> This CV# is already in use!
                         </p>
@@ -1757,24 +1752,17 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                         isStockAllocationMode ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400'
                       }`}>
                         <span>OR / INV # <span className="text-blue-500 font-bold">* (At least one)</span></span>
-                        {isStockAllocationMode && <span className="text-[9px] font-black bg-emerald-600 text-white px-1.5 py-0.5 rounded uppercase tracking-wider">LOCKED</span>}
                       </label>
                       <input type="text" name="or_inv_no" placeholder="Receipt No."
-                        readOnly={isStockAllocationMode}
                         className={`w-full p-2 rounded-md text-sm outline-none font-bold transition-all duration-200 ${
-                          isStockAllocationMode
-                            ? 'border border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-100 bg-emerald-50 dark:bg-emerald-950/50 cursor-not-allowed'
-                            : isDuplicateOR
-                              ? 'border-2 border-red-500 dark:border-red-400 text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 focus:ring-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
-                              : 'border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400'
+                          isDuplicateOR
+                            ? 'border-2 border-red-500 dark:border-red-400 text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 focus:ring-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
+                            : 'border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400'
                         }`}
                         value={headerData.or_inv_no}
-                        onChange={(e) => {
-                          if (isStockAllocationMode) return;
-                          handleHeaderChange(e);
-                        }}
+                        onChange={handleHeaderChange}
                       />
-                      {!isStockAllocationMode && isDuplicateOR && (
+                      {isDuplicateOR && (
                         <p className="text-[10px] text-red-600 dark:text-red-400 font-bold flex items-center gap-1 animate-in slide-in-from-top-1">
                           <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span> This OR/INV# is already in use!
                         </p>
@@ -2025,71 +2013,75 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                       </div>
                     </div>
 
-                    {/* STOCKS OPT-IN CHECKBOX */}
-                    <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between transition-colors duration-300">
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="checkbox"
-                          id="add-stocks-checkbox"
-                          className="w-4.5 h-4.5 text-blue-600 border-slate-300 dark:border-slate-600 rounded focus:ring-blue-500 cursor-pointer"
-                          checked={isAddStocksChecked}
-                          onChange={(e) => {
-                            setIsAddStocksChecked(e.target.checked);
-                            if (!e.target.checked) setStocksAmount('');
-                          }}
-                        />
-                        <label htmlFor="add-stocks-checkbox" className="text-sm font-bold text-slate-700 dark:text-slate-200 cursor-pointer select-none">
-                          Add Stocks
-                        </label>
-                      </div>
-                      <span className="text-[10px] bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                        Inventory Link
-                      </span>
-                    </div>
-
-                    {/* 4. INPUT STOCKS */}
-                    {isAddStocksChecked && (
-                      <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden transition-colors duration-300 animate-in slide-in-from-top-3">
-                        <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100 dark:border-slate-700">
-                          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">4. INPUT STOCKS <span className="text-red-500">*</span></h3>
+                    {!isStockAllocationMode && (
+                      <>
+                        {/* STOCKS OPT-IN CHECKBOX */}
+                        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between transition-colors duration-300">
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              id="add-stocks-checkbox"
+                              className="w-4.5 h-4.5 text-blue-600 border-slate-300 dark:border-slate-600 rounded focus:ring-blue-500 cursor-pointer"
+                              checked={isAddStocksChecked}
+                              onChange={(e) => {
+                                setIsAddStocksChecked(e.target.checked);
+                                if (!e.target.checked) setStocksAmount('');
+                              }}
+                            />
+                            <label htmlFor="add-stocks-checkbox" className="text-sm font-bold text-slate-700 dark:text-slate-200 cursor-pointer select-none">
+                              Add Stocks
+                            </label>
+                          </div>
+                          <span className="text-[10px] bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded font-black uppercase tracking-wider">
+                            Inventory Link
+                          </span>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-1">
-                            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Stock Amount (₱) <span className="text-red-500">*</span></label>
-                            <div className="relative w-full">
-                              <span className="absolute left-3 top-2.5 text-slate-400 dark:text-slate-500 text-sm font-medium">₱</span>
-                              <input
-                                type="text"
-                                placeholder="0.00"
-                                className="w-full pl-7 p-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors"
-                                value={stocksAmount}
-                                onChange={(e) => {
-                                  let val = e.target.value.replace(/[^0-9.]/g, '');
-                                  const parts = val.split('.');
-                                  if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
-                                  if (val) {
-                                    const p2 = val.split('.');
-                                    p2[0] = p2[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-                                    val = p2.join('.');
-                                  }
-                                  setStocksAmount(val);
-                                }}
-                                required
-                              />
+
+                        {/* 4. INPUT STOCKS */}
+                        {isAddStocksChecked && (
+                          <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative overflow-hidden transition-colors duration-300 animate-in slide-in-from-top-3">
+                            <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100 dark:border-slate-700">
+                              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">4. INPUT STOCKS <span className="text-red-500">*</span></h3>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Stock Amount (₱) <span className="text-red-500">*</span></label>
+                                <div className="relative w-full">
+                                  <span className="absolute left-3 top-2.5 text-slate-400 dark:text-slate-500 text-sm font-medium">₱</span>
+                                  <input
+                                    type="text"
+                                    placeholder="0.00"
+                                    className="w-full pl-7 p-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors"
+                                    value={stocksAmount}
+                                    onChange={(e) => {
+                                      let val = e.target.value.replace(/[^0-9.]/g, '');
+                                      const parts = val.split('.');
+                                      if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+                                      if (val) {
+                                        const p2 = val.split('.');
+                                        p2[0] = p2[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                                        val = p2.join('.');
+                                      }
+                                      setStocksAmount(val);
+                                    }}
+                                    required
+                                  />
+                                </div>
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Stock Description / Item Name <span className="text-red-500">*</span></label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g., Cement, Rebars..."
+                                  className="w-full p-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors uppercase"
+                                  value={stockDescription}
+                                  onChange={(e) => setStockDescription(e.target.value)}
+                                />
+                              </div>
                             </div>
                           </div>
-                          <div className="space-y-1">
-                            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Stock Description / Item Name <span className="text-red-500">*</span></label>
-                            <input
-                              type="text"
-                              placeholder="e.g., Cement, Rebars..."
-                              className="w-full p-2.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-bold focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 outline-none text-slate-800 dark:text-white transition-colors uppercase"
-                              value={stockDescription}
-                              onChange={(e) => setStockDescription(e.target.value)}
-                            />
-                          </div>
-                        </div>
-                      </div>
+                        )}
+                      </>
                     )}
 
                     {/* ==========================================
