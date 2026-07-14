@@ -1218,10 +1218,10 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
 
   useEffect(() => {
-    if (initialDisbursementId && groupedDisbursements.length > 0) {
+    if (initialDisbursementId && disbursements.length > 0) {
       // Find the grouped record that contains this underlying ID
       const groupedRecord = groupedDisbursements.find(g =>
-        (g.underlying_records || [g]).some(r => r.id === initialDisbursementId)
+        (g.underlying_records || [g]).some(r => String(r.id) === String(initialDisbursementId))
       );
 
       if (groupedRecord) {
@@ -1232,7 +1232,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
         return () => clearTimeout(timer);
       } else {
         // Fallback to raw record just in case it got filtered out
-        const rawRecord = disbursements.find(d => d.id === initialDisbursementId);
+        const rawRecord = disbursements.find(d => String(d.id) === String(initialDisbursementId));
         if (rawRecord) {
           const timer = setTimeout(() => {
             handleEditRow(rawRecord);
@@ -1243,7 +1243,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialDisbursementId, groupedDisbursements]);
+  }, [initialDisbursementId, groupedDisbursements, disbursements]);
 
   // ==========================================
   // STOCK ALLOCATION MODE — auto-open and pre-fill
