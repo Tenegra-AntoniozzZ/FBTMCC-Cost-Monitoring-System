@@ -435,7 +435,7 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
 
           list.push({
             id: d.id, lineId: exp.id, date: d.date, cv_no: d.cv_no, or_inv_no: d.or_inv_no,
-            payee: d.payee, particulars: exp.particulars, itemName: exp.category || 'Uncategorized',
+            payee: d.payee, particulars: d.particulars, itemName: exp.category || 'Uncategorized',
             amount: amount, grossAmount: grossAmount, laborLess, laborEwt, laborTotal, matlQty: 0,
             matlUnitCost: 0, matlTotal, totalMatlCost, totalLaborCost
           });
@@ -1030,7 +1030,10 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
       {/* ADD / EDIT ADDITIONAL COST MODAL WITH UNSAVED & DRAFT FUNCTIONALITY */}
       <AddAdditionalModal
         isOpen={isAddAdditionalModalOpen}
-        onClose={() => setIsAddAdditionalModalOpen(false)}
+        onClose={() => {
+          setIsAddAdditionalModalOpen(false);
+          setEditingAdditionalId(null);
+        }}
         project={project}
         disbursements={disbursements}
         refreshData={refreshData}
@@ -1044,6 +1047,20 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
 // 1. MODAL COMPONENT para sa Additional Works Ledger 
 // ==============================================
 function AdditionalsLedgerModal({ isOpen, onClose, data, canEdit, onDeleteClick, onEditClick, zoomLevel }) {
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const totalAmount = data.reduce((sum, item) => sum + item.amount, 0);
@@ -1167,95 +1184,122 @@ function AdditionalsLedgerModal({ isOpen, onClose, data, canEdit, onDeleteClick,
 // 2. MODAL COMPONENT para mag-Add/Edit ng Additional Works
 // ==============================================
 function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshData, editingAdditionalId }) {
-  const [headerData, setHeaderData] = useState({
+  const DRAFT_KEY = 'additional_cost_draft';
+
+  const blankHeader = () => ({
     date: new Date().toISOString().split('T')[0],
     project_code: project?.project_code || '',
     payee: '', particulars: '', tin: '', check_no: '', or_inv_no: '',
     accts_pay: '', input_tax: '', output_tax: '', target_cib: '', costing_type: 'additional'
   });
 
+  const [headerData, setHeaderData] = useState(blankHeader);
   const [lines, setLines] = useState([{ id: Date.now(), category: '', amount: '' }]);
   const [showTaxFields, setShowTaxFields] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successPrompt, setSuccessPrompt] = useState(false);
-
-  // DEDICATED MODALS FOR DRAFTS, UNSAVED, AND PASSWORD
   const [passwordModal, setPasswordModal] = useState({ isOpen: false, payload: null });
   const [initialFormState, setInitialFormState] = useState(null);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const [showDraftModal, setShowDraftModal] = useState(false);
 
-  const editingData = useMemo(() => disbursements.find(d => d.id === editingAdditionalId), [disbursements, editingAdditionalId]);
+  // Use a ref to track the "mode" we opened in — avoids stale closure issues
+  // when disbursements prop updates after refreshData() mid-session
+  const isEditingRef = useRef(false);
+  const editingDataRef = useRef(null);
+
+  const editingData = useMemo(
+    () => disbursements.find(d => d.id === editingAdditionalId),
+    [disbursements, editingAdditionalId]
+  );
 
   const historicalSuggestions = useMemo(() => {
     const suggestions = new Set();
     disbursements.forEach(d => {
       if (d.costing_type === 'additional' && d.expenses) {
         d.expenses.forEach(exp => {
-          if (exp.category && exp.category.trim() !== '') {
-            suggestions.add(exp.category.trim());
-          }
+          if (exp.category && exp.category.trim() !== '') suggestions.add(exp.category.trim());
         });
       }
     });
     return Array.from(suggestions).sort();
   }, [disbursements]);
 
+  // ─── Initialize form when the modal opens ───────────────────────────────────
   useEffect(() => {
-    if (isOpen) {
-      if (editingData) {
+    if (!isOpen) return;
+
+    setSuccessPrompt(false);
+    setErrorMessage('');
+
+    if (editingAdditionalId) {
+      // EDIT MODE — load the record to edit
+      const record = disbursements.find(d => d.id === editingAdditionalId);
+      isEditingRef.current = true;
+      editingDataRef.current = record || null;
+
+      if (record) {
         const newHeader = {
-          date: editingData.date || new Date().toISOString().split('T')[0],
-          project_code: editingData.project_code || project?.project_code || '',
-          payee: editingData.payee || '',
-          particulars: editingData.particulars || '',
-          tin: editingData.tin || '',
-          check_no: editingData.check_no || '',
-          or_inv_no: editingData.or_inv_no || '',
-          accts_pay: editingData.accts_pay || '',
-          input_tax: editingData.input_tax || '',
-          output_tax: editingData.output_tax || '',
-          target_cib: (editingData.target_cib || '').toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','),
+          date: record.date || new Date().toISOString().split('T')[0],
+          project_code: record.project_code || project?.project_code || '',
+          payee: record.payee || '',
+          particulars: record.particulars || '',
+          tin: record.tin || '',
+          check_no: record.check_no || '',
+          or_inv_no: record.or_inv_no || '',
+          accts_pay: record.accts_pay || '',
+          input_tax: record.input_tax || '',
+          output_tax: record.output_tax || '',
+          target_cib: (record.target_cib || '').toString(),
           costing_type: 'additional'
         };
-        const newLines = editingData.expenses?.length > 0 ? editingData.expenses.map(line => ({ ...line, amount: line.amount ? String(line.amount).replace(/\B(?=(\d{3})+(?!\d))/g, ',') : '' })) : [{ id: Date.now(), category: '', amount: '' }];
-
+        const newLines = record.expenses?.length > 0
+          ? record.expenses.map(l => ({ ...l, amount: l.amount ? String(l.amount) : '' }))
+          : [{ id: Date.now(), category: '', amount: '' }];
         setHeaderData(newHeader);
         setLines(newLines);
-        setShowTaxFields(!!(editingData.accts_pay || editingData.input_tax || editingData.output_tax));
-
-        setInitialFormState({
-          headerData: JSON.stringify(newHeader),
-          lines: JSON.stringify(newLines)
-        });
-      } else {
-        const hasDraft = localStorage.getItem('additional_cost_draft');
-        if (hasDraft) {
-          setShowDraftModal(true);
-        } else {
-          const newHeader = {
-            date: new Date().toISOString().split('T')[0],
-            project_code: project?.project_code || '',
-            payee: '', particulars: '', tin: '', check_no: '', or_inv_no: '',
-            accts_pay: '', input_tax: '', output_tax: '', target_cib: '', costing_type: 'additional'
-          };
-          const newLines = [{ id: Date.now(), category: '', amount: '' }];
-          setHeaderData(newHeader);
-          setLines(newLines);
-          setShowTaxFields(false);
-          setInitialFormState({ headerData: JSON.stringify(newHeader), lines: JSON.stringify(newLines) });
-        }
+        setShowTaxFields(!!(record.accts_pay || record.input_tax || record.output_tax));
+        setInitialFormState({ headerData: JSON.stringify(newHeader), lines: JSON.stringify(newLines) });
       }
-      setSuccessPrompt(false);
-      setErrorMessage('');
-    }
-  }, [isOpen, editingData, project]);
+    } else {
+      // NEW MODE — check for draft first
+      isEditingRef.current = false;
+      editingDataRef.current = null;
 
+      const hasDraft = localStorage.getItem(DRAFT_KEY);
+      if (hasDraft) {
+        setShowDraftModal(true);
+        return; // wait for user choice before initializing form
+      }
+      resetToBlank();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, editingAdditionalId]);
+  // NOTE: Intentionally NOT including editingData or disbursements in deps.
+  // We only want this to fire when the modal opens or the target ID changes,
+  // NOT every time disbursements updates (which would reset the form after save).
+
+  const resetToBlank = () => {
+    const newHeader = blankHeader();
+    const newLines = [{ id: Date.now(), category: '', amount: '' }];
+    setHeaderData(newHeader);
+    setLines(newLines);
+    setShowTaxFields(false);
+    setInitialFormState({ headerData: JSON.stringify(newHeader), lines: JSON.stringify(newLines) });
+  };
+
+  // ─── Unsaved-changes detection ───────────────────────────────────────────────
   const checkUnsavedChanges = () => {
     if (!initialFormState) return false;
     return JSON.stringify(headerData) !== initialFormState.headerData ||
       JSON.stringify(lines) !== initialFormState.lines;
+  };
+
+  const handleClose = () => {
+    setSuccessPrompt(false);
+    setErrorMessage('');
+    onClose();
   };
 
   const handleCloseRequest = () => {
@@ -1266,20 +1310,9 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
     }
   };
 
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && isOpen && !passwordModal.isOpen && !showUnsavedModal && !showDraftModal && !successPrompt) {
-        handleCloseRequest();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, passwordModal.isOpen, showUnsavedModal, showDraftModal, successPrompt, headerData, lines, initialFormState]);
-
+  // ─── Draft handlers ──────────────────────────────────────────────────────────
   const handleSaveDraft = () => {
-    localStorage.setItem('additional_cost_draft', JSON.stringify({
-      headerData, lines, editingAdditionalId
-    }));
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ headerData, lines }));
     setShowUnsavedModal(false);
     handleClose();
   };
@@ -1290,43 +1323,41 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
   };
 
   const handleRestoreDraft = () => {
-    const draftStr = localStorage.getItem('additional_cost_draft');
+    const draftStr = localStorage.getItem(DRAFT_KEY);
     if (draftStr) {
-      const draft = JSON.parse(draftStr);
-      setHeaderData(draft.headerData);
-      setLines(draft.lines || []);
-      setShowTaxFields(!!(draft.headerData.accts_pay || draft.headerData.input_tax || draft.headerData.output_tax));
-      setInitialFormState({
-        headerData: JSON.stringify(draft.headerData),
-        lines: JSON.stringify(draft.lines || [])
-      });
-      setShowDraftModal(false);
+      try {
+        const draft = JSON.parse(draftStr);
+        const restoredHeader = { ...blankHeader(), ...draft.headerData, project_code: project?.project_code || draft.headerData.project_code || '' };
+        const restoredLines = draft.lines?.length > 0 ? draft.lines : [{ id: Date.now(), category: '', amount: '' }];
+        setHeaderData(restoredHeader);
+        setLines(restoredLines);
+        setShowTaxFields(!!(restoredHeader.accts_pay || restoredHeader.input_tax || restoredHeader.output_tax));
+        setInitialFormState({ headerData: JSON.stringify(restoredHeader), lines: JSON.stringify(restoredLines) });
+      } catch { resetToBlank(); }
     }
+    setShowDraftModal(false);
   };
 
   const handleDiscardDraft = () => {
-    localStorage.removeItem('additional_cost_draft');
+    localStorage.removeItem(DRAFT_KEY);
     setShowDraftModal(false);
-    const newHeader = {
-      date: new Date().toISOString().split('T')[0],
-      project_code: project?.project_code || '',
-      payee: '', particulars: '', tin: '', check_no: '', or_inv_no: '',
-      accts_pay: '', input_tax: '', output_tax: '', target_cib: '', costing_type: 'additional'
-    };
-    const newLines = [{ id: Date.now(), category: '', amount: '' }];
-    setHeaderData(newHeader);
-    setLines(newLines);
-    setShowTaxFields(false);
-    setInitialFormState({ headerData: JSON.stringify(newHeader), lines: JSON.stringify(newLines) });
+    resetToBlank();
   };
 
-  const handleClose = () => {
+  // ─── Post-save handlers ──────────────────────────────────────────────────────
+  const handleStayInModal = () => {
     setSuccessPrompt(false);
-    setErrorMessage('');
-    onClose();
+    resetToBlank();
   };
 
-  const handleHeaderChange = (e) => setHeaderData({ ...headerData, [e.target.name]: e.target.value });
+  const handleCloseModalAfterSave = () => {
+    setSuccessPrompt(false);
+    handleClose();
+  };
+
+  // ─── Form field handlers ─────────────────────────────────────────────────────
+  const handleHeaderChange = (e) => setHeaderData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+
   const handleLineChange = (id, field, value) => {
     let finalValue = value;
     if (field === 'amount') {
@@ -1342,15 +1373,17 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
     }
     setLines(prev => prev.map(line => line.id === id ? { ...line, [field]: finalValue } : line));
   };
-  const addLine = () => setLines(prev => [...prev, { id: Date.now() + Math.random(), category: '', amount: '' }]);
-  const removeLine = (id) => { if (lines.length > 1) setLines(prev => prev.filter(line => line.id !== id)); };
 
+  const addLine = () => setLines(prev => [...prev, { id: Date.now() + Math.random(), category: '', amount: '' }]);
+  const removeLine = (id) => { if (lines.length > 1) setLines(prev => prev.filter(l => l.id !== id)); };
+
+  // ─── Totals ──────────────────────────────────────────────────────────────────
   const totals = useMemo(() => {
     let totalDebit = 0; let ewtPayable = 0;
     lines.forEach(line => {
       const amt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
       totalDebit += amt;
-      const cat = line.category ? line.category.toUpperCase().replace(/\s+/g, '') : '';
+      const cat = (line.category || '').toUpperCase().replace(/\s+/g, '');
       if (cat === 'LABOR/SUBCONTRACTOR' || cat === 'LABOR/PAYROLL') {
         ewtPayable += (amt / 0.98) - amt;
       }
@@ -1361,74 +1394,110 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
   const targetCib = parseFloat(String(headerData.target_cib).replace(/,/g, '')) || 0;
   const isVarianceZero = Math.abs(targetCib - totals.cib_coh) < 0.01;
 
-  const executeSave = async (dataToSave) => {
+  // ─── Save — uses refs so it NEVER reads stale closure state ─────────────────
+  const executeSave = async (dataToSave, editing) => {
     setIsSaving(true);
     try {
       const token = sessionStorage.getItem('fbtmcc_token');
-      const url = editingData ? `${API_URL}/disbursements/${editingData.id}` : `${API_URL}/disbursements`;
-      const method = editingData ? 'PUT' : 'POST';
+      // Use the `editing` parameter passed explicitly — never the closure
+      const url = editing
+        ? `${API_URL}/disbursements/${editing.id}`
+        : `${API_URL}/disbursements`;
+      const method = editing ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
-        method: method,
+        method,
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(dataToSave)
       });
 
       if (response.ok) {
         if (refreshData) await refreshData();
-        setSuccessPrompt(true);
+        if (editing) {
+          handleCloseModalAfterSave();
+        } else {
+          // Clear any saved draft since it was successfully posted
+          localStorage.removeItem(DRAFT_KEY);
+          setSuccessPrompt(true);
+        }
       } else {
-        const errData = await response.json();
-        setErrorMessage(errData.error || "Hindi ma-save ang data.");
+        const errData = await response.json().catch(() => ({}));
+        setErrorMessage(errData.error || 'Hindi ma-save ang data.');
       }
-    } catch (error) {
-      console.error(error);
-      setErrorMessage("Network Error");
+    } catch (err) {
+      console.error('Additional costing save error:', err);
+      setErrorMessage('Network Error. Check your connection.');
     } finally {
       setIsSaving(false);
     }
   };
 
+  // ─── Submit ──────────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
 
-    const validLines = lines.map(line => ({ ...line, amount: line.amount ? String(line.amount).replace(/,/g, '') : '' }));
+    const validLines = lines
+      .filter(line => line.category && line.category.trim() !== '')
+      .map(line => ({ ...line, amount: String(line.amount).replace(/,/g, '') || '0' }));
 
-    const isEditing = !!editingData;
-    const newDisbursement = {
-      id: isEditing ? editingData.id : Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(),
+    if (validLines.length === 0) {
+      setErrorMessage('Kailangan maglagay ng kahit isang item sa Cost Breakdown.');
+      return;
+    }
+
+    const editing = isEditingRef.current ? editingDataRef.current : null;
+
+    const payload = {
       ...headerData,
+      id: editing ? editing.id : Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(),
       target_cib: String(headerData.target_cib).replace(/,/g, ''),
-      cv_no: isEditing ? (editingData.cv_no || '') : '',
+      cv_no: editing ? (editing.cv_no || '') : '',
       expenses: validLines,
       gross_amount: totals.cib_coh,
       ewt_amount: totals.ewtPayable,
       net_amount: totals.totalDebit,
-      created_at: isEditing ? editingData.created_at : new Date().toISOString()
+      stocks_amount: 0,
+      costing_type: 'additional',
+      created_at: editing ? editing.created_at : new Date().toISOString()
     };
 
-    executeSave(newDisbursement);
+    if (editing) {
+      // Editing: require password first
+      setPasswordModal({ isOpen: true, payload });
+    } else {
+      // New: post directly, no password
+      executeSave(payload, null);
+    }
   };
+
+  // ─── Keyboard shortcuts ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen && !passwordModal.isOpen && !showUnsavedModal && !showDraftModal && !successPrompt) {
+        handleCloseRequest();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, passwordModal.isOpen, showUnsavedModal, showDraftModal, successPrompt, headerData, lines, initialFormState]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[45] flex justify-center items-start pt-6 pb-6 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm px-4 overflow-hidden transition-colors duration-300">
+    <div className={`fixed inset-0 z-[45] flex justify-center ${successPrompt ? 'items-center' : 'items-start pt-6 pb-6'} bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm px-4 overflow-hidden transition-colors duration-300`}>
 
-      {/* FLOATING PASSWORD MODAL PARA SA EDIT/UPDATE NG ADDITIONAL */}
-      <div style={{ position: 'relative', zIndex: 9999 }}>
-        <PasswordConfirmModal
-          isOpen={passwordModal.isOpen}
-          actionType="update"
-          onClose={() => setPasswordModal({ isOpen: false, payload: null })}
-          onConfirm={() => {
-            const payload = passwordModal.payload;
-            setPasswordModal({ isOpen: false, payload: null });
-            executeSave(payload);
-          }}
-        />
-      </div>
+      {/* PASSWORD MODAL — only fires when EDITING */}
+      <PasswordConfirmModal
+        isOpen={passwordModal.isOpen}
+        actionType="update"
+        onClose={() => setPasswordModal({ isOpen: false, payload: null })}
+        onConfirm={() => {
+          const payload = passwordModal.payload;
+          setPasswordModal({ isOpen: false, payload: null });
+          executeSave(payload, editingDataRef.current);
+        }}
+      />
 
       <UnsavedChangesModal
         isOpen={showUnsavedModal}
@@ -1448,13 +1517,26 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
           <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mb-6 shadow-inner">
             <CheckCircle2 size={40} />
           </div>
-          <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-2">{editingAdditionalId ? 'Cost Updated!' : 'Cost Saved!'}</h3>
+          <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Cost Saved!</h3>
           <p className="text-slate-500 dark:text-slate-400 font-medium mb-8">
-            The additional cost has been {editingAdditionalId ? 'updated in' : 'added to'} the ledger successfully.
+            The additional cost has been added to the ledger successfully. Would you like to add a new one?
           </p>
-          <button onClick={handleClose} className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl transition-all shadow-lg">
-            Done
-          </button>
+          <div className="flex flex-col sm:flex-row w-full gap-3">
+            <button
+              onClick={handleCloseModalAfterSave}
+              className="flex-1 py-3.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-black rounded-xl transition-all"
+            >
+              <span className="flex items-center justify-center gap-2"><X size={16} /> Close</span>
+              <div className="text-[10px] font-medium text-slate-400 dark:text-slate-500 mt-0.5 uppercase tracking-widest">(ESC)</div>
+            </button>
+            <button
+              onClick={handleStayInModal}
+              className="flex-[1.5] py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl transition-all shadow-lg shadow-blue-200 dark:shadow-none"
+            >
+              <span className="flex items-center justify-center gap-2"><Plus size={16} /> Stay & Add New</span>
+              <div className="text-[10px] font-medium text-blue-300 mt-0.5 uppercase tracking-widest">(ENTER)</div>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="bg-slate-50 dark:bg-slate-900 w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-full border-2 border-red-300 dark:border-red-900">
@@ -1524,11 +1606,7 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
                         let val = e.target.value.replace(/[^0-9.]/g, '');
                         const parts = val.split('.');
                         if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
-                        if (val) {
-                          const p2 = val.split('.');
-                          p2[0] = p2[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-                          val = p2.join('.');
-                        }
+                        if (val) { const p2 = val.split('.'); p2[0] = p2[0].replace(/\B(?=(\d{3})+(?!\d))/g, ','); val = p2.join('.'); }
                         handleHeaderChange({ target: { name: 'target_cib', value: val } });
                       }} />
                   </div>
@@ -1583,9 +1661,7 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
                               onChange={(e) => handleLineChange(line.id, 'category', e.target.value)}
                             />
                             <datalist id="historical-additional-items">
-                              {historicalSuggestions.map(suggestion => (
-                                <option key={suggestion} value={suggestion} />
-                              ))}
+                              {historicalSuggestions.map(s => <option key={s} value={s} />)}
                             </datalist>
                           </div>
 
@@ -1652,3 +1728,4 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
     </div>
   );
 }
+
