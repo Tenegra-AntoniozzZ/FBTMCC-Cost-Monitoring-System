@@ -403,6 +403,10 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     return (filteredDisbursements || []).some(d => (parseFloat(d.ewt_amount) || 0) > 0);
   }, [filteredDisbursements]);
 
+  const isStocksVisible = useMemo(() => {
+    return (filteredDisbursements || []).some(d => (parseFloat(d.stocks_amount) || 0) > 0);
+  }, [filteredDisbursements]);
+
   const visibleCategories = useMemo(() => {
     return (categories || []).filter(cat => {
       return (filteredDisbursements || []).some(d => {
@@ -413,8 +417,8 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   }, [categories, filteredDisbursements]);
 
   const totalVisibleColumns = useMemo(() => {
-    return 8 + (isAcctsPayVisible ? 1 : 0) + (isEwtVisible ? 1 : 0) + visibleCategories.length + (canEdit ? 1 : 0);
-  }, [isAcctsPayVisible, isEwtVisible, visibleCategories, canEdit]);
+    return 8 + (isAcctsPayVisible ? 1 : 0) + (isEwtVisible ? 1 : 0) + (isStocksVisible ? 1 : 0) + visibleCategories.length + (canEdit ? 1 : 0);
+  }, [isAcctsPayVisible, isEwtVisible, isStocksVisible, visibleCategories, canEdit]);
 
   const ledgerTotals = useMemo(() => {
     let dr = 0;
@@ -422,6 +426,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     let ewt = 0;
     let cib = 0;
     let accts_pay = 0;
+    let stocks = 0;
 
     filteredDisbursements.forEach(d => {
       const inputTax = parseFloat(d.input_tax) || 0;
@@ -431,17 +436,19 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       const dbAcctsPay = parseFloat(d.accts_pay) || 0;   // already correct: CC net or 0
       const dbEwt = parseFloat(d.ewt_amount) || 0;
       const dbGross = parseFloat(d.gross_amount) || 0;
+      const dbStocks = parseFloat(d.stocks_amount) || 0;
       const cibAmount = Number((dbNet - dbAcctsPay).toFixed(2)); // 0 for CC, full net for normal
 
       dr += dbGross + inputTax;
       ewt += dbEwt;
       accts_pay += dbAcctsPay;
       cib += cibAmount;
-      // Full credit side = CIB + EWT + AcctsPay + outputTax
-      cr += cibAmount + dbEwt + dbAcctsPay + outputTax;
+      stocks += dbStocks;
+      // Full credit side = CIB + EWT + AcctsPay + Stocks + outputTax
+      cr += cibAmount + dbEwt + dbAcctsPay + dbStocks + outputTax;
     });
 
-    return { dr, cr, diff: dr - cr, ewt, cib, accts_pay };
+    return { dr, cr, diff: dr - cr, ewt, cib, accts_pay, stocks };
   }, [filteredDisbursements]);
 
   // ==========================================
@@ -747,8 +754,21 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
   const handleEditRow = (d) => {
     if (!canEdit) return;
+
+    // We must fetch full underlying records directly from `disbursements` 
+    // because `d.underlying_records` comes from `filteredDisbursements`
+    // which intentionally excludes "pure stock" records.
+    const getKey = (rec) => {
+      if (rec.cv_no && rec.cv_no.trim() !== '') return `cv_${rec.cv_no.toLowerCase().trim()}`;
+      if (rec.or_inv_no && rec.or_inv_no.trim() !== '') return `or_${rec.or_inv_no.toLowerCase().trim()}`;
+      return `solo_${rec.id}`;
+    };
+
+    const targetKey = getKey(d);
+    const fullUnderlyingRecords = disbursements.filter(rec => getKey(rec) === targetKey);
+
     setEditingId(d.id);
-    setEditingUnderlyingRecords(d.underlying_records || [d]);
+    setEditingUnderlyingRecords(fullUnderlyingRecords);
 
     // Normalize project_code to an array to prevent crashes when older string data or grouped array data is passed
     const projCodes = Array.isArray(d.project_code)
@@ -791,7 +811,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     });
 
     const groupsMap = {};
-    const underlying = d.underlying_records || [d];
+    const underlying = fullUnderlyingRecords;
 
     underlying.forEach(record => {
       const recordExpenses = record.expenses && record.expenses.length > 0 ? record.expenses : [];
@@ -855,7 +875,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     setCostingGroups(parsedGroups);
     setModalAttachments(d.attachments || []);
 
-    const stockRecords = (d.underlying_records || [d]).filter(r => (parseFloat(r.stocks_amount) || 0) > 0);
+    const stockRecords = fullUnderlyingRecords.filter(r => (parseFloat(r.stocks_amount) || 0) > 0);
 
     if (stockRecords.length > 0) {
       setIsAddStocksChecked(true);
@@ -1275,27 +1295,27 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
   useEffect(() => {
     if (initialDisbursementId && disbursements.length > 0) {
-      // Find the grouped record that contains this underlying ID
-      const groupedRecord = groupedDisbursements.find(g =>
-        (g.underlying_records || [g]).some(r => String(r.id) === String(initialDisbursementId))
-      );
+      const rawRecord = disbursements.find(d => String(d.id) === String(initialDisbursementId));
+      
+      if (rawRecord) {
+        const getGroupKey = (d) => {
+          if (d.cv_no && d.cv_no.trim() !== '') return `cv_${d.cv_no.toLowerCase().trim()}`;
+          if (d.or_inv_no && d.or_inv_no.trim() !== '') return `or_${d.or_inv_no.toLowerCase().trim()}`;
+          return `solo_${d.id}`;
+        };
 
-      if (groupedRecord) {
+        const targetKey = getGroupKey(rawRecord);
+        let recordToEdit = groupedDisbursements.find(g => getGroupKey(g) === targetKey);
+
+        if (!recordToEdit) {
+          recordToEdit = rawRecord;
+        }
+
         const timer = setTimeout(() => {
-          handleEditRow(groupedRecord);
+          handleEditRow(recordToEdit);
           if (onClearInitialDisbursement) onClearInitialDisbursement();
         }, 100);
         return () => clearTimeout(timer);
-      } else {
-        // Fallback to raw record just in case it got filtered out
-        const rawRecord = disbursements.find(d => String(d.id) === String(initialDisbursementId));
-        if (rawRecord) {
-          const timer = setTimeout(() => {
-            handleEditRow(rawRecord);
-            if (onClearInitialDisbursement) onClearInitialDisbursement();
-          }, 100);
-          return () => clearTimeout(timer);
-        }
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1573,6 +1593,9 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                   {isEwtVisible && (
                     <th className="px-6 py-5 text-xs font-black text-rose-800 dark:text-rose-400 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 text-right bg-rose-50/50 dark:bg-rose-900/30">EWT</th>
                   )}
+                  {isStocksVisible && (
+                    <th className="px-6 py-5 text-xs font-black text-violet-800 dark:text-violet-400 uppercase tracking-wider border-b-2 border-r border-slate-400 dark:border-slate-600 text-right bg-violet-50/50 dark:bg-violet-900/30">STOCKS</th>
+                  )}
                   {visibleCategories.map(cat => (
                     <th key={cat} className="px-4 py-5 text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-widest border-b-2 border-r border-slate-400 dark:border-slate-600 text-right min-w-[120px] bg-slate-50 dark:bg-slate-800" title={cat}>
                       {cat}
@@ -1619,6 +1642,9 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                     {isEwtVisible && (
                       <td className="px-6 py-4 text-right font-mono font-black text-rose-600 dark:text-rose-400 bg-rose-50/20 dark:bg-rose-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-rose-100/20 dark:group-hover:bg-rose-900/30">₱{(d.ewt_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     )}
+                    {isStocksVisible && (
+                      <td className="px-6 py-4 text-right font-mono font-black text-violet-600 dark:text-violet-400 bg-violet-50/20 dark:bg-violet-900/10 border-r border-slate-400 dark:border-slate-600 group-hover:bg-violet-100/20 dark:group-hover:bg-violet-900/30">₱{(d.stocks_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    )}
                     {visibleCategories.map(cat => {
                       const amt = getCategoryAmount(d, cat);
                       return (
@@ -1654,6 +1680,9 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                     )}
                     {isEwtVisible && (
                       <td className="px-6 py-6 text-right font-mono text-rose-800 dark:text-rose-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.ewt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    )}
+                    {isStocksVisible && (
+                      <td className="px-6 py-6 text-right font-mono text-violet-800 dark:text-violet-400 border-r border-slate-400 dark:border-slate-600 text-lg">₱{ledgerTotals.stocks.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                     )}
                     <td colSpan={visibleCategories.length + (canEdit ? 2 : 1)} className="px-6 py-6"></td>
                   </tr>
