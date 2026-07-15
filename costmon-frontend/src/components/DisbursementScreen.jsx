@@ -859,10 +859,15 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     setCostingGroups(parsedGroups);
     setModalAttachments(d.attachments || []);
 
+    // Stock description is only stored on the first DB sub-row (null for others).
+    // Always search underlying_records to find the record that actually has it.
+    const stockRecord = (d.underlying_records || [d]).find(r => r.stock_description && r.stock_description.trim() !== '');
+    const resolvedStockDescription = stockRecord ? (stockRecord.stock_description || '') : (d.stock_description || '');
+
     if (d.stocks_amount && d.stocks_amount > 0) {
       setIsAddStocksChecked(true);
       setStocksAmount(String(d.stocks_amount).replace(/\B(?=(\d{3})+(?!\d))/g, ','));
-      setStockDescription(d.stock_description || '');
+      setStockDescription(resolvedStockDescription);
     } else {
       setIsAddStocksChecked(false);
       setStocksAmount('');
