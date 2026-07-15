@@ -438,7 +438,8 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       accts_pay += acctsPay;
     });
 
-    return { dr, cr, diff: dr - cr, ewt, cib, accts_pay };
+    const adjustedTotalCredit = cr - accts_pay;
+    return { dr, cr: adjustedTotalCredit, diff: dr - cr, ewt, cib, accts_pay };
   }, [filteredDisbursements]);
 
   // ==========================================
@@ -1307,7 +1308,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       <main className="flex-1 overflow-hidden flex flex-col p-8 space-y-8">
 
         {/* STATS CARDS */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
+        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 shrink-0">
           <HealthCard
             title="Total of Debit (Gross)"
             amount={ledgerTotals.dr}
@@ -1315,10 +1316,16 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
             textClass="text-blue-600 dark:text-blue-400"
           />
           <HealthCard
-            title="Total of Credit (Net+Tax)"
+            title="TOTAL OF CREDIT (CIB)"
             amount={ledgerTotals.cr}
             colorClass="bg-emerald-600 dark:bg-emerald-500"
             textClass="text-emerald-600 dark:text-emerald-400"
+          />
+          <HealthCard
+            title="TOTAL ACCTS PAY (CREDIT CARD)"
+            amount={ledgerTotals.accts_pay}
+            colorClass="bg-amber-600 dark:bg-amber-500"
+            textClass="text-amber-600 dark:text-amber-400"
           />
           <HealthCard
             title="TOTAL EWT"
