@@ -266,14 +266,13 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     filteredDisbursements.forEach(d => {
       const key = getKey(d);
 
-      // Apply the same Credit Card redistribution used in ledgerTotals:
-      // If this sub-row belongs to a Credit Card project, its net_amount
-      // is an ACCTS PAY disbursement (not CIB), so move it accordingly.
-      const isCreditCard = d.project_code?.toLowerCase() === 'credit card';
-      const rawNet = parseFloat(d.net_amount) || 0;
-      const rawAcctsPay = parseFloat(d.accts_pay) || 0;
-      const effectiveNet = isCreditCard ? 0 : rawNet;
-      const effectiveAcctsPay = isCreditCard ? rawAcctsPay + rawNet : rawAcctsPay;
+      // DB values are already correctly split at save time:
+      //   net_amount  = gross - ewt - stocks (backend formula; for CC rows this equals the CC payment net)
+      //   accts_pay   = net_amount for CC rows, 0 for normal rows
+      // We derive the CIB display value as: net_amount - accts_pay
+      const dbNet = parseFloat(d.net_amount) || 0;
+      const dbAcctsPay = parseFloat(d.accts_pay) || 0;
+      const displayCib = Number((dbNet - dbAcctsPay).toFixed(2)); // 0 for CC rows, full net for normal rows
 
       if (!groups[key]) {
         groups[key] = {
@@ -281,9 +280,9 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
           project_code: [d.project_code],
           underlying_records: [d],
           gross_amount: parseFloat(d.gross_amount) || 0,
-          net_amount: effectiveNet,
+          net_amount: displayCib,
           ewt_amount: parseFloat(d.ewt_amount) || 0,
-          accts_pay: effectiveAcctsPay,
+          accts_pay: dbAcctsPay,
           target_cib: parseFloat(d.target_cib) || 0,
           input_tax: parseFloat(d.input_tax) || 0,
           output_tax: parseFloat(d.output_tax) || 0,
@@ -298,9 +297,9 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
           group.project_code.push(d.project_code);
         }
         group.gross_amount += parseFloat(d.gross_amount) || 0;
-        group.net_amount += effectiveNet;
+        group.net_amount += displayCib;
         group.ewt_amount += parseFloat(d.ewt_amount) || 0;
-        group.accts_pay += effectiveAcctsPay;
+        group.accts_pay += dbAcctsPay;
         group.target_cib += parseFloat(d.target_cib) || 0;
         group.input_tax += parseFloat(d.input_tax) || 0;
         group.output_tax += parseFloat(d.output_tax) || 0;
@@ -429,27 +428,21 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       const inputTax = parseFloat(d.input_tax) || 0;
       const outputTax = parseFloat(d.output_tax) || 0;
 
-      let netAmount = parseFloat(d.net_amount) || 0;
-      let acctsPay = parseFloat(d.accts_pay) || 0;
+      const dbNet = parseFloat(d.net_amount) || 0;       // gross - ewt - stocks
+      const dbAcctsPay = parseFloat(d.accts_pay) || 0;   // already correct: CC net or 0
+      const dbEwt = parseFloat(d.ewt_amount) || 0;
+      const dbGross = parseFloat(d.gross_amount) || 0;
+      const cibAmount = Number((dbNet - dbAcctsPay).toFixed(2)); // 0 for CC, full net for normal
 
-      // Overwrite: If project is Credit Card, move CIB to Accts Pay
-      if (Array.isArray(d.project_code) ? d.project_code.some(pc => pc?.toLowerCase() === 'credit card') : d.project_code?.toLowerCase() === 'credit card') {
-        acctsPay += netAmount;
-        netAmount = 0;
-      }
-
-      const currentDr = (parseFloat(d.gross_amount) || 0) + inputTax;
-      const currentCr = netAmount + (parseFloat(d.ewt_amount) || 0) + acctsPay + outputTax;
-
-      dr += currentDr;
-      cr += currentCr;
-      ewt += (parseFloat(d.ewt_amount) || 0);
-      cib += netAmount;
-      accts_pay += acctsPay;
+      dr += dbGross + inputTax;
+      ewt += dbEwt;
+      accts_pay += dbAcctsPay;
+      cib += cibAmount;
+      // Full credit side = CIB + EWT + AcctsPay + outputTax
+      cr += cibAmount + dbEwt + dbAcctsPay + outputTax;
     });
 
-    const adjustedTotalCredit = cr - accts_pay;
-    return { dr, cr: adjustedTotalCredit, diff: dr - cr, ewt, cib, accts_pay };
+    return { dr, cr, diff: dr - cr, ewt, cib, accts_pay };
   }, [filteredDisbursements]);
 
   // ==========================================
@@ -1085,6 +1078,13 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
         : 0;
       const projGross = Number((projNet + projEwt + projStocksAmount).toFixed(2));
 
+      const isCreditCard = (projCode || '').toLowerCase() === 'credit card';
+      // accts_pay is a metadata field stored separately. net_amount must always satisfy
+      // the backend formula: gross_amount - ewt_amount - stocks_amount
+      const explicitAcctsPay = isCreditCard ? projNet : 0;
+      // net_amount = gross - ewt - stocks (the backend validation formula)
+      const backendNet = Number((projGross - projEwt - projStocksAmount).toFixed(2));
+
       const isAllocation = isStockAllocationMode && stockAllocationSource;
 
       return {
@@ -1095,12 +1095,29 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
         target_cib: getSplitVal(finalHeaderData.target_cib),
         input_tax: getSplitVal(finalHeaderData.input_tax),
         output_tax: getSplitVal(finalHeaderData.output_tax),
-        accts_pay: getSplitVal(finalHeaderData.accts_pay),
-        expenses: projectExpenses.map(exp => ({ ...exp, category: exp.category || null })),
+        accts_pay: explicitAcctsPay,
+        expenses: projectExpenses.map(exp => {
+          const cat = (exp.category || '').toUpperCase();
+          const taxAmount = (cat === 'LABOR /SUBCONTRACTOR' || cat === 'LABOR/PAYROLL') 
+            ? Number(((exp.amount / 0.98) - exp.amount).toFixed(2)) 
+            : 0;
+          
+          const netAmount = exp.amount;
+          const baseAmount = Number((netAmount + taxAmount).toFixed(2));
+
+          return {
+            ...exp,
+            category: exp.category || null,
+            debit: baseAmount,
+            ewt: taxAmount,
+            accts_pay: isCreditCard ? netAmount : 0,
+            credit: isCreditCard ? 0 : netAmount
+          };
+        }),
         attachments: modalAttachments,
         gross_amount: projGross,
         ewt_amount: projEwt,
-        net_amount: projNet,
+        net_amount: backendNet,
         // Stock allocation entries are saved as plain expenses — stocks_amount = 0
         stocks_amount: isAllocation ? 0 : projStocksAmount,
         stock_description: (!isAllocation && isAddStocksChecked && index === 0) ? stockDescription.trim() : null,
@@ -1328,7 +1345,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
           />
           <HealthCard
             title="TOTAL OF CREDIT (CIB)"
-            amount={ledgerTotals.cr}
+            amount={ledgerTotals.cib}
             colorClass="bg-emerald-600 dark:bg-emerald-500"
             textClass="text-emerald-600 dark:text-emerald-400"
           />
