@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Loader2, Search, Edit, ShoppingCart } from 'lucide-react';
+import { Package, Loader2, Search, Edit, ShoppingCart, Eye, EyeOff } from 'lucide-react';
 import { API_URL } from '../utils/Constants';
 
 export default function StocksScreen({ onNavigateToDisbursement, onUseStock }) {
     const [disbursements, setDisbursements] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [hideMonitoring, setHideMonitoring] = useState(false);
 
     useEffect(() => {
         const fetchDisbursements = async () => {
@@ -30,6 +31,7 @@ export default function StocksScreen({ onNavigateToDisbursement, onUseStock }) {
     const stockRecords = disbursements.filter(d => d.stocks_amount && parseFloat(d.stocks_amount) > 0);
 
     const filteredRecords = stockRecords.filter(d => {
+        if (hideMonitoring && d.is_monitoring_only) return false;
         if (!searchQuery) return true;
         const query = searchQuery.toLowerCase();
         return d.cv_no && d.cv_no.toLowerCase().includes(query);
@@ -49,17 +51,26 @@ export default function StocksScreen({ onNavigateToDisbursement, onUseStock }) {
                         </p>
                     </div>
 
-                    <div className="relative w-full md:w-64">
-                        <span className="absolute left-3 top-2.5 text-slate-400">
-                            <Search size={18} />
-                        </span>
-                        <input
-                            type="text"
-                            placeholder="Search CV No..."
-                            className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-white transition-colors shadow-sm"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+                        <button
+                            onClick={() => setHideMonitoring(prev => !prev)}
+                            className="p-2.5 bg-white dark:bg-slate-800 border border-amber-400 dark:border-amber-600 rounded-lg text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors shadow-sm flex items-center justify-center focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                            title={hideMonitoring ? "Show Monitoring Drafts" : "Hide Monitoring Drafts"}
+                        >
+                            {hideMonitoring ? <Eye size={18} /> : <EyeOff size={18} />}
+                        </button>
+                        <div className="relative w-full sm:w-64">
+                            <span className="absolute left-3 top-2.5 text-slate-400">
+                                <Search size={18} />
+                            </span>
+                            <input
+                                type="text"
+                                placeholder="Search CV No..."
+                                className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none text-slate-800 dark:text-white transition-colors shadow-sm"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
                     </div>
                 </header>
 
