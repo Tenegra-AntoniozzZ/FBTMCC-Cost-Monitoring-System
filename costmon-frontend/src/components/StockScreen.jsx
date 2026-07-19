@@ -47,7 +47,7 @@ export default function StocksScreen({ onNavigateToDisbursement, onUseStock }) {
                             Stock Monitoring
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">
-                            Minimalist viewer for stock disbursements
+                            Stock disbursements
                         </p>
                     </div>
 
