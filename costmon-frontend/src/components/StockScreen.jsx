@@ -98,10 +98,21 @@ export default function StocksScreen({ onNavigateToDisbursement, onUseStock }) {
                                     filteredRecords.map((record, index) => (
                                         <tr
                                             key={record.id || index}
-                                            className="even:bg-slate-50/80 dark:even:bg-slate-800/80 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-colors group"
+                                            className={
+                                                record.is_monitoring_only
+                                                    ? "bg-amber-50/40 dark:bg-amber-950/20 outline outline-2 outline-amber-400 -outline-offset-2 transition-colors group"
+                                                    : "even:bg-slate-50/80 dark:even:bg-slate-800/80 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-colors group"
+                                            }
                                         >
                                             <td className="px-6 py-4 font-black text-blue-700 dark:text-blue-400 border-r border-slate-100 dark:border-slate-700 w-32">
-                                                {record.cv_no ? `#${record.cv_no}` : '-'}
+                                                <div className="flex flex-col gap-1 items-start">
+                                                    <span>{record.cv_no ? `#${record.cv_no}` : '-'}</span>
+                                                    {Boolean(record.is_monitoring_only) && (
+                                                        <span className="text-[9px] bg-amber-400 text-amber-900 px-1.5 py-0.5 rounded-full uppercase tracking-wider font-bold w-fit">
+                                                            Monitoring
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 font-bold text-slate-600 dark:text-slate-400 border-r border-slate-100 dark:border-slate-700 whitespace-nowrap uppercase">
                                                 {record.or_inv_no || '-'}
