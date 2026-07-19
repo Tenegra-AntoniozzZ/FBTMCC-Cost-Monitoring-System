@@ -56,6 +56,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   const [postSavePrompt, setPostSavePrompt] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editingUnderlyingRecords, setEditingUnderlyingRecords] = useState([]);
+  const [usedStocksAmount, setUsedStocksAmount] = useState(0);
   const [showTaxFields, setShowTaxFields] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -494,9 +495,9 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     });
 
     const totalStocks = isAddStocksChecked ? stocksList.reduce((sum, stock) => sum + (parseFloat(String(stock.amount).replace(/,/g, '')) || 0), 0) : 0;
-    const cib_coh = totalDebit + ewtPayable + totalStocks;
+    const cib_coh = totalDebit + ewtPayable + totalStocks + usedStocksAmount;
     return { totalDebit, ewtPayable, cib_coh, stocksAmountVal: totalStocks };
-  }, [costingGroups, isAddStocksChecked, stocksList]);
+  }, [costingGroups, isAddStocksChecked, stocksList, usedStocksAmount]);
 
   const targetCib = parseFloat(String(headerData.target_cib).replace(/,/g, '')) || 0;
   const isVarianceZero = Math.abs(targetCib - totals.cib_coh) < 0.01;
@@ -557,6 +558,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     setLineErrors([]);
     setEditingId(null);
     setEditingUnderlyingRecords([]);
+    setUsedStocksAmount(0);
     setIsAddStocksChecked(false);
     setStocksList([{ amount: '', description: '' }]);
     setIsMonitoringOnly(false);
@@ -788,6 +790,16 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
         return Math.abs(dTime - recTime) < 3000; // within 3 seconds
       });
     }
+
+    // --- Compute Used Stocks Amount ---
+    const allStockLines = fullUnderlyingRecords.filter(r => typeof r.stock_description === 'string' && r.stock_description.trim() !== '');
+    const usedTotal = allStockLines.reduce((sum, r) => {
+      const original = parseFloat(r.gross_amount) || 0;
+      const current = parseFloat(r.stocks_amount) || 0;
+      const diff = original - current;
+      return sum + (diff > 0 ? diff : 0);
+    }, 0);
+    setUsedStocksAmount(usedTotal);
 
     // ── Set monitoring toggle FIRST to avoid stale-state race with resetForm ──
     const monitoringFlag = Boolean(fullUnderlyingRecords[0]?.is_monitoring_only);
@@ -2613,6 +2625,12 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                           <div className="flex justify-between items-center text-blue-300 dark:text-blue-400 text-sm">
                             <span>Add: Stocks Amount</span>
                             <span className="font-mono text-white">+ ₱ {totals.stocksAmountVal ? totals.stocksAmountVal.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'}</span>
+                          </div>
+                        )}
+                        {usedStocksAmount > 0 && (
+                          <div className="flex justify-between items-center text-orange-400 dark:text-orange-500 text-sm">
+                            <span>Add: Used Stocks</span>
+                            <span className="font-mono text-white">+ ₱ {usedStocksAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                           </div>
                         )}
                         {headerData.input_tax && (
