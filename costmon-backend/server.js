@@ -370,6 +370,30 @@ app.put('/api/users/:id/change-own-password', authenticateToken, async (req, res
 // ==========================================
 // AUDIT LOG ENDPOINT (CEO ONLY)
 // ==========================================
+
+// ==========================================
+// USER SETTINGS ENDPOINTS
+// ==========================================
+app.get('/api/users/me/settings', authenticateToken, (req, res) => {
+  db.get("SELECT settings_json FROM users WHERE id = ?", [req.user.id], (err, user) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    let parsedSettings = {};
+    try { parsedSettings = JSON.parse(user.settings_json || '{}'); } catch(e){}
+    res.json({ settings: parsedSettings });
+  });
+});
+
+app.put('/api/users/me/settings', authenticateToken, (req, res) => {
+  const { settings } = req.body;
+  if (!settings) return res.status(400).json({ error: "No settings provided" });
+  
+  db.run("UPDATE users SET settings_json = ? WHERE id = ?", [JSON.stringify(settings), req.user.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
 app.get('/api/audit-logs', authenticateToken, requireCEO, (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 50;
