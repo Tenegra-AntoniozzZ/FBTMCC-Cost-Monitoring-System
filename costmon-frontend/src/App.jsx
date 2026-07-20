@@ -367,6 +367,7 @@ export default function App() {
               <DashboardScreen 
                 projects={projects} 
                 disbursements={disbursements} 
+                categories={categories}
               />
             } 
           />

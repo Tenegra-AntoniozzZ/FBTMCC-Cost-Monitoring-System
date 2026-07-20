@@ -1,9 +1,47 @@
 import { useState, useMemo, Fragment, useRef } from 'react';
-import { LayoutDashboard, Briefcase, Building2, ArrowLeft, TrendingUp, FileText, ZoomIn, ZoomOut, RotateCcw, Wallet, Receipt, Eye, EyeOff, Calendar, X, Download, FileSpreadsheet, BarChart2, PieChart as PieChartIcon } from 'lucide-react';
+import { LayoutDashboard, Briefcase, Building2, ArrowLeft, TrendingUp, FileText, ZoomIn, ZoomOut, RotateCcw, Wallet, Receipt, Eye, EyeOff, Calendar, X, Download, FileSpreadsheet, BarChart2, PieChart as PieChartIcon, Settings } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line } from 'recharts';
 
-export default function DashboardScreen({ projects = [], disbursements = [] }) {
+export default function DashboardScreen({ projects = [], disbursements = [], categories = [] }) {
   const [activeView, setActiveView] = useState('selection');
+
+  // --- DYNAMIC OPR CONFIGURATION STATES ---
+  const [overheadProjects, setOverheadProjects] = useState(() => {
+    const saved = localStorage.getItem('dashboard_overhead_projects');
+    return saved ? JSON.parse(saved) : ['OFFICE', 'PAYATAS', 'RESIDENCE'];
+  });
+  const [customColumns, setCustomColumns] = useState(() => {
+    const saved = localStorage.getItem('dashboard_custom_columns');
+    return saved ? JSON.parse(saved) : [
+      { id: 'col_payroll', title: 'Payroll', mappedCategories: ['[MAIN] Payroll', 'Labor /SUBCONTRACTOR', 'Salaries & Wages'] },
+      { id: 'col_electrical', title: 'Electrical Office/Payatas', mappedCategories: ['[MAIN] Electrical Office/Payatas', 'Light & Power'] },
+      { id: 'col_water', title: 'Water/office/Payatas', mappedCategories: ['[MAIN] Water/office/Payatas', 'Water'] },
+      { id: 'col_comms', title: 'Comunication/Telephone', mappedCategories: ['[MAIN] Comunication/Telephone', 'Communication'] },
+      { id: 'col_retainer', title: 'Retainer', mappedCategories: ['[MAIN] Retainer', 'SOP/Retainer Fee'] },
+      { id: 'col_supplies', title: 'Office supplies/Outing', mappedCategories: ['[MISC] Office supplies/Outing', 'Office Supplies'] },
+      { id: 'col_car_repair', title: 'Car Repair & Maintenance', mappedCategories: ['[MISC] Car Repair & Maintenance', 'Repair & Maint.'] },
+      { id: 'col_car_reg', title: 'Car Registration', mappedCategories: ['[MISC] Car Registration'] },
+      { id: 'col_contribution', title: 'Contribution', mappedCategories: ['[MISC] Contribution'] }
+    ];
+  });
+  const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
+  const [editingColumn, setEditingColumn] = useState(null);
+
+  const saveColumnConfig = () => {
+    if (!editingColumn) return;
+    const updated = customColumns.map(col => col.id === editingColumn.id ? editingColumn : col);
+    setCustomColumns(updated);
+    localStorage.setItem('dashboard_custom_columns', JSON.stringify(updated));
+    setIsColumnModalOpen(false);
+  };
+
+  const toggleProjectSelection = (code) => {
+    const updated = overheadProjects.includes(code)
+      ? overheadProjects.filter(p => p !== code)
+      : [...overheadProjects, code];
+    setOverheadProjects(updated);
+    localStorage.setItem('dashboard_overhead_projects', JSON.stringify(updated));
+  };
 
   // State para i-toggle ang Additional Works breakdown columns
   const [showAdditionalWorks, setShowAdditionalWorks] = useState(true);
@@ -173,42 +211,64 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
   };
 
   // ==========================================
-  // EXPORT TO EXCEL FUNCTION (OFFICE)
+  // EXPORT TO EXCEL FUNCTION (OFFICE — UNIFIED)
   // ==========================================
   const downloadOfficeExcel = async () => {
     try {
       setIsExportingOfficeExcel(true);
       const XLSX = (await import('xlsx')).default;
-
       const wb = XLSX.utils.book_new();
       const excelRows = [];
 
-      excelRows.push(["FBTMCC - OFFICE OPERATIONS MASTER LEDGER"]);
+      excelRows.push(["FBTMCC - MONTHLY UNIFIED MASTER LEDGER"]);
       excelRows.push([dateFilterLabel ? `Filter Period: ${dateFilterLabel}` : "Period: All-Time Records"]);
       excelRows.push([]);
 
       excelRows.push([
-        "Date", "Code", "Total", "Net Profit", "Contract plus Add'l w/VAT", "Empty",
-        "Contract w/o Vat", "Contract w/o Vat & Overhead & PM", "Equivalent 30% Overhead, Contingency & PM",
-        "Equivalent 10% Retention base on Contract w/ Vat", "Effective Overhead", "Total EOC per Month",
-        "Payroll", "Electrical Office/Payatas", "Water/office/Payatas", "Comunication/Telephone",
-        "Retainer", "Office supplies/Outing", "Car Repair & Maintenance", "Car Registration", "Contribution"
+        "Month", "Code",
+        "Contract plus Add'l w/VAT",
+        "Contract w/o Vat",
+        "Contract w/o Vat & Overhead & PM",
+        "Equivalent 30% Overhead, Contingency & PM",
+        "Equivalent 10% Retention base on Contract w/ Vat",
+        "Effective Overhead",
+        "Total EOC per Month",
+        ...customColumns.map(col => col.title),
+        "Total", "Net Profit"
       ]);
 
-      officeData.forEach(o => {
-        excelRows.push([
-          o.project_start || '-', o.project_code, o.total_specific_expenses, o.NET_PROFIT, o.TCC, "-",
-          o.CC_WITHOUT_VAT, o.CC_WO_VAT_OH_PM, o.OH_30, o.RETENTION_10, o.EFFECTIVE_OVERHEAD, "-",
-          o.exp_payroll, o.exp_electrical, o.exp_water, o.exp_comms, o.exp_retainer,
-          o.exp_supplies, o.exp_car_repair, o.exp_car_reg, o.exp_contribution
-        ]);
+      monthlyTableRows.forEach(row => {
+        const fmt = (v) => (v === null || v === undefined || v === 0) ? '' : v;
+        if (row.rowType === 'month_header') {
+          excelRows.push([
+            row.monthLabel, '', '', '', '', '', '', '', '', ...customColumns.map(() => ''), '', ''
+          ]);
+        } else if (row.rowType === 'project') {
+          excelRows.push([
+            '', // Blank for individual project rows
+            row.project_code,
+            fmt(row.TCC), fmt(row.CONTRACT_WO_VAT), fmt(row.CONTRACT_WO_VAT_OH_PM),
+            fmt(row.EQ_30_OH), fmt(row.EQ_10_RETENTION), fmt(row.EFFECTIVE_OH),
+            '', // Total EOC per Month
+            ...customColumns.map(col => fmt(row[col.id])),
+            fmt(row.total_specific_expenses), fmt(row.NET_PROFIT)
+          ]);
+        } else if (row.rowType === 'monthly_total') {
+          excelRows.push([
+            '', 'MONTHLY TOTAL',
+            fmt(row.TCC), fmt(row.CONTRACT_WO_VAT), fmt(row.CONTRACT_WO_VAT_OH_PM),
+            fmt(row.EQ_30_OH), fmt(row.EQ_10_RETENTION), fmt(row.EFFECTIVE_OH),
+            '',
+            ...customColumns.map(col => fmt(row[col.id])),
+            fmt(row.total_specific_expenses), fmt(row.NET_PROFIT)
+          ]);
+        }
       });
 
       const ws = XLSX.utils.aoa_to_sheet(excelRows);
-      XLSX.utils.book_append_sheet(wb, ws, "Office Master Ledger");
-
+      XLSX.utils.book_append_sheet(wb, ws, "Monthly Master Ledger");
       const dateStr = new Date().toISOString().split('T')[0];
-      XLSX.writeFile(wb, `OFFICE_MASTER_LEDGER_${dateStr}.xlsx`);
+      XLSX.writeFile(wb, `MONTHLY_MASTER_LEDGER_${dateStr}.xlsx`);
     } catch (error) {
       console.error("Failed to export Excel file:", error);
     } finally {
@@ -297,7 +357,7 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
   // ==========================================
   // CALCULATIONS BASED ON YOUR TABLE IMAGES
   // ==========================================
-  const { officeData, projectData, officeTotalBudget, projectTotalBudget, totalCompanyExpenses } = useMemo(() => {
+  const { officeData, projectData, unifiedData, officeTotalBudget, projectTotalBudget, totalCompanyExpenses } = useMemo(() => {
     const office = [];
     const projs = [];
     let oBudget = 0;
@@ -370,18 +430,38 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
       const CC_WO_VAT_OH_PM = CC_WITHOUT_VAT - OH_30;
       const EFFECTIVE_OVERHEAD = OH_30;
 
-      const exp_payroll = getCategoryTotal('payroll') + getCategoryTotal('labor');
-      const exp_electrical = getCategoryTotal('electrical');
-      const exp_water = getCategoryTotal('water');
-      const exp_comms = getCategoryTotal('comunication') + getCategoryTotal('telephone') + getCategoryTotal('internet');
-      const exp_retainer = getCategoryTotal('retainer');
-      const exp_supplies = getCategoryTotal('office supplies') + getCategoryTotal('outing');
-      const exp_car_repair = getCategoryTotal('car repair') + getCategoryTotal('maintenance');
-      const exp_car_reg = getCategoryTotal('car registration');
-      const exp_contribution = getCategoryTotal('contribution');
+      let total_specific_expenses = 0;
+      const dynamicExpenses = {};
+      customColumns.forEach(col => {
+        const sum = projExpenses.reduce((total, d) => {
+          const lineTotal = (d.expenses || [])
+            .filter(e => {
+              if (!e.category) return false;
+              return col.mappedCategories.some(kw => {
+                const eClean = String(e.category).toLowerCase().replace(/[^a-z0-9]/g, '');
+                const kClean = String(kw).toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (!eClean || !kClean) return false;
+                return eClean.includes(kClean) || kClean.includes(eClean);
+              });
+            })
+            .reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+          return total + lineTotal;
+        }, 0);
+        dynamicExpenses[col.id] = sum;
+        total_specific_expenses += sum;
+      });
 
-      const total_specific_expenses = exp_payroll + exp_electrical + exp_water + exp_comms + exp_retainer + exp_supplies + exp_car_repair + exp_car_reg + exp_contribution;
       const NET_PROFIT = TCC - total_specific_expenses;
+
+      // -----------------------------------------------
+      // NEW: D5-based formula columns for unified table
+      // D5 = TCC (Contract + Additional Works + VAT)
+      // -----------------------------------------------
+      const CONTRACT_WO_VAT = TCC / 1.12;
+      const CONTRACT_WO_VAT_OH_PM = CONTRACT_WO_VAT / 1.3;
+      const EQ_30_OH = CONTRACT_WO_VAT_OH_PM * 0.3;
+      const EQ_10_RETENTION = TCC * 0.1;
+      const EFFECTIVE_OH = EQ_30_OH - EQ_10_RETENTION;
 
       const computedData = {
         ...p,
@@ -391,16 +471,21 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
         ADLM, SAVING_30, SAVING_20, SAVING_12,
 
         NET_PROFIT, RETENTION_10, CC_WO_VAT_OH_PM, EFFECTIVE_OVERHEAD,
-        total_specific_expenses, exp_payroll,
-        exp_electrical, exp_water, exp_comms, exp_retainer,
-        exp_supplies, exp_car_repair, exp_car_reg, exp_contribution
+        total_specific_expenses, ...dynamicExpenses,
+
+        // Unified table D5-based formula columns
+        CONTRACT_WO_VAT,
+        CONTRACT_WO_VAT_OH_PM,
+        EQ_30_OH,
+        EQ_10_RETENTION,
+        EFFECTIVE_OH
       };
 
       projs.push(computedData);
       pBudget += CC;
     });
 
-    // 3. Filter and map office disbursements
+    // 3. Filter and map office disbursements (for existing officeData — summary cards still use this)
     const officeDisbursements = filteredDisbursements.filter(d =>
       d.project_code && officeProjectCodes.has(d.project_code.toUpperCase())
     );
@@ -412,17 +497,23 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
           .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
       };
 
-      const exp_payroll = getDisbCategoryTotal(['payroll', 'labor']);
-      const exp_electrical = getDisbCategoryTotal(['electrical', 'light', 'power']);
-      const exp_water = getDisbCategoryTotal(['water']);
-      const exp_comms = getDisbCategoryTotal(['comunication', 'telephone', 'internet', 'comms']);
-      const exp_retainer = getDisbCategoryTotal(['retainer', 'sop']);
-      const exp_supplies = getDisbCategoryTotal(['office supplies', 'outing', 'supplies']);
-      const exp_car_repair = getDisbCategoryTotal(['car repair', 'maintenance', 'repair']);
-      const exp_car_reg = getDisbCategoryTotal(['car registration', 'registration']);
-      const exp_contribution = getDisbCategoryTotal(['contribution']);
-
-      const total_specific_expenses = exp_payroll + exp_electrical + exp_water + exp_comms + exp_retainer + exp_supplies + exp_car_repair + exp_car_reg + exp_contribution;
+      let total_specific_expenses = 0;
+      const dynamicExpenses = {};
+      customColumns.forEach(col => {
+        const sum = (d.expenses || [])
+          .filter(e => {
+            if (!e.category) return false;
+            return col.mappedCategories.some(kw => {
+              const eClean = String(e.category).toLowerCase().replace(/[^a-z0-9]/g, '');
+              const kClean = String(kw).toLowerCase().replace(/[^a-z0-9]/g, '');
+              if (!eClean || !kClean) return false;
+              return eClean.includes(kClean) || kClean.includes(eClean);
+            });
+          })
+          .reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+        dynamicExpenses[col.id] = sum;
+        total_specific_expenses += sum;
+      });
       const NET_PROFIT = 0 - total_specific_expenses;
 
       office.push({
@@ -451,28 +542,239 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
         CC_WO_VAT_OH_PM: 0,
         EFFECTIVE_OVERHEAD: 0,
         total_specific_expenses,
-        exp_payroll,
-        exp_electrical,
-        exp_water,
-        exp_comms,
-        exp_retainer,
-        exp_supplies,
-        exp_car_repair,
-        exp_car_reg,
-        exp_contribution
+        ...dynamicExpenses
       });
 
       totalExp += total_specific_expenses;
     });
 
+    // ============================================================
+    // 4. BUILD UNIFIED DATA: All Disbursements (Expense rows) +
+    //    All Construction Projects (Project rows), sorted by Date
+    // ============================================================
+
+    // Expense rows: ALL disbursements (regardless of project_type)
+    const expenseRows = filteredDisbursements.map(d => {
+      const getDisbCategoryTotal = (keywords) => {
+        return (d.expenses || [])
+          .filter(e => e.category && keywords.some(kw => e.category.toLowerCase().includes(kw.toLowerCase())))
+          .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+      };
+
+      let total_specific_expenses = 0;
+      const dynamicExpenses = {};
+      customColumns.forEach(col => {
+        const sum = (d.expenses || [])
+          .filter(e => {
+            if (!e.category) return false;
+            return col.mappedCategories.some(kw => {
+              const eClean = String(e.category).toLowerCase().replace(/[^a-z0-9]/g, '');
+              const kClean = String(kw).toLowerCase().replace(/[^a-z0-9]/g, '');
+              if (!eClean || !kClean) return false;
+              return eClean.includes(kClean) || kClean.includes(eClean);
+            });
+          })
+          .reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+        dynamicExpenses[col.id] = sum;
+        total_specific_expenses += sum;
+      });
+      const NET_PROFIT = 0 - total_specific_expenses;
+
+      return {
+        rowType: 'expense',
+        id: `expense-${d.id}`,
+        date: d.date || null,
+        project_code: d.project_code,
+        project_name: d.particulars || d.payee || 'Expense Record',
+        total_specific_expenses,
+        NET_PROFIT,
+        ...dynamicExpenses,
+        // Project formula columns are not applicable → null
+        TCC: null,
+        CONTRACT_WO_VAT: null,
+        CONTRACT_WO_VAT_OH_PM: null,
+        EQ_30_OH: null,
+        EQ_10_RETENTION: null,
+        EFFECTIVE_OH: null,
+      };
+    });
+
+    // Project rows: ALL construction projects
+    const projectRows = projs.map(p => ({
+      rowType: 'project',
+      id: `project-${p.id}`,
+      date: (p.project_start && String(p.project_start).trim()) ? p.project_start : null,
+      project_code: p.project_code,
+      project_name: p.project_name,
+      total_specific_expenses: p.total_specific_expenses,
+      NET_PROFIT: p.NET_PROFIT,
+      TCC: p.TCC,
+      CONTRACT_WO_VAT: p.CONTRACT_WO_VAT,
+      CONTRACT_WO_VAT_OH_PM: p.CONTRACT_WO_VAT_OH_PM,
+      EQ_30_OH: p.EQ_30_OH,
+      EQ_10_RETENTION: p.EQ_10_RETENTION,
+      EFFECTIVE_OH: p.EFFECTIVE_OH,
+      // Expense columns are not applicable → null
+      exp_payroll: null,
+      exp_electrical: null,
+      exp_water: null,
+      exp_comms: null,
+      exp_retainer: null,
+      exp_supplies: null,
+      exp_car_repair: null,
+      exp_car_reg: null,
+      exp_contribution: null,
+    }));
+
+    const merged = [...projectRows, ...expenseRows];
+
+    // Sort: rows WITH a date first (ascending), rows WITHOUT date pushed to the bottom
+    merged.sort((a, b) => {
+      const hasA = a.date && String(a.date).trim();
+      const hasB = b.date && String(b.date).trim();
+      if (!hasA && !hasB) return 0;
+      if (!hasA) return 1;  // a has no date → push to bottom
+      if (!hasB) return -1; // b has no date → push to bottom
+      return new Date(a.date) - new Date(b.date); // ascending by date
+    });
+
     return {
       officeData: office,
       projectData: projs,
+      unifiedData: merged,
       officeTotalBudget: oBudget,
       projectTotalBudget: pBudget,
       totalCompanyExpenses: totalExp
     };
-  }, [projects, filteredDisbursements]);
+  }, [projects, filteredDisbursements, customColumns]);
+
+  // ================================================================
+  // MONTHLY TABLE ROWS
+  // Groups construction projects by month.
+  // Aggregates OFFICE/PAYATAS/RESIDENCE disbursements per month.
+  // Produces: [project row, project row, ..., monthly_total row] per month.
+  // ================================================================
+  const monthlyTableRows = useMemo(() => {
+    // ── 1. Filter & aggregate expenses by month using overheadProjects ──
+    const oprDisb = filteredDisbursements.filter(d =>
+      d.project_code && overheadProjects.some(kw =>
+        d.project_code.toUpperCase() === kw.toUpperCase()
+      )
+    );
+
+    const expsByMonth = {}; 
+    oprDisb.forEach(d => {
+      const mk = d.date && String(d.date).trim() ? String(d.date).slice(0, 7) : '__unscheduled__';
+      if (!expsByMonth[mk]) {
+        expsByMonth[mk] = {};
+        // Initialize dynamic column totals
+        customColumns.forEach(col => {
+          expsByMonth[mk][col.id] = 0;
+        });
+      }
+
+      (d.expenses || []).forEach(e => {
+        if (!e.category) return;
+        customColumns.forEach(col => {
+          // More robust matching: ignore case, spaces, and punctuation. Allow two-way substring matching.
+          if (col.mappedCategories.some(kw => {
+            const eClean = String(e.category).toLowerCase().replace(/[^a-z0-9]/g, '');
+            const kClean = String(kw).toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (!eClean || !kClean) return false;
+            return eClean.includes(kClean) || kClean.includes(eClean);
+          })) {
+            expsByMonth[mk][col.id] += (parseFloat(e.amount) || 0);
+          }
+        });
+      });
+    });
+
+    // ── 2. Create 12 months array ──
+    const allMonths = [];
+    const thisYear = new Date().getFullYear();
+    const monthsNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    for (let m = 1; m <= 12; m++) {
+      const mk = `${thisYear}-${String(m).padStart(2, '0')}`;
+      allMonths.push({ mk, label: `${monthsNames[m - 1].toUpperCase()}` });
+    }
+    // Add unscheduled / no month
+    allMonths.push({ mk: '__unscheduled__', label: 'NO MONTHS' });
+
+    const rows = [];
+    allMonths.forEach(({ mk, label }) => {
+      const projs = projectData.filter(p => {
+        const d = p.project_start;
+        const projectMk = (d && String(d).trim()) ? String(d).slice(0, 7) : '__unscheduled__';
+        return projectMk === mk;
+      });
+
+      const exps = expsByMonth[mk] || {};
+      const monthLabel = label;
+
+      // Hide empty months
+      const dynamicExpensesSum = Object.values(exps).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+      if (projs.length === 0 && dynamicExpensesSum === 0) {
+        return; 
+      }
+
+      rows.push({
+        rowType: 'month_header',
+        id: `header-${mk}`,
+        monthKey: mk,
+        monthLabel
+      });
+
+      projs.forEach(p => {
+        rows.push({
+          rowType: 'project',
+          id: p.project_code,
+          project_code: p.project_code,
+          project_name: p.project_name,
+          monthKey: mk,
+          monthLabel: null, 
+          TCC: p.TCC || 0,
+          CONTRACT_WO_VAT: p.CONTRACT_WO_VAT || 0,
+          CONTRACT_WO_VAT_OH_PM: p.CONTRACT_WO_VAT_OH_PM || 0,
+          EQ_30_OH: p.EQ_30_OH || 0,
+          EQ_10_RETENTION: p.EQ_10_RETENTION || 0,
+          EFFECTIVE_OH: p.EFFECTIVE_OH || 0,
+          total_specific_expenses: p.total_specific_expenses || 0,
+          NET_PROFIT: p.NET_PROFIT || 0,
+        });
+      });
+
+      const zero = {
+        TCC: 0, CONTRACT_WO_VAT: 0, CONTRACT_WO_VAT_OH_PM: 0,
+        EQ_30_OH: 0, EQ_10_RETENTION: 0, EFFECTIVE_OH: 0,
+        total_specific_expenses: 0, NET_PROFIT: 0
+      };
+      const projSums = projs.reduce((acc, p) => ({
+        TCC: acc.TCC + (p.TCC || 0),
+        CONTRACT_WO_VAT: acc.CONTRACT_WO_VAT + (p.CONTRACT_WO_VAT || 0),
+        CONTRACT_WO_VAT_OH_PM: acc.CONTRACT_WO_VAT_OH_PM + (p.CONTRACT_WO_VAT_OH_PM || 0),
+        EQ_30_OH: acc.EQ_30_OH + (p.EQ_30_OH || 0),
+        EQ_10_RETENTION: acc.EQ_10_RETENTION + (p.EQ_10_RETENTION || 0),
+        EFFECTIVE_OH: acc.EFFECTIVE_OH + (p.EFFECTIVE_OH || 0),
+        total_specific_expenses: acc.total_specific_expenses + (p.total_specific_expenses || 0),
+        NET_PROFIT: acc.NET_PROFIT + (p.NET_PROFIT || 0),
+      }), zero);
+
+      // Sum all dynamic expenses for the monthly total
+      projSums.total_specific_expenses += dynamicExpensesSum;
+      projSums.NET_PROFIT -= dynamicExpensesSum;
+
+      rows.push({
+        rowType: 'monthly_total',
+        id: `total-${mk}`,
+        monthKey: mk,
+        monthLabel,
+        ...projSums,
+        ...exps,
+      });
+    });
+
+    return rows;
+  }, [projectData, filteredDisbursements, overheadProjects, customColumns]);
 
   const summaryCards = [
     { title: "Active Projects", value: `${projectData.length} Sites`, icon: <Briefcase size={28} />, colorClass: "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800" },
@@ -956,7 +1258,10 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
         )}
 
         {/* ==============================================
-            VIEW 3: OFFICE & ADMIN TABLE
+            VIEW 3: MONTHLY UNIFIED MASTER TABLE
+            Projects grouped by month.
+            One Monthly Total row per month combines
+            project sums + OFFICE/PAYATAS/RESIDENCE expenses.
         ============================================== */}
         {activeView === 'office' && (
           <div className="animate-in slide-in-from-right-8 duration-500 space-y-6">
@@ -964,14 +1269,32 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
               <ArrowLeft size={16} /> Back to Selection
             </button>
 
-            <section ref={officeTableRef} className="bg-white dark:bg-[#0a0a0a] rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col transition-colors duration-300">
-              <div className="px-8 py-4 bg-amber-600 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4 flex-wrap">
+            {/* Legend */}
+            <div className="flex items-center gap-5 px-1 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 rounded-sm bg-indigo-400"></span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Project row — shows contract formula columns</span>
+              </div>
+              <div className="w-px h-4 bg-slate-200 dark:bg-slate-700"></div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 rounded-sm bg-amber-400"></span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Monthly Total row — project sums + OFFICE/PAYATAS/RESIDENCE expense breakdown</span>
+              </div>
+              <div className="ml-auto text-[10px] text-slate-400 dark:text-slate-500">
+                {monthlyTableRows.filter(r => r.rowType === 'project').length} projects &bull; {monthlyTableRows.filter(r => r.rowType === 'monthly_total').length} months
+              </div>
+            </div>
+
+            <section ref={officeTableRef} className="bg-white dark:bg-[#0a0a0a] rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col">
+              {/* Header */}
+              <div className="px-8 py-4 bg-gradient-to-r from-amber-600 to-indigo-700 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
                   <FileText size={24} />
                   <div>
-                    <h2 className="text-xl font-black uppercase tracking-widest leading-tight">Office Operations Master Ledger</h2>
+                    <h2 className="text-xl font-black uppercase tracking-widest leading-tight">Monthly Unified Master Ledger</h2>
+                    <p className="text-[10px] text-white/70 font-medium mt-0.5">Projects by Month &amp; Office/Payatas/Residence Expenses</p>
                     {dateFilterLabel && (
-                      <div className="hidden sm:flex items-center px-3 py-1 bg-white/10 rounded-full border border-white/20 shadow-sm gap-2">
+                      <div className="hidden sm:flex items-center px-3 py-1 bg-white/10 rounded-full border border-white/20 gap-2 mt-1">
                         <Calendar size={12} className="opacity-80" />
                         <span className="text-[10px] font-bold uppercase tracking-widest">{dateFilterLabel}</span>
                       </div>
@@ -979,122 +1302,261 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
                   </div>
                 </div>
 
-                {/* CONTROLS (OFFICE) */}
                 <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-
-                  {/* EXCEL EXPORT BUTTON (OFFICE) */}
-                  <div className="relative group flex items-center justify-center">
-                    <button
-                      onClick={downloadOfficeExcel}
-                      disabled={isExportingOfficeExcel}
-                      className="flex items-center justify-center p-2 bg-white/10 hover:bg-white/20 disabled:opacity-50 border border-white/20 rounded-xl font-bold transition-all shadow-sm cursor-pointer"
-                    >
-                      <FileSpreadsheet size={16} className={`${isExportingOfficeExcel ? 'animate-pulse' : ''}`} />
+                  {/* Excel Export */}
+                  <div className="relative group">
+                    <button onClick={downloadOfficeExcel} disabled={isExportingOfficeExcel}
+                      className="flex items-center justify-center p-2 bg-white/10 hover:bg-white/20 disabled:opacity-50 border border-white/20 rounded-xl transition-all shadow-sm">
+                      <FileSpreadsheet size={16} className={isExportingOfficeExcel ? 'animate-pulse' : ''} />
                     </button>
                     <div className="absolute bottom-full mb-2 bg-slate-800 text-white text-[10px] font-bold py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg border border-slate-700">
-                      {isExportingOfficeExcel ? 'Exporting Excel...' : 'Download as Excel (.xlsx)'}
+                      {isExportingOfficeExcel ? 'Exporting...' : 'Download Monthly Ledger (.xlsx)'}
                     </div>
                   </div>
-
-                  {/* PDF EXPORT BUTTON (OFFICE) */}
-                  <div className="relative group flex items-center justify-center">
-                    <button
-                      onClick={downloadOfficePDF}
-                      disabled={isExportingOfficePDF}
-                      className="flex items-center justify-center p-2 bg-white/10 hover:bg-white/20 disabled:opacity-50 border border-white/20 rounded-xl font-bold transition-all shadow-sm cursor-pointer"
-                    >
-                      <Download size={16} className={`${isExportingOfficePDF ? 'animate-bounce' : ''}`} />
+                  {/* PDF Export */}
+                  <div className="relative group">
+                    <button onClick={downloadOfficePDF} disabled={isExportingOfficePDF}
+                      className="flex items-center justify-center p-2 bg-white/10 hover:bg-white/20 disabled:opacity-50 border border-white/20 rounded-xl transition-all shadow-sm">
+                      <Download size={16} className={isExportingOfficePDF ? 'animate-bounce' : ''} />
                     </button>
                     <div className="absolute bottom-full mb-2 bg-slate-800 text-white text-[10px] font-bold py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg border border-slate-700">
                       {isExportingOfficePDF ? 'Generating PDF...' : 'Download as PDF'}
                     </div>
                   </div>
-
+                  {/* Zoom */}
                   <div className="flex items-center bg-black/20 rounded-xl px-2 py-1 gap-1 backdrop-blur-sm border border-white/10">
-                    <button onClick={handleZoomOut} className="p-1 hover:bg-white/20 rounded-lg transition-colors disabled:opacity-30" disabled={zoomLevel <= 0.6}>
-                      <ZoomOut size={16} />
-                    </button>
-                    <div className="text-[10px] font-black w-10 text-center select-none uppercase tracking-tighter">
-                      {Math.round(zoomLevel * 100)}%
-                    </div>
-                    <button onClick={handleZoomIn} className="p-1 hover:bg-white/20 rounded-lg transition-colors disabled:opacity-30" disabled={zoomLevel >= 1.5}>
-                      <ZoomIn size={16} />
-                    </button>
+                    <button onClick={handleZoomOut} className="p-1 hover:bg-white/20 rounded-lg transition-colors disabled:opacity-30" disabled={zoomLevel <= 0.6}><ZoomOut size={16} /></button>
+                    <div className="text-[10px] font-black w-10 text-center select-none uppercase tracking-tighter">{Math.round(zoomLevel * 100)}%</div>
+                    <button onClick={handleZoomIn} className="p-1 hover:bg-white/20 rounded-lg transition-colors disabled:opacity-30" disabled={zoomLevel >= 1.5}><ZoomIn size={16} /></button>
                     <div className="w-px h-3 bg-white/20 mx-1"></div>
-                    <button onClick={resetZoom} className="p-1 hover:bg-white/20 rounded-lg transition-colors" title="Reset Zoom">
-                      <RotateCcw size={14} />
-                    </button>
+                    <button onClick={resetZoom} className="p-1 hover:bg-white/20 rounded-lg transition-colors" title="Reset Zoom"><RotateCcw size={14} /></button>
                   </div>
                 </div>
               </div>
 
-              {dateFilterLabel && (
-                <div className="sm:hidden px-8 py-2 bg-amber-700 text-white flex items-center gap-2 border-b border-amber-500/50">
-                  <Calendar size={12} className="opacity-80" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">{dateFilterLabel}</span>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-8 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+                <div className="flex flex-col gap-1 w-full">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Select Overhead Projects</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Basic representation of multi-select. In a real app we might use a dedicated component, but for now we'll allow toggling from a fixed list and adding custom. */}
+                    {['OFFICE', 'PAYATAS', 'RESIDENCE'].map(code => (
+                      <button
+                        key={code}
+                        onClick={() => toggleProjectSelection(code)}
+                        className={`px-3 py-1 text-[10px] font-bold rounded-lg border transition-colors ${
+                          overheadProjects.includes(code)
+                            ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700'
+                            : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        {code}
+                      </button>
+                    ))}
+                    {/* Optional: Show others that might be selected if dynamically added */}
+                    {overheadProjects.filter(p => !['OFFICE', 'PAYATAS', 'RESIDENCE'].includes(p)).map(code => (
+                      <button
+                        key={code}
+                        onClick={() => toggleProjectSelection(code)}
+                        className="px-3 py-1 text-[10px] font-bold rounded-lg border bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700 transition-colors"
+                      >
+                        {code} <X size={10} className="inline ml-1" />
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              )}
+
+                {dateFilterLabel && (
+                  <div className="sm:hidden px-4 py-1.5 bg-amber-700 text-white rounded-lg flex items-center gap-2">
+                    <Calendar size={12} className="opacity-80" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">{dateFilterLabel}</span>
+                  </div>
+                )}
+              </div>
 
               <div className="overflow-x-auto custom-scrollbar">
-                <table className="w-full text-left border-collapse min-w-[2800px]" style={{ zoom: zoomLevel }}>
+                <table className="w-full text-left border-collapse min-w-[3200px]" style={{ zoom: zoomLevel }}>
                   <thead>
+                    {/* Column group row */}
+                    <tr className="bg-slate-200 dark:bg-slate-800 text-[8px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                      <th colSpan={2} className="p-2 text-center sticky left-0 z-20 bg-slate-200 dark:bg-slate-800 border-r border-slate-300 dark:border-slate-700">Identity</th>
+                      <th colSpan={7} className="p-2 text-center bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-r border-indigo-200 dark:border-indigo-800">
+                        ◆ Contract Formula Columns
+                      </th>
+                      <th colSpan={customColumns.length} className="p-2 text-center bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-r border-amber-200 dark:border-amber-700">
+                        ◆ Office / Payatas / Residence Expenses
+                      </th>
+                      <th colSpan={2} className="p-2 text-center bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400">Summary</th>
+                    </tr>
+                    {/* Actual headers */}
                     <tr className="bg-slate-100 dark:bg-slate-900 text-[10px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-tighter border-b border-slate-300 dark:border-slate-700">
-                      <th className="p-4 sticky left-0 z-20 bg-slate-100 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 w-[120px]">Date</th>
-                      <th className="p-4 sticky left-[120px] z-20 bg-slate-100 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 w-[150px]">Code</th>
-                      <th className="p-4 text-center font-bold text-amber-700 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/10">Total</th>
-                      <th className="p-4 text-center text-emerald-600">Net Profit</th>
-                      <th className="p-4 text-center bg-blue-50 dark:bg-blue-900/10">Contract plus Add'l w/VAT</th>
-                      <th className="p-4 text-center">Empty</th>
-                      <th className="p-4 text-center">Contract w/o Vat</th>
-                      <th className="p-4 text-center">Contract w/o Vat & Overhead & PM</th>
-                      <th className="p-4 text-center bg-purple-50 dark:bg-purple-900/10 text-purple-700 dark:text-purple-400">Equivalent 30% Overhead, Contingency & PM</th>
-                      <th className="p-4 text-center bg-rose-50 dark:bg-rose-900/10 text-rose-600">Equivalent 10% Retention base on Contract w/ Vat</th>
-                      <th className="p-4 text-center font-bold border-r border-slate-300 dark:border-slate-700">Effective Overhead</th>
-                      <th className="p-4 text-center">Total EOC per Month</th>
+                      <th className="p-3 sticky left-0 z-20 bg-slate-100 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 w-[90px]">Date</th>
+                      <th className="p-3 sticky left-[90px] z-20 bg-slate-100 dark:bg-slate-900 border-r border-slate-300 dark:border-slate-700 w-[220px]">Code / Name</th>
 
-                      {/* SPECIFIC EXPENSES */}
-                      <th className="p-4 text-center bg-slate-50 dark:bg-slate-800">Payroll</th>
-                      <th className="p-4 text-center bg-slate-50 dark:bg-slate-800">Electrical Office/Payatas</th>
-                      <th className="p-4 text-center bg-slate-50 dark:bg-slate-800">Water/office/Payatas</th>
-                      <th className="p-4 text-center bg-slate-50 dark:bg-slate-800">Comunication/Telephone</th>
-                      <th className="p-4 text-center bg-slate-50 dark:bg-slate-800">Retainer</th>
-                      <th className="p-4 text-center bg-slate-50 dark:bg-slate-800">Office supplies/Outing</th>
-                      <th className="p-4 text-center bg-slate-50 dark:bg-slate-800">Car Repair & Maintenance</th>
-                      <th className="p-4 text-center bg-slate-50 dark:bg-slate-800">Car Registration</th>
-                      <th className="p-4 text-center bg-slate-50 dark:bg-slate-800">Contribution</th>
+                      {/* Contract formula cols — indigo group */}
+                      <th className="p-3 text-center bg-indigo-50 dark:bg-indigo-900/10 text-indigo-700 dark:text-indigo-400 w-[160px]">Contract plus Add&apos;l w/VAT</th>
+                      <th className="p-3 text-center bg-indigo-50/70 dark:bg-indigo-900/5 text-indigo-600 dark:text-indigo-400 w-[155px]">Contract w/o Vat</th>
+                      <th className="p-3 text-center bg-indigo-50/70 dark:bg-indigo-900/5 text-indigo-600 dark:text-indigo-400 w-[195px]">Contract w/o Vat &amp; Overhead &amp; PM</th>
+                      <th className="p-3 text-center bg-purple-50 dark:bg-purple-900/10 text-purple-700 dark:text-purple-400 w-[205px]">Equivalent 30% Overhead, Contingency &amp; PM</th>
+                      <th className="p-3 text-center bg-rose-50 dark:bg-rose-900/10 text-rose-600 w-[195px]">Equivalent 10% Retention</th>
+                      <th className="p-3 text-center font-bold bg-indigo-50/50 dark:bg-indigo-900/5 w-[155px]">Effective Overhead</th>
+                      <th className="p-3 text-center bg-slate-50 dark:bg-slate-800 border-r border-indigo-200 dark:border-indigo-800 w-[135px]">Total EOC per Month</th>
+
+                      {/* Dynamic Expense cols — amber group */}
+                      {customColumns.map((col, idx) => (
+                        <th 
+                          key={col.id} 
+                          onClick={() => {
+                            setEditingColumn(col);
+                            setIsColumnModalOpen(true);
+                          }}
+                          className={`p-3 text-center bg-amber-50 dark:bg-amber-900/5 hover:bg-amber-100 dark:hover:bg-amber-900/20 cursor-pointer transition-colors group ${
+                            idx === customColumns.length - 1 ? 'border-r border-amber-200 dark:border-amber-700' : ''
+                          }`}
+                          title="Click to configure column mappings"
+                        >
+                          <div className="flex items-center justify-center gap-1">
+                            {col.title}
+                            <Settings size={10} className="opacity-0 group-hover:opacity-100 transition-opacity text-amber-600" />
+                          </div>
+                        </th>
+                      ))}
+
+                      {/* Summary cols — emerald group */}
+                      <th className="p-3 text-center text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/10 w-[145px]">Total</th>
+                      <th className="p-3 text-center text-emerald-600 dark:text-emerald-400 bg-emerald-50/70 dark:bg-emerald-900/5 w-[145px]">Net Profit</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-[12px]">
-                    {officeData.length === 0 ? (
-                      <tr>
-                        <td colSpan="21" className="p-8 text-center text-slate-400 dark:text-slate-500 italic">No records for this date range.</td>
-                      </tr>
-                    ) : officeData.map(o => (
-                      <tr key={o.id} className="hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
-                        <td className="p-4 font-medium text-slate-500 dark:text-slate-400 sticky left-0 z-10 bg-white dark:bg-[#0a0a0a] border-r dark:border-slate-800">{o.project_start || '-'}</td>
-                        <td className="p-4 font-black text-amber-600 dark:text-amber-500 sticky left-[120px] z-10 bg-white dark:bg-[#0a0a0a] border-r dark:border-slate-800">{o.project_code}</td>
-                        <td className="p-4 text-right font-mono font-black text-amber-700 dark:text-amber-500 bg-amber-50/50 dark:bg-amber-900/10">{formatMoney(o.total_specific_expenses)}</td>
-                        <td className="p-4 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">{formatMoney(o.NET_PROFIT)}</td>
-                        <td className="p-4 text-right font-mono bg-blue-50/30 dark:bg-blue-900/5">{formatMoney(o.TCC)}</td>
-                        <td className="p-4 text-center text-slate-300">-</td>
-                        <td className="p-4 text-right font-mono text-slate-600 dark:text-slate-300">{formatMoney(o.CC_WITHOUT_VAT)}</td>
-                        <td className="p-4 text-right font-mono text-slate-600 dark:text-slate-300">{formatMoney(o.CC_WO_VAT_OH_PM)}</td>
-                        <td className="p-4 text-right font-mono text-purple-600 dark:text-purple-400 bg-purple-50/30 dark:bg-purple-900/5">{formatMoney(o.OH_30)}</td>
-                        <td className="p-4 text-right font-mono text-rose-500 bg-rose-50/30 dark:bg-rose-900/5">{formatMoney(o.RETENTION_10)}</td>
-                        <td className="p-4 text-right font-mono font-bold border-r dark:border-slate-800">{formatMoney(o.EFFECTIVE_OVERHEAD)}</td>
-                        <td className="p-4 text-right font-mono text-slate-500">-</td>
 
-                        <td className="p-4 text-right font-mono text-slate-500">{formatMoney(o.exp_payroll)}</td>
-                        <td className="p-4 text-right font-mono text-slate-500">{formatMoney(o.exp_electrical)}</td>
-                        <td className="p-4 text-right font-mono text-slate-500">{formatMoney(o.exp_water)}</td>
-                        <td className="p-4 text-right font-mono text-slate-500">{formatMoney(o.exp_comms)}</td>
-                        <td className="p-4 text-right font-mono text-slate-500">{formatMoney(o.exp_retainer)}</td>
-                        <td className="p-4 text-right font-mono text-slate-500">{formatMoney(o.exp_supplies)}</td>
-                        <td className="p-4 text-right font-mono text-slate-500">{formatMoney(o.exp_car_repair)}</td>
-                        <td className="p-4 text-right font-mono text-slate-500">{formatMoney(o.exp_car_reg)}</td>
-                        <td className="p-4 text-right font-mono text-slate-500">{formatMoney(o.exp_contribution)}</td>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-[12px]">
+                    {monthlyTableRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={20} className="p-10 text-center text-slate-400 dark:text-slate-500 italic">
+                          No records found for the selected date range.
+                        </td>
                       </tr>
-                    ))}
+                    ) : monthlyTableRows.map(row => {
+                      const isHeader = row.rowType === 'month_header';
+                      const isTotal = row.rowType === 'monthly_total';
+                      const dash = <span className="text-slate-300 dark:text-slate-600 select-none">&mdash;</span>;
+                      const fmt = (v) => (v === null || v === undefined) ? dash : formatMoney(v);
+                      const fmtExp = (v) => (!v || v === 0) ? dash : formatMoney(v);
+
+                      if (isHeader) {
+                        return (
+                          <tr key={row.id} className="bg-slate-200 dark:bg-slate-800 border-t-4 border-slate-300 dark:border-slate-900">
+                            <td colSpan={2} className="p-4 sticky left-0 z-20 bg-slate-200 dark:bg-slate-800 border-r border-slate-300 dark:border-slate-700">
+                              <span className="font-black text-[14px] uppercase tracking-widest text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                                <Calendar size={16} className="text-indigo-500" />
+                                {row.monthLabel}
+                              </span>
+                            </td>
+                            <td colSpan={9 + customColumns.length} className="bg-slate-200 dark:bg-slate-800"></td>
+                          </tr>
+                        );
+                      }
+
+                      if (isTotal) {
+                        // ══ MONTHLY TOTAL ROW ══
+                        return (
+                          <tr key={row.id} className="bg-amber-50 dark:bg-amber-900/10 border-t-2 border-amber-300 dark:border-amber-700">
+                            {/* Date — empty on Monthly Total row since we have a header */}
+                            <td className="p-3 sticky left-0 z-10 bg-amber-50 dark:bg-amber-900/10 border-r dark:border-amber-800/40"></td>
+                            {/* Code — MONTHLY TOTAL label */}
+                            <td className="p-3 sticky left-[90px] z-10 bg-amber-50 dark:bg-amber-900/10 border-r border-amber-200 dark:border-amber-700">
+                              <span className="inline-flex items-center px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest bg-amber-200 dark:bg-amber-800/60 text-amber-800 dark:text-amber-200">
+                                Monthly Total
+                              </span>
+                            </td>
+
+                            {/* ── Project formula cols (summed) ── */}
+                            <td className="p-3 text-right font-mono font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50/30 dark:bg-indigo-900/10">{fmt(row.TCC)}</td>
+                            <td className="p-3 text-right font-mono font-bold text-indigo-600 dark:text-indigo-400">{fmt(row.CONTRACT_WO_VAT)}</td>
+                            <td className="p-3 text-right font-mono font-bold text-indigo-600 dark:text-indigo-400">{fmt(row.CONTRACT_WO_VAT_OH_PM)}</td>
+                            <td className="p-3 text-right font-mono font-bold text-purple-600 dark:text-purple-400 bg-purple-50/20 dark:bg-purple-900/5">{fmt(row.EQ_30_OH)}</td>
+                            <td className="p-3 text-right font-mono font-bold text-rose-500 bg-rose-50/20 dark:bg-rose-900/5">{fmt(row.EQ_10_RETENTION)}</td>
+                            <td className="p-3 text-right font-mono font-bold text-slate-700 dark:text-slate-200">{fmt(row.EFFECTIVE_OH)}</td>
+                            <td className="p-3 text-center border-r border-indigo-200 dark:border-indigo-800">{dash}</td>
+
+                            {/* ── Dynamic Expense cols (OFFICE/PAYATAS/RESIDENCE aggregated) ── */}
+                            {customColumns.map((col, idx) => {
+                              const val = row[col.id];
+                              const isFirst = idx === 0;
+                              const isLast = idx === customColumns.length - 1;
+                              let cellClass = "p-3 text-right font-mono text-amber-600 dark:text-amber-500";
+                              if (isFirst) cellClass = "p-3 text-right font-mono font-bold text-amber-700 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-900/10";
+                              if (isLast) cellClass = "p-3 text-right font-mono font-bold text-amber-700 dark:text-amber-400 border-r border-amber-200 dark:border-amber-700";
+                              
+                              return (
+                                <td key={col.id} className={cellClass}>
+                                  {fmtExp(val)}
+                                </td>
+                              );
+                            })}
+
+                            {/* ── Summary cols ── */}
+                            <td className="p-3 text-right font-mono font-black text-emerald-700 dark:text-emerald-400 bg-emerald-50/40 dark:bg-emerald-900/10">{fmt(row.total_specific_expenses)}</td>
+                            <td className={`p-3 text-right font-mono font-black ${
+                              row.NET_PROFIT >= 0
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : 'text-rose-600 dark:text-rose-400'
+                            } bg-emerald-50/30 dark:bg-emerald-900/5`}>{fmt(row.NET_PROFIT)}</td>
+                          </tr>
+                        );
+                      }
+
+                      // ══ INDIVIDUAL PROJECT ROW ══
+                      return (
+                        <tr key={row.id}
+                          className="hover:bg-indigo-50/30 dark:hover:bg-indigo-900/5 transition-colors border-l-2 border-l-indigo-300 dark:border-l-indigo-700"
+                        >
+                          {/* Date — blank for project rows */}
+                          <td className="p-3 sticky left-0 z-10 bg-white dark:bg-[#0a0a0a] border-r dark:border-slate-800"></td>
+
+                          {/* Code / Name */}
+                          <td className="p-3 sticky left-[90px] z-10 bg-white dark:bg-[#0a0a0a] border-r border-slate-300 dark:border-slate-700">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-black text-[13px] text-indigo-600 dark:text-indigo-400">
+                                {row.project_code}
+                              </span>
+                              {row.project_name && (
+                                <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{row.project_name}</span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Contract formula cols */}
+                          <td className="p-3 text-right font-mono text-indigo-700 dark:text-indigo-400 bg-indigo-50/10 dark:bg-indigo-900/5">{fmt(row.TCC)}</td>
+                          <td className="p-3 text-right font-mono text-slate-600 dark:text-slate-300">{fmt(row.CONTRACT_WO_VAT)}</td>
+                          <td className="p-3 text-right font-mono text-slate-600 dark:text-slate-300">{fmt(row.CONTRACT_WO_VAT_OH_PM)}</td>
+                          <td className="p-3 text-right font-mono text-purple-600 dark:text-purple-400 bg-purple-50/10 dark:bg-purple-900/5">{fmt(row.EQ_30_OH)}</td>
+                          <td className="p-3 text-right font-mono text-rose-500 bg-rose-50/10 dark:bg-rose-900/5">{fmt(row.EQ_10_RETENTION)}</td>
+                          <td className="p-3 text-right font-mono text-slate-600 dark:text-slate-300">{fmt(row.EFFECTIVE_OH)}</td>
+                          <td className="p-3 text-center border-r border-indigo-200 dark:border-indigo-800 text-slate-300 dark:text-slate-700">&mdash;</td>
+
+                          {/* Dynamic Expense cols — blank for project rows */}
+                          {customColumns.map((col, idx) => {
+                            const isFirst = idx === 0;
+                            const isLast = idx === customColumns.length - 1;
+                            let cellClass = "p-3";
+                            if (isFirst) cellClass = "p-3 bg-amber-50/10 dark:bg-amber-900/5";
+                            if (isLast) cellClass = "p-3 border-r border-amber-200 dark:border-amber-700 bg-amber-50/10 dark:bg-amber-900/5";
+                            return <td key={`empty-${col.id}`} className={cellClass}></td>;
+                          })}
+
+                          {/* Summary */}
+                          <td className="p-3 text-right font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-50/20 dark:bg-emerald-900/5">
+                            {row.total_specific_expenses > 0 ? fmt(row.total_specific_expenses) : dash}
+                          </td>
+                          <td className={`p-3 text-right font-mono font-bold ${
+                            row.NET_PROFIT >= 0
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-rose-600 dark:text-rose-400'
+                          } bg-emerald-50/10 dark:bg-emerald-900/5`}>
+                            {fmt(row.NET_PROFIT)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1102,6 +1564,101 @@ export default function DashboardScreen({ projects = [], disbursements = [] }) {
           </div>
         )}
       </main>
+
+      {/* ==============================================
+          COLUMN CONFIGURATION MODAL
+      ============================================== */}
+      {isColumnModalOpen && editingColumn && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+              <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <Settings size={20} className="text-amber-600" />
+                Configure Column
+              </h2>
+              <button 
+                onClick={() => setIsColumnModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-5 flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-5">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Column Title</label>
+                <input 
+                  type="text" 
+                  value={editingColumn.title} 
+                  onChange={(e) => setEditingColumn({ ...editingColumn, title: e.target.value })}
+                  className="px-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-medium"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Mapped Categories</label>
+                <p className="text-[10px] text-slate-500 mb-2 leading-tight">Select which expenses will be aggregated into this column. This relies on exact matches or partial text matches to the project setup categories.</p>
+                
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 max-h-[300px] overflow-y-auto custom-scrollbar p-2 flex flex-col gap-1">
+                  {categories.map((cat, i) => {
+                    // For safety, fallback to string if categories array contains strings
+                    const catName = typeof cat === 'string' ? cat : cat.name;
+                    const isSelected = editingColumn.mappedCategories.includes(catName);
+                    
+                    return (
+                      <label key={i} className="flex items-center gap-3 p-2 hover:bg-white dark:hover:bg-slate-700/50 rounded-lg cursor-pointer transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-600">
+                        <input 
+                          type="checkbox" 
+                          checked={isSelected}
+                          onChange={() => {
+                            const newMapping = isSelected 
+                              ? editingColumn.mappedCategories.filter(c => c !== catName)
+                              : [...editingColumn.mappedCategories, catName];
+                            setEditingColumn({ ...editingColumn, mappedCategories: newMapping });
+                          }}
+                          className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900"
+                        />
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{catName}</span>
+                      </label>
+                    );
+                  })}
+                  
+                  {/* Allow adding custom text just in case the legacy data has categories not in the DB */}
+                  <div className="p-2 border-t border-slate-200 dark:border-slate-700 mt-2 flex flex-col gap-2">
+                    <span className="text-xs font-medium text-slate-500">Legacy / Custom Keywords:</span>
+                    <div className="flex flex-wrap gap-2">
+                      {editingColumn.mappedCategories.filter(mc => !categories.find(c => (typeof c === 'string' ? c : c.name) === mc)).map(customKw => (
+                        <div key={customKw} className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-bold rounded flex items-center gap-1 border border-amber-200 dark:border-amber-800">
+                          {customKw}
+                          <button onClick={() => setEditingColumn({ ...editingColumn, mappedCategories: editingColumn.mappedCategories.filter(c => c !== customKw) })} className="hover:text-amber-900 dark:hover:text-amber-200">
+                            <X size={10} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex justify-end gap-3">
+              <button 
+                onClick={() => setIsColumnModalOpen(false)}
+                className="px-5 py-2 font-bold text-sm text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={saveColumnConfig}
+                className="px-6 py-2 font-bold text-sm text-white bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 rounded-xl shadow-lg shadow-amber-500/20 transition-all active:scale-95"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
