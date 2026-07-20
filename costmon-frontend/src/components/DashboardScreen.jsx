@@ -430,13 +430,28 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
       const CC_WO_VAT_OH_PM = CC_WITHOUT_VAT - OH_30;
       const EFFECTIVE_OVERHEAD = OH_30;
 
-      // For construction projects, the dynamic overhead columns (Office/Payatas/Residence expenses)
-      // do not apply to them directly. They are only sources of "Effective Overhead" (Income).
       let total_specific_expenses = 0;
       const dynamicExpenses = {};
       customColumns.forEach(col => {
-        dynamicExpenses[col.id] = 0;
+        const sum = projExpenses.reduce((total, d) => {
+          const lineTotal = (d.expenses || [])
+            .filter(e => {
+              if (!e.category) return false;
+              return col.mappedCategories.some(kw => {
+                const eClean = String(e.category).toLowerCase().replace(/[^a-z0-9]/g, '');
+                const kClean = String(kw).toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (!eClean || !kClean) return false;
+                return eClean.includes(kClean) || kClean.includes(eClean);
+              });
+            })
+            .reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+          return total + lineTotal;
+        }, 0);
+        dynamicExpenses[col.id] = sum;
+        total_specific_expenses += sum;
       });
+
+      const NET_PROFIT = TCC - total_specific_expenses;
 
       // -----------------------------------------------
       // NEW: D5-based formula columns for unified table
@@ -447,9 +462,6 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
       const EQ_30_OH = CONTRACT_WO_VAT_OH_PM * 0.3;
       const EQ_10_RETENTION = TCC * 0.1;
       const EFFECTIVE_OH = EQ_30_OH - EQ_10_RETENTION;
-
-      // The project's contribution to Net Profit in the Unified Ledger is its Effective Overhead
-      const NET_PROFIT = EFFECTIVE_OH;
 
       const computedData = {
         ...p,
@@ -713,7 +725,7 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
       });
 
       projs.forEach(p => {
-        const rowData = {
+        rows.push({
           rowType: 'project',
           id: p.project_code,
           project_code: p.project_code,
@@ -728,14 +740,7 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
           EFFECTIVE_OH: p.EFFECTIVE_OH || 0,
           total_specific_expenses: p.total_specific_expenses || 0,
           NET_PROFIT: p.NET_PROFIT || 0,
-        };
-
-        // Add dynamic column values to rowData
-        customColumns.forEach(col => {
-          rowData[col.id] = p[col.id] || 0;
         });
-
-        rows.push(rowData);
       });
 
       const zero = {
@@ -773,7 +778,7 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
 
   const summaryCards = [
     { title: "Active Projects", value: `${projectData.length} Sites`, icon: <Briefcase size={28} />, colorClass: "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800" },
-    { title: "Office Departments", value: `${officeData.length} Records`, icon: <Building2 size={28} />, colorClass: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800" },
+    { title: "Office Departments", value: `${monthlyTableRows.filter(r => r.rowType === 'project' && r.monthKey !== '__unscheduled__').length} Records`, icon: <Building2 size={28} />, colorClass: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800" },
     { title: "Overall Allocated Budget", value: `₱ ${formatMoney(projectTotalBudget + officeTotalBudget)}`, icon: <Wallet size={28} />, colorClass: "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800" },
     { title: "Total Expenses (Filtered)", value: `₱ ${formatMoney(totalCompanyExpenses)}`, icon: <Receipt size={28} />, colorClass: "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 border-rose-100 dark:border-rose-800" }
   ];
