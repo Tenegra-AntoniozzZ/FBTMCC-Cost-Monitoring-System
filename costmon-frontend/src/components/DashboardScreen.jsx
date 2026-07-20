@@ -1,38 +1,62 @@
-import { useState, useMemo, Fragment, useRef } from 'react';
+import { useState, useEffect, useMemo, Fragment, useRef } from 'react';
 import { LayoutDashboard, Briefcase, Building2, ArrowLeft, TrendingUp, FileText, ZoomIn, ZoomOut, RotateCcw, Wallet, Receipt, Eye, EyeOff, Calendar, X, Download, FileSpreadsheet, BarChart2, PieChart as PieChartIcon, Settings } from 'lucide-react';
+import { API_URL } from '../utils/Constants';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line } from 'recharts';
 
 export default function DashboardScreen({ projects = [], disbursements = [], categories = [] }) {
   const [activeView, setActiveView] = useState('selection');
 
   // --- DYNAMIC OPR CONFIGURATION STATES ---
-  const [overheadProjects, setOverheadProjects] = useState(() => {
-    const saved = localStorage.getItem('dashboard_overhead_projects');
-    return saved ? JSON.parse(saved) : ['OFFICE', 'PAYATAS', 'RESIDENCE'];
-  });
-  const [customColumns, setCustomColumns] = useState(() => {
-    const saved = localStorage.getItem('dashboard_custom_columns');
-    return saved ? JSON.parse(saved) : [
-      { id: 'col_payroll', title: 'Payroll', mappedCategories: ['[MAIN] Payroll', 'Labor /SUBCONTRACTOR', 'Salaries & Wages'] },
-      { id: 'col_electrical', title: 'Electrical Office/Payatas', mappedCategories: ['[MAIN] Electrical Office/Payatas', 'Light & Power'] },
-      { id: 'col_water', title: 'Water/office/Payatas', mappedCategories: ['[MAIN] Water/office/Payatas', 'Water'] },
-      { id: 'col_comms', title: 'Comunication/Telephone', mappedCategories: ['[MAIN] Comunication/Telephone', 'Communication'] },
-      { id: 'col_retainer', title: 'Retainer', mappedCategories: ['[MAIN] Retainer', 'SOP/Retainer Fee'] },
-      { id: 'col_supplies', title: 'Office supplies/Outing', mappedCategories: ['[MISC] Office supplies/Outing', 'Office Supplies'] },
-      { id: 'col_car_repair', title: 'Car Repair & Maintenance', mappedCategories: ['[MISC] Car Repair & Maintenance', 'Repair & Maint.'] },
-      { id: 'col_car_reg', title: 'Car Registration', mappedCategories: ['[MISC] Car Registration'] },
-      { id: 'col_contribution', title: 'Contribution', mappedCategories: ['[MISC] Contribution'] }
-    ];
-  });
+  const [overheadProjects, setOverheadProjects] = useState(['OFFICE', 'PAYATAS', 'RESIDENCE']);
+  const [customColumns, setCustomColumns] = useState([
+    { id: 'col_payroll', title: 'Payroll', mappedCategories: ['[MAIN] Payroll', 'Labor /SUBCONTRACTOR', 'Salaries & Wages'] },
+    { id: 'col_electrical', title: 'Electrical Office/Payatas', mappedCategories: ['[MAIN] Electrical Office/Payatas', 'Light & Power'] },
+    { id: 'col_water', title: 'Water/office/Payatas', mappedCategories: ['[MAIN] Water/office/Payatas', 'Water'] },
+    { id: 'col_comms', title: 'Comunication/Telephone', mappedCategories: ['[MAIN] Comunication/Telephone', 'Communication'] },
+    { id: 'col_retainer', title: 'Retainer', mappedCategories: ['[MAIN] Retainer', 'SOP/Retainer Fee'] },
+    { id: 'col_supplies', title: 'Office supplies/Outing', mappedCategories: ['[MISC] Office supplies/Outing', 'Office Supplies'] },
+    { id: 'col_car_repair', title: 'Car Repair & Maintenance', mappedCategories: ['[MISC] Car Repair & Maintenance', 'Repair & Maint.'] },
+    { id: 'col_car_reg', title: 'Car Registration', mappedCategories: ['[MISC] Car Registration'] },
+    { id: 'col_contribution', title: 'Contribution', mappedCategories: ['[MISC] Contribution'] }
+  ]);
   const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
   const [editingColumn, setEditingColumn] = useState(null);
 
-  const saveColumnConfig = () => {
+  // Fetch preferences on mount
+  useEffect(() => {
+    const fetchPrefs = async () => {
+      const token = sessionStorage.getItem('fbtmcc_token');
+      if (!token) return;
+      try {
+        const res = await fetch(`${API_URL}/users/preferences`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.dashboard_custom_columns) setCustomColumns(data.dashboard_custom_columns);
+          if (data.dashboard_overhead_projects) setOverheadProjects(data.dashboard_overhead_projects);
+        }
+      } catch (err) {
+        console.error("Failed to fetch preferences", err);
+      }
+    };
+    fetchPrefs();
+  }, []);
+
+  const saveColumnConfig = async () => {
     if (!editingColumn) return;
     const updated = customColumns.map(col => col.id === editingColumn.id ? editingColumn : col);
     setCustomColumns(updated);
-    localStorage.setItem('dashboard_custom_columns', JSON.stringify(updated));
     setIsColumnModalOpen(false);
+
+    const token = sessionStorage.getItem('fbtmcc_token');
+    if (token) {
+      fetch(`${API_URL}/users/preferences`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dashboard_custom_columns: updated })
+      }).catch(console.error);
+    }
   };
 
   const toggleProjectSelection = (code) => {
@@ -40,7 +64,15 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
       ? overheadProjects.filter(p => p !== code)
       : [...overheadProjects, code];
     setOverheadProjects(updated);
-    localStorage.setItem('dashboard_overhead_projects', JSON.stringify(updated));
+
+    const token = sessionStorage.getItem('fbtmcc_token');
+    if (token) {
+      fetch(`${API_URL}/users/preferences`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dashboard_overhead_projects: updated })
+      }).catch(console.error);
+    }
   };
 
   // State para i-toggle ang Additional Works breakdown columns
@@ -432,8 +464,16 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
 
       let total_specific_expenses = 0;
       const dynamicExpenses = {};
+      
+      // STRICT FILTERING: Only include records from 'OFFICE', 'PAYATAS', 'RESIDENCE' projects
+      const overheadProjExpenses = projExpenses.filter(d => 
+        d.project_code && overheadProjects.some(kw => 
+          d.project_code.toUpperCase() === kw.toUpperCase()
+        )
+      );
+
       customColumns.forEach(col => {
-        const sum = projExpenses.reduce((total, d) => {
+        const sum = overheadProjExpenses.reduce((total, d) => {
           const lineTotal = (d.expenses || [])
             .filter(e => {
               if (!e.category) return false;
@@ -451,8 +491,6 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
         total_specific_expenses += sum;
       });
 
-      const NET_PROFIT = TCC - total_specific_expenses;
-
       // -----------------------------------------------
       // NEW: D5-based formula columns for unified table
       // D5 = TCC (Contract + Additional Works + VAT)
@@ -462,6 +500,9 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
       const EQ_30_OH = CONTRACT_WO_VAT_OH_PM * 0.3;
       const EQ_10_RETENTION = TCC * 0.1;
       const EFFECTIVE_OH = EQ_30_OH - EQ_10_RETENTION;
+
+      // The project's contribution to Net Profit in the Unified Ledger is its Effective Overhead
+      const NET_PROFIT = EFFECTIVE_OH;
 
       const computedData = {
         ...p,

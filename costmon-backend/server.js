@@ -162,9 +162,11 @@ db.serialize(() => {
     role TEXT,
     security_question TEXT,
     security_answer TEXT,
-    is_active INTEGER DEFAULT 1
+    is_active INTEGER DEFAULT 1,
+    preferences TEXT DEFAULT '{}'
   )`);
   db.run("ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1", () => { });
+  db.run("ALTER TABLE users ADD COLUMN preferences TEXT DEFAULT '{}'", () => { });
 
   db.run(`CREATE TABLE IF NOT EXISTS audit_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -273,6 +275,42 @@ app.post('/api/verify-password', authenticateToken, (req, res) => {
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ error: "Mali ang password." });
     res.json({ success: true });
+  });
+});
+
+// ==========================================
+// USER PREFERENCES ENDPOINTS
+// ==========================================
+app.get('/api/users/preferences', authenticateToken, (req, res) => {
+  db.get("SELECT preferences FROM users WHERE id = ?", [req.user.id], (err, row) => {
+    if (err) return res.status(500).json({ error: "Database error." });
+    if (!row) return res.status(404).json({ error: "User not found." });
+    try {
+      const prefs = row.preferences ? JSON.parse(row.preferences) : {};
+      res.json(prefs);
+    } catch (e) {
+      res.json({});
+    }
+  });
+});
+
+app.put('/api/users/preferences', authenticateToken, (req, res) => {
+  db.get("SELECT preferences FROM users WHERE id = ?", [req.user.id], (err, row) => {
+    if (err) return res.status(500).json({ error: "Database error." });
+    if (!row) return res.status(404).json({ error: "User not found." });
+    
+    let currentPrefs = {};
+    try {
+      currentPrefs = row.preferences ? JSON.parse(row.preferences) : {};
+    } catch (e) {}
+
+    const newPrefs = { ...currentPrefs, ...req.body };
+    const prefsString = JSON.stringify(newPrefs);
+
+    db.run("UPDATE users SET preferences = ? WHERE id = ?", [prefsString, req.user.id], (updateErr) => {
+      if (updateErr) return res.status(500).json({ error: "Failed to update preferences." });
+      res.json({ success: true, preferences: newPrefs });
+    });
   });
 });
 
