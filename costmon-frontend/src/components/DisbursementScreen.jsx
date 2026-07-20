@@ -505,12 +505,6 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
   const isDuplicateCV = useMemo(() => {
     if (!headerData.cv_no) return false;
 
-    // Bypass if in Stock Allocation Mode and value matches the source stock's CV#
-    if (isStockAllocationMode && stockAllocationSource &&
-      headerData.cv_no.trim().toLowerCase() === String(stockAllocationSource.cv_no || '').trim().toLowerCase()) {
-      return false;
-    }
-
     // Bypass validation if in edit mode and the CV hasn't changed from its original value
     if (editingId) {
       const originalRecord = disbursements.find(d => d.id === editingId);
@@ -522,7 +516,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     return disbursements.some(
       (d) => d.id !== editingId && d.cv_no && d.cv_no.trim().toLowerCase() === headerData.cv_no.trim().toLowerCase()
     );
-  }, [headerData.cv_no, disbursements, editingId, isStockAllocationMode, stockAllocationSource]);
+  }, [headerData.cv_no, disbursements, editingId]);
 
   const isDuplicateOR = useMemo(() => {
     if (!headerData.or_inv_no) return false;
@@ -1521,7 +1515,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
         ...prev,
         target_cib: formattedAmount,
         particulars: `Stock Allocation from CV# ${cv_no} — ${stock_description || 'N/A'}`,
-        cv_no: cv_no || '',
+        cv_no: '',
         or_inv_no: or_inv_no || ''
       }));
       setIsModalOpen(true);
