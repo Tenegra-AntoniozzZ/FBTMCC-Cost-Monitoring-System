@@ -1356,23 +1356,27 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
         ============================================== */}
         {activeView === 'office' && (
           <div className="animate-in slide-in-from-right-8 duration-500 space-y-6">
-            <button onClick={() => setActiveView('selection')} className="flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400 hover:text-amber-600 transition-colors bg-white dark:bg-slate-900 px-4 py-2 rounded-xl shadow-sm border dark:border-slate-800">
-              <ArrowLeft size={16} /> Back to Selection
-            </button>
+            {/* Top Bar: Back Button & Right-Aligned Legend */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
+              <button onClick={() => setActiveView('selection')} className="flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400 hover:text-amber-600 transition-colors bg-white dark:bg-slate-900 px-4 py-2 rounded-xl shadow-sm border dark:border-slate-800 self-start sm:self-auto">
+                <ArrowLeft size={16} /> Back to Selection
+              </button>
 
-            {/* Legend */}
-            <div className="flex items-center gap-5 px-1 flex-wrap">
-              <div className="flex items-center gap-2">
-                <span className="inline-block w-3 h-3 rounded-sm bg-indigo-400"></span>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Project row — shows contract formula columns</span>
-              </div>
-              <div className="w-px h-4 bg-slate-200 dark:bg-slate-700"></div>
-              <div className="flex items-center gap-2">
-                <span className="inline-block w-3 h-3 rounded-sm bg-amber-400"></span>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Monthly Total row — project sums + OFFICE/PAYATAS/RESIDENCE expense breakdown</span>
-              </div>
-              <div className="ml-auto text-[10px] text-slate-400 dark:text-slate-500">
-                {monthlyTableRows.filter(r => r.rowType === 'project').length} projects &bull; {monthlyTableRows.filter(r => r.rowType === 'monthly_total').length} months
+              {/* Legend */}
+              <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="inline-block w-3 h-3 rounded-sm bg-indigo-400"></span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Project row — shows contract formula columns</span>
+                </div>
+                <div className="w-px h-4 bg-slate-200 dark:bg-slate-700"></div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-block w-3 h-3 rounded-sm bg-amber-400"></span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Monthly Total row — project sums + OFFICE/PAYATAS/RESIDENCE expense breakdown</span>
+                </div>
+                <div className="w-px h-4 bg-slate-200 dark:bg-slate-700"></div>
+                <div className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                  {monthlyTableRows.filter(r => r.rowType === 'project').length} projects &bull; {monthlyTableRows.filter(r => r.rowType === 'monthly_total').length} months
+                </div>
               </div>
             </div>
 
