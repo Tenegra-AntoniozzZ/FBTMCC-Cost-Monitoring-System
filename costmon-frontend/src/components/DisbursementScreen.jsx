@@ -1227,6 +1227,29 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
         setErrorMessage("Kailangan maglagay ng Stock Description kapag nag-add ng stocks.");
         return;
       }
+      const hasEmptyStockAmount = stocksList.some(s => {
+        const rawAmt = parseFloat(String(s.amount).replace(/,/g, '')) || 0;
+        return s.description && s.description.trim() !== '' && rawAmt <= 0;
+      });
+      if (hasEmptyStockAmount) {
+        setErrorMessage("Please enter a valid amount for all added stocks, or remove the empty row.");
+        return;
+      }
+    }
+
+    const hasEmptyCosting = costingGroups.some(group => {
+      const allLines = [...group.constructionLines, ...group.miscLines];
+      return allLines.some(line => {
+        const cat = line.category ? line.category.trim() : '';
+        const isValidCat = cat !== '' && !cat.toLowerCase().includes('select');
+        const rawAmt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
+        return isValidCat && rawAmt <= 0;
+      });
+    });
+
+    if (hasEmptyCosting) {
+      setErrorMessage("Please enter a valid amount for all selected categories, or remove the empty row.");
+      return;
     }
 
     const numProjects = finalProjectCodes.length;
