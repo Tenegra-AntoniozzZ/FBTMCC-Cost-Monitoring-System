@@ -371,15 +371,16 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
           const grossAmount = isLabor ? laborTotal : amount;
 
           // For misc items, prefix with the original category so the user can tell them apart
-          const itemDesc = (targetCat === MISC_KEY && !miscCategorySet.has(catUpper))
+          const miscItemDesc = (targetCat === MISC_KEY && !miscCategorySet.has(catUpper))
             ? `[${originalCat}] ${exp.particulars || ''}`
             : (exp.particulars || '');
 
           grouped[targetCat].push({
             id: d.id, lineId: exp.id, date: d.date, cv_no: d.cv_no, or_inv_no: d.or_inv_no,
-            payee: d.payee, particulars: itemDesc, amount: amount, grossAmount: grossAmount,
+            payee: d.payee, particulars: d.particulars, amount: amount, grossAmount: grossAmount,
             // miscCategory holds the original category name for display in the Misc table
             miscCategory: targetCat === MISC_KEY ? originalCat : '',
+            miscItemDesc,
             laborLess, laborEwt, laborTotal, matlQty: 0, matlUnitCost: 0,
             matlTotal, totalMatlCost, totalLaborCost,
             // Carry the monitoring flag through so renderers can badge & skip this item
@@ -888,17 +889,17 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
                           {isMisc ? (
                             /* ── MISCELLANEOUS COST TABLE HEADER (with Item Description column) ── */
                             <>
-                              <tr className={`${headerColor} border-b-2 border-slate-800 dark:border-slate-600`}><th colSpan={canEdit ? 14 : 13} className="text-center py-3.5 font-black text-white uppercase tracking-[0.15em] text-sm">{category}</th></tr>
+                              <tr className={`${headerColor} border-b-2 border-slate-800 dark:border-slate-600`}><th colSpan={canEdit ? 15 : 14} className="text-center py-3.5 font-black text-white uppercase tracking-[0.15em] text-sm">{category}</th></tr>
                               <tr className="bg-slate-200 dark:bg-slate-700 border-b-2 border-slate-800 dark:border-slate-600 text-[10px] font-black text-slate-800 dark:text-slate-200 text-center uppercase tracking-wider leading-tight">
-                                <th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Date</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">C.V.#</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Invoice</th><th className="py-3 px-2 w-[15%] text-left border-r border-slate-800 dark:border-slate-600">Supplier / Particulars</th><th className="py-3 px-2 w-[15%] text-left border-r border-slate-800 dark:border-slate-600">Item Description</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Less</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Ewt</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Total</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l QTY</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l Unit Cost</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Item Amount</th><th className="py-3 px-2 w-[8%] border-r border-slate-800 dark:border-slate-600">Total Material Cost</th><th className="py-3 px-2 w-[8%] border-r border-slate-800 dark:border-slate-600 text-right pr-4">Total Labor Cost</th>{canEdit && <th className="py-3 px-2 w-[4%]">Act</th>}
+                                <th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Date</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">C.V.#</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Invoice</th><th className="py-3 px-2 w-[10%] text-left border-r border-slate-800 dark:border-slate-600">Payee</th><th className="py-3 px-2 w-[10%] text-left border-r border-slate-800 dark:border-slate-600">Supplier / Particulars</th><th className="py-3 px-2 w-[10%] text-left border-r border-slate-800 dark:border-slate-600">Item Description</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Less</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Ewt</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Total</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l QTY</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l Unit Cost</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Item Amount</th><th className="py-3 px-2 w-[8%] border-r border-slate-800 dark:border-slate-600">Total Material Cost</th><th className="py-3 px-2 w-[8%] border-r border-slate-800 dark:border-slate-600 text-right pr-4">Total Labor Cost</th>{canEdit && <th className="py-3 px-2 w-[4%]">Act</th>}
                               </tr>
                             </>
                           ) : (
                             /* ── MAIN CATEGORY TABLE HEADER (no Item Description column) ── */
                             <>
-                              <tr className={`${headerColor} border-b-2 border-slate-800 dark:border-slate-600`}><th colSpan={canEdit ? 13 : 12} className="text-center py-3.5 font-black text-white uppercase tracking-[0.15em] text-sm">{category}</th></tr>
+                              <tr className={`${headerColor} border-b-2 border-slate-800 dark:border-slate-600`}><th colSpan={canEdit ? 14 : 13} className="text-center py-3.5 font-black text-white uppercase tracking-[0.15em] text-sm">{category}</th></tr>
                               <tr className="bg-slate-200 dark:bg-slate-700 border-b-2 border-slate-800 dark:border-slate-600 text-[10px] font-black text-slate-800 dark:text-slate-200 text-center uppercase tracking-wider leading-tight">
-                                <th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Date</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">C.V.#</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Invoice</th><th className="py-3 px-2 w-[20%] text-left border-r border-slate-800 dark:border-slate-600">Supplier / Particulars</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Less</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Ewt</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Total</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l QTY</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l Unit Cost</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Item Amount</th><th className="py-3 px-2 w-[9%] border-r border-slate-800 dark:border-slate-600">Total Material Cost</th><th className="py-3 px-2 w-[9%] border-r border-slate-800 dark:border-slate-600 text-right pr-4">Total Labor Cost</th>{canEdit && <th className="py-3 px-2 w-[4%]">Act</th>}
+                                <th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Date</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">C.V.#</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Invoice</th><th className="py-3 px-2 w-[10%] text-left border-r border-slate-800 dark:border-slate-600">Payee</th><th className="py-3 px-2 w-[12%] text-left border-r border-slate-800 dark:border-slate-600">Supplier / Particulars</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Less</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Ewt</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Labor Total</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l QTY</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Mat'l Unit Cost</th><th className="py-3 px-2 w-[6%] border-r border-slate-800 dark:border-slate-600">Item Amount</th><th className="py-3 px-2 w-[8%] border-r border-slate-800 dark:border-slate-600">Total Material Cost</th><th className="py-3 px-2 w-[8%] border-r border-slate-800 dark:border-slate-600 text-right pr-4">Total Labor Cost</th>{canEdit && <th className="py-3 px-2 w-[4%]">Act</th>}
                               </tr>
                             </>
                           )}
@@ -909,7 +910,7 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
                               <td className="p-3 text-center font-bold text-slate-700 dark:text-slate-300 border-r border-slate-800">{item.date}</td>
                               <td className="p-3 text-center border-r border-slate-800"><span className="px-1.5 py-1 bg-white text-slate-800 rounded font-mono font-bold text-[10px] border border-slate-300">{item.cv_no || 'N/A'}</span></td>
                               <td className="p-3 text-center font-mono font-bold text-slate-700 dark:text-slate-300 border-r border-slate-800">{item.or_inv_no || '-'}</td>
-                              <td className="p-3 font-bold text-slate-800 dark:text-slate-200 text-left border-r border-slate-800 truncate max-w-[150px]" title={item.payee}>
+                              <td className="p-3 font-bold text-slate-800 dark:text-slate-200 text-left border-r border-slate-800 truncate max-w-[120px]" title={item.payee}>
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <span>{item.payee}</span>
                                   {item.is_monitoring_only && (
@@ -917,9 +918,10 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
                                   )}
                                 </div>
                               </td>
+                              <td className="p-3 font-medium text-slate-600 dark:text-slate-400 text-left border-r border-slate-800 truncate max-w-[120px]" title={item.particulars}>{item.particulars || '-'}</td>
                               {/* Item Description column — only for Misc table */}
                               {isMisc && (
-                                <td className="p-3 font-medium text-slate-600 dark:text-slate-400 text-left border-r border-slate-800 truncate max-w-[150px]" title={item.miscCategory}>{item.miscCategory || '-'}</td>
+                                <td className="p-3 font-medium text-slate-600 dark:text-slate-400 text-left border-r border-slate-800 truncate max-w-[150px]" title={item.miscItemDesc || item.miscCategory}>{item.miscItemDesc || item.miscCategory || '-'}</td>
                               )}
                               <td className={`p-3 text-center font-mono font-medium border-r border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 ${item.is_monitoring_only ? 'opacity-40 line-through text-slate-400 dark:text-slate-500' : 'text-slate-600 dark:text-slate-400'}`}>{formatMoney(item.laborLess)}</td>
                               <td className={`p-3 text-center font-mono font-medium border-r border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 ${item.is_monitoring_only ? 'opacity-40 line-through text-slate-400 dark:text-slate-500' : 'text-slate-600 dark:text-slate-400'}`}>{formatMoney(item.laborEwt)}</td>
@@ -937,7 +939,7 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
                             </tr>
                           ))}
                           <tr className="bg-slate-100 dark:bg-slate-700/80 border-t-2 border-slate-800 dark:border-slate-600">
-                            <td colSpan={isMisc ? 11 : 10} className="p-3 text-right font-black text-[11px] uppercase tracking-widest text-slate-800 dark:text-slate-200 border-r border-slate-800">TOTAL FOR {category}:</td>
+                            <td colSpan={isMisc ? 12 : 11} className="p-3 text-right font-black text-[11px] uppercase tracking-widest text-slate-800 dark:text-slate-200 border-r border-slate-800">TOTAL FOR {category}:</td>
                             <td className="p-3 text-right font-mono font-black text-slate-800 dark:text-slate-200 text-sm border-r border-slate-800 bg-slate-200/50">₱ {items.reduce((sum, i) => i.is_monitoring_only ? sum : sum + i.totalMatlCost, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                             <td className="p-3 text-right pr-4 font-mono font-black text-slate-800 dark:text-slate-200 text-sm border-r border-slate-800 bg-slate-200/50">₱ {items.reduce((sum, i) => i.is_monitoring_only ? sum : sum + i.totalLaborCost, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                             {canEdit && <td></td>}
