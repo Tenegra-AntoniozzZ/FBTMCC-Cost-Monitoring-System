@@ -24,7 +24,7 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 // ==========================================
 // UPLOADS FOLDER SETUP
@@ -1646,7 +1646,7 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
     const MONEY_FMT = '#,##0.00';
 
     // Helper: set em-dash or number value
-    const fmtNum = (v) => (v === null || v === undefined || v === 0) ? '—' : v;
+    const fmtNum = (v) => (v === null || v === undefined || v === '') ? '' : v;
 
     // Helper: apply cell style for a data cell
     const styleDataCell = (cell, fill, isNumeric = false, isBold = false, fontColor = DARK_TEXT) => {
@@ -1709,7 +1709,7 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
           fmtNum(p.EQ_30_OH),
           fmtNum(p.EQ_10_RETENTION),
           fmtNum(p.EFFECTIVE_OH),
-          fmtNum(p.TCC || null),        // Total EOC per Month ≈ TCC
+          fmtNum(p.TCC),        // Total EOC per Month ≈ TCC
           ...customColumns.map(() => '—'),  // Expense cols: n/a for project rows
           '—',                          // Total (expense total: n/a)
           fmtNum(p.NET_PROFIT)
@@ -1817,7 +1817,10 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
     });
 
     // ── Grand Total Row ───────────────────────────────────────
-    const gtLabel = (year && year !== 'All') ? `YEAR ${year} TOTAL` : 'GRAND TOTAL';
+    const spacerRow = sheet.addRow([]);
+    spacerRow.commit();
+    
+    const gtLabel = 'TOTAL';
     const gtValues = [
       '',
       gtLabel,
@@ -1871,6 +1874,216 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
     console.error('Office Ledger export error:', err.message, err.stack);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Failed to generate Office Ledger Excel file.' });
+    }
+  }
+});
+
+// ==========================================
+// EXPORT PROJECT MASTER SPREADSHEET (STYLED)
+// ==========================================
+app.post('/api/project-ledger/export-styled', authenticateToken, async (req, res) => {
+  try {
+    const { projectData, dateFilterLabel } = req.body;
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('PROJECT MASTER SPREADSHEET');
+
+    // Color Constants (Matching Office Dashboard)
+    const INDIGO       = 'FF3730A3';
+    const WHITE        = 'FFFFFFFF';
+    const GRAY_BORDER  = 'FFD1D5DB';
+    const DARK_TEXT    = 'FF1E293B';
+    const BLUE_TEXT    = 'FF2563EB';
+    const RED_TEXT     = 'FFDC2626';
+
+    const thinBorder = {
+      top:    { style: 'thin',  color: { argb: GRAY_BORDER } },
+      left:   { style: 'thin',  color: { argb: GRAY_BORDER } },
+      bottom: { style: 'thin',  color: { argb: GRAY_BORDER } },
+      right:  { style: 'thin',  color: { argb: GRAY_BORDER } }
+    };
+
+    const colDefs = [
+      { key: 'code',            width: 15 },
+      { key: 'name',            width: 35 },
+      { key: 'cc',              width: 18 },
+      { key: 'add_parts',       width: 25 },
+      { key: 'add_amount',      width: 15 },
+      { key: 'taw',             width: 18 },
+      { key: 'tcc',             width: 18 },
+      { key: 'vat',             width: 15 },
+      { key: 'cc_wo_vat',       width: 18 },
+      { key: 'oh_30',           width: 15 },
+      { key: 'oh_20',           width: 15 },
+      { key: 'oh_12',           width: 15 },
+      { key: 'dlm_30',          width: 18 },
+      { key: 'dlm_20',          width: 18 },
+      { key: 'dlm_12',          width: 18 },
+      { key: 'adlm',            width: 15 },
+      { key: 'sav_30',          width: 15 },
+      { key: 'sav_20',          width: 15 },
+      { key: 'sav_12',          width: 15 },
+      { key: 'remarks',         width: 15 },
+      { key: 'proj_area',       width: 20 },
+      { key: 'proj_start',      width: 15 }
+    ];
+
+    colDefs.forEach((col, i) => {
+      const c = sheet.getColumn(i + 1);
+      c.key = col.key;
+      c.width = col.width;
+    });
+
+    // Title Row
+    sheet.mergeCells(1, 1, 1, colDefs.length);
+    const titleCell = sheet.getCell(1, 1);
+    titleCell.value = 'FBTMCC - PROJECT MASTER SPREADSHEET';
+    titleCell.font = { name: 'Arial', size: 14, bold: true, color: { argb: WHITE } };
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: INDIGO } };
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // Subtitle Row
+    sheet.mergeCells(2, 1, 2, colDefs.length);
+    const subCell = sheet.getCell(2, 1);
+    subCell.value = dateFilterLabel ? `Filter Period: ${dateFilterLabel}` : "Period: All-Time Records";
+    subCell.font = { name: 'Arial', size: 11, italic: true, color: { argb: DARK_TEXT } };
+    subCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // Empty Row
+    sheet.addRow([]);
+
+    // Headers
+    const headerVals = [
+        "Code", "Store Name", "Contract Cost (CC)",
+        "Additional Works Particulars", "Amount", "Total Additional (TAW)",
+        "Total Contract (TCC)", "12% VAT of TCC", "CC without VAT",
+        "Overhead 30%", "Overhead 20%", "Overhead 12%",
+        "Target DLM @ 30%", "Target DLM @ 20%", "Target DLM @ 12%",
+        "Actual ADLM", "Saving @ 30%", "Saving @ 20%", "Saving @ 12%", "Remarks", "PROJECT AREA", "PROJECT START"
+    ];
+    
+    const headerRow = sheet.addRow(headerVals);
+    headerRow.eachCell(cell => {
+      cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: INDIGO } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.border = thinBorder;
+    });
+    headerRow.height = 35;
+
+    // Formatting Helpers
+    const formatMoney = (val) => {
+       if (val === null || val === undefined || val === '') return '';
+       const v = parseFloat(val);
+       return isNaN(v) ? '' : v;
+    };
+    const formatDate = (dateStr) => {
+      if (!dateStr) return "";
+      const d = new Date(dateStr);
+      return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
+    };
+
+    function styleRow(r) {
+      r.eachCell((cell, colNumber) => {
+        cell.font = { name: 'Arial', size: 9 };
+        cell.border = thinBorder;
+        if (colNumber >= 3 && colNumber <= 19) {
+          cell.numFmt = '#,##0.00';
+        }
+        if (colNumber >= 17 && colNumber <= 19 && typeof cell.value === 'number') {
+            if (cell.value < 0) cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: RED_TEXT } };
+            else cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: BLUE_TEXT } };
+        }
+        if (colNumber === 7 || colNumber === 9 || colNumber === 16) {
+             cell.font = { name: 'Arial', size: 9, bold: true };
+        }
+      });
+    }
+
+    function styleSubRow(r) {
+       r.eachCell((cell, colNumber) => {
+        cell.font = { name: 'Arial', size: 9, italic: true, color: { argb: 'FF64748B' } };
+        cell.border = thinBorder;
+        if (colNumber === 5) {
+          cell.numFmt = '#,##0.00';
+        }
+      });
+    }
+
+    function styleSubTotalRow(r) {
+       r.eachCell((cell, colNumber) => {
+        cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FF334155' } };
+        cell.border = thinBorder;
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+        if (colNumber === 5) {
+          cell.numFmt = '#,##0.00';
+        }
+      });
+    }
+
+    // Data Loop
+    (projectData || []).forEach(p => {
+      const adds = p.additionalExpensesList || [];
+      const pArea = p.project_area || "";
+      const pStart = formatDate(p.project_start);
+
+      if (adds.length === 0) {
+        const row = sheet.addRow([
+          p.project_code, p.project_name, formatMoney(p.CC),
+          "-", 0, formatMoney(p.TAW), formatMoney(p.TCC), formatMoney(p.VAT_12), formatMoney(p.CC_WITHOUT_VAT),
+          formatMoney(p.OH_30), formatMoney(p.OH_20), formatMoney(p.OH_12),
+          formatMoney(p.TARGET_DLM_30), formatMoney(p.TARGET_DLM_20), formatMoney(p.TARGET_DLM_12),
+          formatMoney(p.ADLM), formatMoney(p.SAVING_30), formatMoney(p.SAVING_20), formatMoney(p.SAVING_12), 
+          "No Record", pArea, pStart
+        ]);
+        styleRow(row);
+      } else {
+        adds.forEach((add, idx) => {
+          if (idx === 0) {
+            const row = sheet.addRow([
+              p.project_code, p.project_name, formatMoney(p.CC),
+              add.particulars, formatMoney(add.amount), formatMoney(p.TAW), formatMoney(p.TCC), formatMoney(p.VAT_12), formatMoney(p.CC_WITHOUT_VAT),
+              formatMoney(p.OH_30), formatMoney(p.OH_20), formatMoney(p.OH_12),
+              formatMoney(p.TARGET_DLM_30), formatMoney(p.TARGET_DLM_20), formatMoney(p.TARGET_DLM_12),
+              formatMoney(p.ADLM), formatMoney(p.SAVING_30), formatMoney(p.SAVING_20), formatMoney(p.SAVING_12), 
+              "Active Works", pArea, pStart
+            ]);
+            styleRow(row);
+          } else {
+            const row = sheet.addRow([
+              "", "", "",
+              add.particulars, formatMoney(add.amount), "", "", "", "",
+              "", "", "", "", "", "", "", "", "", "", "", "", ""
+            ]);
+            styleSubRow(row);
+          }
+        });
+        if (adds.length > 1) {
+          const row = sheet.addRow([
+            "", "", "",
+            "Total Add'l Works Subtotal", formatMoney(p.TAW), "", "", "", "",
+            "", "", "", "", "", "", "", "", "", "", "", "", ""
+          ]);
+          styleSubTotalRow(row);
+        }
+      }
+    });
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const filename = `PROJECT_MASTER_SPREADSHEET_${timestamp}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+
+    logActivity(req.user.username, 'EXPORT_PROJECT_LEDGER', 'project_ledger', 'excel', 'Exported Project Master Spreadsheet');
+
+  } catch (err) {
+    console.error('Project Ledger export error:', err.message, err.stack);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to generate Project Ledger Excel file.' });
     }
   }
 });

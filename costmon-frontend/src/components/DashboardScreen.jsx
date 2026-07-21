@@ -117,7 +117,6 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
   const [showAdditionalWorks, setShowAdditionalWorks] = useState(true);
 
   // Loading states para sa exports
-  const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
 
   // BAGO: Loading states at Ref para sa Office Exports
@@ -190,68 +189,39 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
   const downloadProjectExcel = async () => {
     try {
       setIsExportingExcel(true);
-      const XLSX = (await import('xlsx')).default;
+      
+      const payload = {
+        projectData,
+        dateFilterLabel
+      };
 
-      const wb = XLSX.utils.book_new();
-      const excelRows = [];
-
-      excelRows.push(["FBTMCC - PROJECT MASTER SPREADSHEET"]);
-      excelRows.push([dateFilterLabel ? `Filter Period: ${dateFilterLabel}` : "Period: All-Time Records"]);
-      excelRows.push([]);
-
-      excelRows.push([
-        "Code", "Store Name", "Contract Cost (CC)",
-        "Additional Works Particulars", "Amount", "Total Additional (TAW)",
-        "Total Contract (TCC)", "12% VAT of TCC", "CC without VAT",
-        "Overhead 30%", "Overhead 20%", "Overhead 12%",
-        "Target DLM @ 30%", "Target DLM @ 20%", "Target DLM @ 12%",
-        "Actual ADLM", "Saving @ 30%", "Saving @ 20%", "Saving @ 12%", "Remarks"
-      ]);
-
-      projectData.forEach(p => {
-        const adds = p.additionalExpensesList || [];
-
-        if (adds.length === 0) {
-          excelRows.push([
-            p.project_code, p.project_name, p.CC,
-            "-", 0, p.TAW, p.TCC, p.VAT_12, p.CC_WITHOUT_VAT,
-            p.OH_30, p.OH_20, p.OH_12,
-            p.TARGET_DLM_30, p.TARGET_DLM_20, p.TARGET_DLM_12,
-            p.ADLM, p.SAVING_30, p.SAVING_20, p.SAVING_12, "No Record"
-          ]);
-        } else {
-          adds.forEach((add, idx) => {
-            if (idx === 0) {
-              excelRows.push([
-                p.project_code, p.project_name, p.CC,
-                add.particulars, add.amount, p.TAW, p.TCC, p.VAT_12, p.CC_WITHOUT_VAT,
-                p.OH_30, p.OH_20, p.OH_12,
-                p.TARGET_DLM_30, p.TARGET_DLM_20, p.TARGET_DLM_12,
-                p.ADLM, p.SAVING_30, p.SAVING_20, p.SAVING_12, "Active Works"
-              ]);
-            } else {
-              excelRows.push([
-                "", "", "",
-                add.particulars, add.amount, "", "", "", "",
-                "", "", "", "", "", "", "", "", "", "", ""
-              ]);
-            }
-          });
-          if (adds.length > 1) {
-            excelRows.push([
-              "", "", "",
-              "Total Add'l Works Subtotal", p.TAW, "", "", "", "",
-              "", "", "", "", "", "", "", "", "", "", ""
-            ]);
-          }
-        }
+      const token = sessionStorage.getItem('fbtmcc_token');
+      const response = await fetch(`${API_URL}/project-ledger/export-styled`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
       });
 
-      const ws = XLSX.utils.aoa_to_sheet(excelRows);
-      XLSX.utils.book_append_sheet(wb, ws, "Projects Master Ledger");
+      if (!response.ok) {
+        let errMsg = 'Export failed.';
+        try { const d = await response.json(); errMsg = d.error || errMsg; } catch (_) {}
+        throw new Error(errMsg);
+      }
 
-      const dateStr = new Date().toISOString().split('T')[0];
-      XLSX.writeFile(wb, `PROJECT_MASTER_SPREADSHEET_${dateStr}.xlsx`);
+      const disposition = response.headers.get('content-disposition') || '';
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : `PROJECT_MASTER_SPREADSHEET_${Date.now()}.xlsx`;
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      window.URL.revokeObjectURL(url);
+
     } catch (error) {
       console.error("Failed to export Excel file:", error);
     } finally {
@@ -262,44 +232,7 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
   // ==========================================
   // EXPORT TO PDF FUNCTION (PROJECTS)
   // ==========================================
-  const downloadProjectPDF = async () => {
-    if (!projectTableRef.current) return;
 
-    try {
-      setIsExportingPDF(true);
-      const html2canvas = (await import('html2canvas')).default;
-      const { jsPDF } = await import('jspdf');
-
-      const element = projectTableRef.current;
-
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: document.documentElement.classList.contains('dark') ? '#0a0a0a' : '#ffffff',
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: 2900
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'px',
-        format: [canvas.width, canvas.height]
-      });
-
-      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-
-      const dateStr = new Date().toISOString().split('T')[0];
-      pdf.save(`PROJECT_MASTER_SPREADSHEET_${dateStr}.pdf`);
-    } catch (error) {
-      console.error("Failed to export PDF:", error);
-    } finally {
-      setIsExportingPDF(false);
-    }
-  };
 
   // ==========================================
   // EXPORT TO EXCEL FUNCTION (OFFICE — UNIFIED)
@@ -840,6 +773,42 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
     return rows;
   }, [projectData, filteredDisbursements, overheadProjects, customColumns, officeYear, hiddenProjects, hiddenMonths]);
 
+  const grandTotals = useMemo(() => {
+    const totals = {
+      TCC: 0,
+      CONTRACT_WO_VAT: 0,
+      CONTRACT_WO_VAT_OH_PM: 0,
+      EQ_30_OH: 0,
+      EQ_10_RETENTION: 0,
+      EFFECTIVE_OH: 0,
+      NET_PROFIT: 0,
+      total_specific_expenses: 0,
+    };
+    
+    customColumns.forEach(col => {
+      totals[col.id] = 0;
+    });
+
+    monthlyTableRows.forEach(row => {
+      if (row.rowType === 'monthly_total') {
+        totals.TCC += row.TCC || 0;
+        totals.CONTRACT_WO_VAT += row.CONTRACT_WO_VAT || 0;
+        totals.CONTRACT_WO_VAT_OH_PM += row.CONTRACT_WO_VAT_OH_PM || 0;
+        totals.EQ_30_OH += row.EQ_30_OH || 0;
+        totals.EQ_10_RETENTION += row.EQ_10_RETENTION || 0;
+        totals.EFFECTIVE_OH += row.EFFECTIVE_OH || 0;
+        totals.NET_PROFIT += row.NET_PROFIT || 0;
+        totals.total_specific_expenses += row.total_specific_expenses || 0;
+        
+        customColumns.forEach(col => {
+          totals[col.id] += row[col.id] || 0;
+        });
+      }
+    });
+    
+    return totals;
+  }, [monthlyTableRows, customColumns]);
+
   const summaryCards = [
     { title: "Active Projects", value: `${projectData.length} Sites`, icon: <Briefcase size={28} />, colorClass: "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800" },
     { title: "Office Departments", value: `${monthlyTableRows.filter(r => r.rowType === 'project' && r.monthKey !== '__unscheduled__').length} Records`, icon: <Building2 size={28} />, colorClass: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800" },
@@ -1130,33 +1099,12 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
                 {/* CONTROLS AREA */}
                 <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
 
-                  {/* BUTTON 1: EXCEL EXPORT */}
-                  <div className="relative group flex items-center justify-center">
-                    <button
-                      onClick={downloadProjectExcel}
-                      disabled={isExportingExcel}
-                      className="flex items-center justify-center p-2 bg-white/10 hover:bg-white/20 disabled:opacity-50 border border-white/20 rounded-xl font-bold transition-all shadow-sm cursor-pointer"
-                    >
-                      <FileSpreadsheet size={16} className={`${isExportingExcel ? 'animate-pulse' : ''}`} />
-                    </button>
-                    <div className="absolute bottom-full mb-2 bg-slate-800 text-white text-[10px] font-bold py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg border border-slate-700">
-                      {isExportingExcel ? 'Exporting Excel...' : 'Download as Excel (.xlsx)'}
-                    </div>
-                  </div>
-
-                  {/* BUTTON 2: PDF EXPORT */}
-                  <div className="relative group flex items-center justify-center">
-                    <button
-                      onClick={downloadProjectPDF}
-                      disabled={isExportingPDF}
-                      className="flex items-center justify-center p-2 bg-white/10 hover:bg-white/20 disabled:opacity-50 border border-white/20 rounded-xl font-bold transition-all shadow-sm cursor-pointer"
-                    >
-                      <Download size={16} className={`${isExportingPDF ? 'animate-bounce' : ''}`} />
-                    </button>
-                    <div className="absolute bottom-full mb-2 bg-slate-800 text-white text-[10px] font-bold py-1 px-2 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg border border-slate-700">
-                      {isExportingPDF ? 'Generating PDF...' : 'Download as PDF'}
-                    </div>
-                  </div>
+                  {/* EXCEL EXPORT (STYLED) */}
+                  <button onClick={downloadProjectExcel} disabled={isExportingExcel}
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 disabled:opacity-50 border border-emerald-200 dark:border-emerald-800 rounded-xl transition-colors font-bold text-sm shadow-sm">
+                    <Download size={16} className={isExportingExcel ? 'animate-pulse' : ''} />
+                    {isExportingExcel ? 'Exporting...' : 'Export Excel'}
+                  </button>
 
                   {/* ZOOM MODULE */}
                   <div className="flex items-center bg-black/20 rounded-xl px-2 py-1 gap-1 backdrop-blur-sm border border-white/10">
@@ -1241,6 +1189,8 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
                       <th className="p-4 text-center bg-blue-50 dark:bg-blue-900/10">Saving @ 20%</th>
                       <th className="p-4 text-center bg-blue-50 dark:bg-blue-900/10">Saving @ 12%</th>
                       <th className="p-4 text-center">Remarks</th>
+                      <th className="p-4 text-center">Project Area</th>
+                      <th className="p-4 text-center">Project Start</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-[12px]">
@@ -1310,6 +1260,12 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
                                   {isFirst ? formatMoney(p.SAVING_12) : ''}
                                 </td>
                                 <td className="p-4 italic text-slate-400 text-[10px] uppercase">{isFirst ? 'No Record' : ''}</td>
+                                <td className="p-4 text-slate-600 dark:text-slate-300">
+                                  {isFirst ? (p.project_area || '') : ''}
+                                </td>
+                                <td className="p-4 text-slate-600 dark:text-slate-300 text-center">
+                                  {isFirst ? (p.project_start && !isNaN(new Date(p.project_start).getTime()) ? new Date(p.project_start).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : (p.project_start || '')) : ''}
+                                </td>
                               </tr>
                             );
                           })}
@@ -1708,6 +1664,43 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
                       );
                     })}
                   </tbody>
+                  <tfoot className="sticky bottom-0 z-30 shadow-[0_-4px_10px_rgba(0,0,0,0.2)] dark:shadow-[0_-4px_10px_rgba(0,0,0,0.5)]">
+                    <tr className="bg-slate-800 dark:bg-black text-[12px] border-t-4 border-slate-600 dark:border-slate-800">
+                      <td colSpan={2} className="p-4 sticky left-0 z-20 bg-slate-800 dark:bg-black border-r border-slate-700 dark:border-slate-800">
+                        <span className="font-black text-[14px] uppercase tracking-widest text-white flex items-center gap-2">
+                          <Wallet size={16} className="text-emerald-400" />
+                          TOTAL
+                        </span>
+                      </td>
+                      <td className="p-4 text-right font-mono font-bold text-white border-r border-slate-700 dark:border-slate-800/80 bg-indigo-900/20">{formatMoney(grandTotals.TCC)}</td>
+                      <td className="p-4 text-right font-mono font-bold text-slate-300 border-r border-slate-700 dark:border-slate-800/80">{formatMoney(grandTotals.CONTRACT_WO_VAT)}</td>
+                      <td className="p-4 text-right font-mono font-bold text-slate-300 border-r border-slate-700 dark:border-slate-800/80">{formatMoney(grandTotals.CONTRACT_WO_VAT_OH_PM)}</td>
+                      <td className="p-4 text-right font-mono font-bold text-purple-300 border-r border-slate-700 dark:border-slate-800/80 bg-purple-900/20">{formatMoney(grandTotals.EQ_30_OH)}</td>
+                      <td className="p-4 text-right font-mono font-bold text-rose-400 border-r border-slate-700 dark:border-slate-800/80 bg-rose-900/20">{formatMoney(grandTotals.EQ_10_RETENTION)}</td>
+                      <td className="p-4 text-right font-mono font-bold text-slate-300 border-r border-slate-700 dark:border-slate-800/80">{formatMoney(grandTotals.EFFECTIVE_OH)}</td>
+                      <td className="p-4 text-center text-slate-500 border-r border-slate-700 dark:border-slate-800/80">&mdash;</td>
+                      
+                      {customColumns.map((col, idx) => {
+                        const isFirst = idx === 0;
+                        const isLast = idx === customColumns.length - 1;
+                        let cellClass = "p-4 text-right font-mono font-bold text-amber-100 border-r border-slate-700 dark:border-slate-800/80";
+                        if (isFirst) cellClass += " bg-amber-900/20";
+                        if (isLast) cellClass += " bg-amber-900/20";
+                        return (
+                          <td key={`gt-${col.id}`} className={cellClass}>
+                            {grandTotals[col.id] > 0 ? formatMoney(grandTotals[col.id]) : <span className="text-slate-500 select-none">&mdash;</span>}
+                          </td>
+                        );
+                      })}
+                      
+                      <td className="p-4 text-right font-mono font-bold text-emerald-100 border-r border-slate-700 dark:border-slate-800/80 bg-emerald-900/20">
+                        {formatMoney(grandTotals.total_specific_expenses)}
+                      </td>
+                      <td className={`p-4 text-right font-mono font-black text-[14px] ${grandTotals.NET_PROFIT >= 0 ? 'text-emerald-400' : 'text-rose-400'} bg-slate-900/50`}>
+                        {formatMoney(grandTotals.NET_PROFIT)}
+                      </td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </section>
