@@ -225,7 +225,8 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       const query = searchQuery.toLowerCase().trim();
       result = result.filter(d =>
         (d.cv_no && d.cv_no.toLowerCase().includes(query)) ||
-        (d.or_inv_no && d.or_inv_no.toLowerCase().includes(query))
+        (d.or_inv_no && d.or_inv_no.toLowerCase().includes(query)) ||
+        (d.payee && d.payee.toLowerCase().includes(query))
       );
     }
 
