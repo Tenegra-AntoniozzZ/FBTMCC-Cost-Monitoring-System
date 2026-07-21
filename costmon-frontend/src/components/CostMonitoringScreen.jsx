@@ -371,15 +371,16 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
           const grossAmount = isLabor ? laborTotal : amount;
 
           // For misc items, prefix with the original category so the user can tell them apart
-          const itemDesc = (targetCat === MISC_KEY && !miscCategorySet.has(catUpper))
+          const miscItemDesc = (targetCat === MISC_KEY && !miscCategorySet.has(catUpper))
             ? `[${originalCat}] ${exp.particulars || ''}`
             : (exp.particulars || '');
 
           grouped[targetCat].push({
             id: d.id, lineId: exp.id, date: d.date, cv_no: d.cv_no, or_inv_no: d.or_inv_no,
-            payee: d.payee, particulars: itemDesc, amount: amount, grossAmount: grossAmount,
+            payee: d.payee, particulars: d.particulars, amount: amount, grossAmount: grossAmount,
             // miscCategory holds the original category name for display in the Misc table
             miscCategory: targetCat === MISC_KEY ? originalCat : '',
+            miscItemDesc,
             laborLess, laborEwt, laborTotal, matlQty: 0, matlUnitCost: 0,
             matlTotal, totalMatlCost, totalLaborCost,
             // Carry the monitoring flag through so renderers can badge & skip this item
@@ -920,7 +921,7 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
                               <td className="p-3 font-medium text-slate-600 dark:text-slate-400 text-left border-r border-slate-800 truncate max-w-[120px]" title={item.particulars}>{item.particulars || '-'}</td>
                               {/* Item Description column — only for Misc table */}
                               {isMisc && (
-                                <td className="p-3 font-medium text-slate-600 dark:text-slate-400 text-left border-r border-slate-800 truncate max-w-[150px]" title={item.miscCategory}>{item.miscCategory || '-'}</td>
+                                <td className="p-3 font-medium text-slate-600 dark:text-slate-400 text-left border-r border-slate-800 truncate max-w-[150px]" title={item.miscItemDesc || item.miscCategory}>{item.miscItemDesc || item.miscCategory || '-'}</td>
                               )}
                               <td className={`p-3 text-center font-mono font-medium border-r border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 ${item.is_monitoring_only ? 'opacity-40 line-through text-slate-400 dark:text-slate-500' : 'text-slate-600 dark:text-slate-400'}`}>{formatMoney(item.laborLess)}</td>
                               <td className={`p-3 text-center font-mono font-medium border-r border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 ${item.is_monitoring_only ? 'opacity-40 line-through text-slate-400 dark:text-slate-500' : 'text-slate-600 dark:text-slate-400'}`}>{formatMoney(item.laborEwt)}</td>
