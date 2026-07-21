@@ -22,6 +22,10 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
   const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
   const [editingColumn, setEditingColumn] = useState(null);
 
+  // Hidden Projects State
+  const [hiddenProjects, setHiddenProjects] = useState([]);
+  const [hiddenMonths, setHiddenMonths] = useState([]);
+
   // Fetch preferences on mount
   useEffect(() => {
     const fetchPrefs = async () => {
@@ -35,6 +39,8 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
           const data = await res.json();
           if (data.dashboard_custom_columns) setCustomColumns(data.dashboard_custom_columns);
           if (data.dashboard_overhead_projects) setOverheadProjects(data.dashboard_overhead_projects);
+          if (data.dashboard_hidden_projects) setHiddenProjects(data.dashboard_hidden_projects);
+          if (data.dashboard_hidden_months) setHiddenMonths(data.dashboard_hidden_months);
         }
       } catch (err) {
         console.error("Failed to fetch preferences", err);
@@ -71,6 +77,38 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ dashboard_overhead_projects: updated })
+      }).catch(console.error);
+    }
+  };
+
+  const toggleProjectVisibility = (code) => {
+    const updated = hiddenProjects.includes(code)
+      ? hiddenProjects.filter(p => p !== code)
+      : [...hiddenProjects, code];
+    setHiddenProjects(updated);
+
+    const token = sessionStorage.getItem('fbtmcc_token');
+    if (token) {
+      fetch(`${API_URL}/users/preferences`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dashboard_hidden_projects: updated })
+      }).catch(console.error);
+    }
+  };
+
+  const toggleMonthVisibility = (monthKey) => {
+    const updated = hiddenMonths.includes(monthKey)
+      ? hiddenMonths.filter(m => m !== monthKey)
+      : [...hiddenMonths, monthKey];
+    setHiddenMonths(updated);
+
+    const token = sessionStorage.getItem('fbtmcc_token');
+    if (token) {
+      fetch(`${API_URL}/users/preferences`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dashboard_hidden_months: updated })
       }).catch(console.error);
     }
   };
@@ -270,20 +308,13 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
     try {
       setIsExportingOfficeExcel(true);
 
-      const params = new URLSearchParams();
-
-      // Pass the active year filter
-      if (officeYear) params.append('year', officeYear);
-
-      // Pass overhead project codes (comma-separated)
-      if (overheadProjects && overheadProjects.length > 0) {
-        params.append('overheadProjects', overheadProjects.join(','));
-      }
-
-      // Pass custom columns config as JSON
-      if (customColumns && customColumns.length > 0) {
-        params.append('customColumns', JSON.stringify(customColumns));
-      }
+      const params = new URLSearchParams({
+        year: officeYear,
+        overheadProjects: overheadProjects.join(','),
+        customColumns: JSON.stringify(customColumns),
+        hiddenProjects: JSON.stringify(hiddenProjects),
+        hiddenMonths: JSON.stringify(hiddenMonths)
+      });
 
       const token = sessionStorage.getItem('fbtmcc_token');
       const response = await fetch(`${API_URL}/office-ledger/export?${params}`, {
@@ -715,6 +746,9 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
       monthKeysArray = monthKeysArray.filter(mk => mk.startsWith(officeYear) || mk === '__unscheduled__');
     }
 
+    // Filter out hidden months
+    monthKeysArray = monthKeysArray.filter(mk => !hiddenMonths.includes(mk));
+
     const monthsNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const allMonths = monthKeysArray.map(mk => {
       if (mk === '__unscheduled__') return { mk, label: 'NO MONTHS' };
@@ -735,7 +769,7 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
       const projs = projectData.filter(p => {
         const d = p.project_start;
         const projectMk = (d && String(d).trim()) ? String(d).slice(0, 7) : '__unscheduled__';
-        return projectMk === mk;
+        return projectMk === mk && !hiddenProjects.includes(p.project_code);
       });
 
       const exps = expsByMonth[mk] || {};
@@ -804,7 +838,7 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
     });
 
     return rows;
-  }, [projectData, filteredDisbursements, overheadProjects, customColumns, officeYear]);
+  }, [projectData, filteredDisbursements, overheadProjects, customColumns, officeYear, hiddenProjects, hiddenMonths]);
 
   const summaryCards = [
     { title: "Active Projects", value: `${projectData.length} Sites`, icon: <Briefcase size={28} />, colorClass: "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 border-indigo-100 dark:border-indigo-800" },
@@ -1335,6 +1369,78 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
                 </div>
 
                 <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                  {/* HIDDEN ITEMS DROPDOWN */}
+                  {(hiddenProjects.length > 0 || hiddenMonths.length > 0) && (
+                    <div className="relative group/hidden">
+                      <button className="flex items-center gap-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-100 p-1.5 px-3 rounded-xl border border-rose-500/20 transition-colors">
+                        <EyeOff size={14} />
+                        <span className="text-xs font-bold">Hidden ({hiddenProjects.length + hiddenMonths.length})</span>
+                      </button>
+                      <div className="absolute right-0 top-[calc(100%+0.5rem)] w-56 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 opacity-0 invisible group-hover/hidden:opacity-100 group-hover/hidden:visible transition-all z-50 overflow-hidden flex flex-col">
+                        
+                        {/* Hidden Months Section */}
+                        {hiddenMonths.length > 0 && (
+                          <div className="border-b border-slate-100 dark:border-slate-700 last:border-b-0">
+                            <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Hidden Months</span>
+                            </div>
+                            <div className="max-h-48 overflow-y-auto custom-scrollbar p-1.5 flex flex-col gap-1">
+                              {hiddenMonths.map(mk => {
+                                const label = mk === '__unscheduled__' ? 'NO MONTHS' : (() => {
+                                  const [y, m] = mk.split('-');
+                                  const mIdx = parseInt(m, 10) - 1;
+                                  const names = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+                                  return names[mIdx] ? names[mIdx] : mk;
+                                })();
+                                return (
+                                  <div key={mk} className="flex items-center justify-between px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg group/item transition-colors">
+                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                                      <Calendar size={12} className="text-indigo-500" />
+                                      {label}
+                                    </span>
+                                    <button 
+                                      onClick={() => toggleMonthVisibility(mk)}
+                                      className="text-slate-400 hover:text-emerald-500 opacity-0 group-hover/item:opacity-100 transition-opacity p-1 bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-600"
+                                      title="Unhide Month"
+                                    >
+                                      <Eye size={12} />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Hidden Projects Section */}
+                        {hiddenProjects.length > 0 && (
+                          <div className="border-b border-slate-100 dark:border-slate-700 last:border-b-0">
+                            <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400">Hidden Projects</span>
+                            </div>
+                            <div className="max-h-48 overflow-y-auto custom-scrollbar p-1.5 flex flex-col gap-1">
+                              {hiddenProjects.map(code => (
+                                <div key={code} className="flex items-center justify-between px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg group/item transition-colors">
+                                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                                    <Briefcase size={12} className="text-indigo-400" />
+                                    {code}
+                                  </span>
+                                  <button 
+                                    onClick={() => toggleProjectVisibility(code)}
+                                    className="text-slate-400 hover:text-emerald-500 opacity-0 group-hover/item:opacity-100 transition-opacity p-1 bg-white dark:bg-slate-800 rounded shadow-sm border border-slate-200 dark:border-slate-600"
+                                    title="Unhide Project"
+                                  >
+                                    <Eye size={12} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* ISOLATED OFFICE YEAR FILTER */}
                   <div className="flex items-center gap-2 bg-white/10 p-1.5 rounded-xl border border-white/20">
                     <Calendar size={14} className="text-white/80 ml-1" />
@@ -1473,11 +1579,18 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
 
                       if (isHeader) {
                         return (
-                          <tr key={row.id} className="bg-slate-200 dark:bg-slate-800 border-t-4 border-slate-300 dark:border-slate-900">
+                          <tr key={row.id} className="group bg-slate-200 dark:bg-slate-800 border-t-4 border-slate-300 dark:border-slate-900">
                             <td colSpan={2} className="p-4 sticky left-0 z-20 bg-slate-200 dark:bg-slate-800 border-r border-slate-300 dark:border-slate-700">
                               <span className="font-black text-[14px] uppercase tracking-widest text-slate-800 dark:text-slate-100 flex items-center gap-2">
                                 <Calendar size={16} className="text-indigo-500" />
                                 {row.monthLabel}
+                                <button 
+                                  onClick={() => toggleMonthVisibility(row.monthKey)}
+                                  className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded ml-1"
+                                  title="Hide Month"
+                                >
+                                  <EyeOff size={14} />
+                                </button>
                               </span>
                             </td>
                             <td colSpan={9 + customColumns.length} className="bg-slate-200 dark:bg-slate-800"></td>
@@ -1536,7 +1649,7 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
                       // ══ INDIVIDUAL PROJECT ROW ══
                       return (
                         <tr key={row.id}
-                          className="hover:bg-indigo-50/30 dark:hover:bg-indigo-900/5 transition-colors border-l-2 border-l-indigo-300 dark:border-l-indigo-700"
+                          className="group hover:bg-indigo-50/30 dark:hover:bg-indigo-900/5 transition-colors border-l-2 border-l-indigo-300 dark:border-l-indigo-700"
                         >
                           {/* Date — blank for project rows */}
                           <td className="p-3 sticky left-0 z-10 bg-white dark:bg-[#0a0a0a] border-r dark:border-slate-800"></td>
@@ -1544,9 +1657,18 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
                           {/* Code / Name */}
                           <td className="p-3 sticky left-[90px] z-10 bg-white dark:bg-[#0a0a0a] border-r border-slate-300 dark:border-slate-700">
                             <div className="flex flex-col gap-0.5">
-                              <span className="font-black text-[13px] text-indigo-600 dark:text-indigo-400">
-                                {row.project_code}
-                              </span>
+                              <div className="flex items-center justify-between">
+                                <span className="font-black text-[13px] text-indigo-600 dark:text-indigo-400">
+                                  {row.project_code}
+                                </span>
+                                <button 
+                                  onClick={() => toggleProjectVisibility(row.project_code)}
+                                  className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded"
+                                  title="Hide Project"
+                                >
+                                  <EyeOff size={14} />
+                                </button>
+                              </div>
                               {row.project_name && (
                                 <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{row.project_name}</span>
                               )}

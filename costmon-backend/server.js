@@ -1366,7 +1366,7 @@ app.post('/api/db/import', authenticateToken, requireCEO, dbUpload.single('dbFil
 //   customColumns   - JSON array of { id, title, mappedCategories[] }
 app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
   try {
-    const { year, overheadProjects: opRaw, customColumns: ccRaw } = req.query;
+    const { year, overheadProjects: opRaw, customColumns: ccRaw, hiddenProjects: hpRaw, hiddenMonths: hmRaw } = req.query;
 
     // Parse params
     const overheadProjects = opRaw
@@ -1380,8 +1380,22 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
       customColumns = [];
     }
 
+    let hiddenProjects = [];
+    try {
+      hiddenProjects = hpRaw ? JSON.parse(hpRaw) : [];
+    } catch (_) {
+      hiddenProjects = [];
+    }
+
+    let hiddenMonths = [];
+    try {
+      hiddenMonths = hmRaw ? JSON.parse(hmRaw) : [];
+    } catch (_) {
+      hiddenMonths = [];
+    }
+
     // ── Fetch all data from DB ────────────────────────────────
-    const [allProjects, allDisbursements] = await Promise.all([
+    let [allProjects, allDisbursements] = await Promise.all([
       new Promise((resolve, reject) =>
         db.all('SELECT * FROM projects ORDER BY project_code ASC', [], (err, rows) =>
           err ? reject(err) : resolve(rows)
@@ -1393,6 +1407,9 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
         )
       )
     ]);
+
+    // Exclude hidden projects
+    allProjects = allProjects.filter(p => !hiddenProjects.includes(p.project_code));
 
     // Parse expenses_json
     const disbursements = allDisbursements.map(d => ({
@@ -1505,6 +1522,9 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
     if (year && year !== 'All') {
       monthKeysArray = monthKeysArray.filter(mk => mk.startsWith(year) || mk === '__unscheduled__');
     }
+
+    // Filter out hidden months
+    monthKeysArray = monthKeysArray.filter(mk => !hiddenMonths.includes(mk));
 
     const monthsNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const allMonths = monthKeysArray.map(mk => {
