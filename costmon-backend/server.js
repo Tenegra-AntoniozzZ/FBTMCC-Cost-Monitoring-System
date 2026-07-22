@@ -61,13 +61,6 @@ const JWT_SECRET = process.env.JWT_SECRET || 'isang_temporary_fallback_secret';
 // ==========================================
 // 2. SECURITY: RATE LIMITING
 // ==========================================
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: { error: "Masyadong maraming maling login. Subukan ulit mamaya." }
-});
-
-// ==========================================
 // 3. JWT MIDDLEWARE
 // ==========================================
 const authenticateToken = (req, res, next) => {
@@ -229,7 +222,7 @@ db.serialize(() => {
 // ==========================================
 // AUTH ENDPOINTS
 // ==========================================
-app.post('/api/login', loginLimiter, (req, res) => {
+app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
   db.get("SELECT * FROM users WHERE username = ?", [username], async (err, user) => {
     if (err) return res.status(500).json({ error: "Database error." });
@@ -243,7 +236,7 @@ app.post('/api/login', loginLimiter, (req, res) => {
   });
 });
 
-app.post('/api/forgot-password/question', loginLimiter, (req, res) => {
+app.post('/api/forgot-password/question', (req, res) => {
   db.get("SELECT security_question FROM users WHERE username = ?", [req.body.username], (err, user) => {
     if (err) return res.status(500).json({ error: "Database error." });
     if (!user) return res.status(404).json({ error: "Hindi nahanap ang username na ito." });
@@ -251,7 +244,7 @@ app.post('/api/forgot-password/question', loginLimiter, (req, res) => {
   });
 });
 
-app.post('/api/forgot-password/reset', loginLimiter, async (req, res) => {
+app.post('/api/forgot-password/reset', async (req, res) => {
   const { username, answer, newPassword } = req.body;
   db.get("SELECT * FROM users WHERE username = ?", [username], async (err, user) => {
     if (err) return res.status(500).json({ error: "Database error." });
