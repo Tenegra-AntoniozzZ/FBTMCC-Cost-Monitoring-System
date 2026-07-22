@@ -573,7 +573,14 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     setIsMonitoringOnly(false);
     setIsStockAllocationMode(false);
     setStockAllocationSource(null);
+    setHasAttemptedSubmit(false);
   };
+
+  useEffect(() => {
+    if (isModalOpen) {
+      setHasAttemptedSubmit(false);
+    }
+  }, [isModalOpen]);
 
   const closeAndResetModal = () => {
     setIsModalOpen(false);
@@ -950,6 +957,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     });
 
     setErrorMessage('');
+    setHasAttemptedSubmit(false);
     setIsModalOpen(true);
   };
 
