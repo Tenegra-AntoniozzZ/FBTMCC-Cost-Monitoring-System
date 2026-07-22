@@ -61,21 +61,14 @@ const JWT_SECRET = process.env.JWT_SECRET || 'isang_temporary_fallback_secret';
 // ==========================================
 // 2. SECURITY: RATE LIMITING
 // ==========================================
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: { error: "Masyadong maraming maling login. Subukan ulit mamaya." }
-});
-
-// ==========================================
 // 3. JWT MIDDLEWARE
 // ==========================================
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ error: "Access Denied. Walang valid na token." });
+  if (!token) return res.status(401).json({ error: "Access Denied. No valid token." });
   jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ error: "Invalid o Expired na ang session mo. Mag-login ulit." });
+    if (err) return res.status(403).json({ error: "Session expired. Please log in again." });
     req.user = user;
     next();
   });
@@ -229,38 +222,38 @@ db.serialize(() => {
 // ==========================================
 // AUTH ENDPOINTS
 // ==========================================
-app.post('/api/login', loginLimiter, (req, res) => {
+app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
   db.get("SELECT * FROM users WHERE username = ?", [username], async (err, user) => {
     if (err) return res.status(500).json({ error: "Database error." });
-    if (!user) return res.status(401).json({ error: "Mali ang username o password." });
-    if (user.is_active === 0) return res.status(403).json({ error: "Ang account na ito ay hindi na aktibo. Makipag-ugnayan sa admin." });
+    if (!user) return res.status(401).json({ error: "Wrong credentials. Pls try again." });
+    if (user.is_active === 0) return res.status(403).json({ error: "This account is not active. Contact your administrator." });
     const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(401).json({ error: "Mali ang username o password." });
+    if (!match) return res.status(401).json({ error: "Wrong credentials. Pls try again." });
     const token = jwt.sign({ id: user.id, role: user.role, username: user.username }, JWT_SECRET, { expiresIn: '12h' });
     logActivity(user.username, 'LOGIN', 'session', user.id, 'User logged in with role: ' + user.role);
     res.json({ success: true, token, role: user.role, username: user.username });
   });
 });
 
-app.post('/api/forgot-password/question', loginLimiter, (req, res) => {
+app.post('/api/forgot-password/question', (req, res) => {
   db.get("SELECT security_question FROM users WHERE username = ?", [req.body.username], (err, user) => {
     if (err) return res.status(500).json({ error: "Database error." });
-    if (!user) return res.status(404).json({ error: "Hindi nahanap ang username na ito." });
+    if (!user) return res.status(404).json({ error: "Can't find this username." });
     res.json({ question: user.security_question });
   });
 });
 
-app.post('/api/forgot-password/reset', loginLimiter, async (req, res) => {
+app.post('/api/forgot-password/reset', async (req, res) => {
   const { username, answer, newPassword } = req.body;
   db.get("SELECT * FROM users WHERE username = ?", [username], async (err, user) => {
     if (err) return res.status(500).json({ error: "Database error." });
     if (!user) return res.status(404).json({ error: "User not found." });
     const match = await bcrypt.compare(answer.toLowerCase().trim(), user.security_answer);
-    if (!match) return res.status(401).json({ error: "Mali ang sagot sa security question!" });
+    if (!match) return res.status(401).json({ error: "Wrong security answer!" });
     const hashedNewPass = await bcrypt.hash(newPassword, 10);
     db.run("UPDATE users SET password = ? WHERE id = ?", [hashedNewPass, user.id], (updateErr) => {
-      if (updateErr) return res.status(500).json({ error: "Hindi ma-update ang password." });
+      if (updateErr) return res.status(500).json({ error: "Failed to update password." });
       logActivity(username, 'RESET_PASSWORD', 'user', user.id, 'Password reset via security question');
       res.json({ success: true, message: "Password updated successfully!" });
     });
@@ -273,7 +266,7 @@ app.post('/api/verify-password', authenticateToken, (req, res) => {
     if (err) return res.status(500).json({ error: "Database error." });
     if (!user) return res.status(401).json({ error: "User not found." });
     const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(401).json({ error: "Mali ang password." });
+    if (!match) return res.status(401).json({ error: "Wrong password." });
     res.json({ success: true });
   });
 });
@@ -298,11 +291,11 @@ app.put('/api/users/preferences', authenticateToken, (req, res) => {
   db.get("SELECT preferences FROM users WHERE id = ?", [req.user.id], (err, row) => {
     if (err) return res.status(500).json({ error: "Database error." });
     if (!row) return res.status(404).json({ error: "User not found." });
-    
+
     let currentPrefs = {};
     try {
       currentPrefs = row.preferences ? JSON.parse(row.preferences) : {};
-    } catch (e) {}
+    } catch (e) { }
 
     const newPrefs = { ...currentPrefs, ...req.body };
     const prefsString = JSON.stringify(newPrefs);
@@ -326,7 +319,7 @@ app.get('/api/users', authenticateToken, requireCEO, (req, res) => {
 
 app.post('/api/users', authenticateToken, requireCEO, async (req, res) => {
   const { username, password, role, security_question, security_answer } = req.body;
-  if (!username || !password || !role) return res.status(400).json({ error: "Username, password, at role ay kailangan." });
+  if (!username || !password || !role) return res.status(400).json({ error: "Username, password, and role are required." });
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
     const hashedAnswer = security_answer ? await bcrypt.hash(security_answer.toLowerCase().trim(), 10) : '';
@@ -374,7 +367,7 @@ app.put('/api/users/:id', authenticateToken, requireCEO, async (req, res) => {
 app.put('/api/users/:id/toggle-active', authenticateToken, requireCEO, (req, res) => {
   const userId = req.params.id;
   if (String(req.user.id) === String(userId)) {
-    return res.status(400).json({ error: "Hindi mo maaaring i-deactivate ang sarili mong account." });
+    return res.status(400).json({ error: "You can't deactivate your own account." });
   }
   db.get("SELECT username, is_active FROM users WHERE id=?", [userId], (err, user) => {
     if (err || !user) return res.status(404).json({ error: "User not found." });
@@ -395,7 +388,7 @@ app.put('/api/users/:id/change-own-password', authenticateToken, async (req, res
   db.get("SELECT password FROM users WHERE id=?", [userId], async (err, user) => {
     if (err || !user) return res.status(404).json({ error: "User not found." });
     const match = await bcrypt.compare(currentPassword, user.password);
-    if (!match) return res.status(401).json({ error: "Mali ang kasalukuyang password." });
+    if (!match) return res.status(401).json({ error: "Wrong password." });
     const hashed = await bcrypt.hash(newPassword, 10);
     db.run("UPDATE users SET password=? WHERE id=?", [hashed, userId], (updateErr) => {
       if (updateErr) return res.status(500).json({ error: updateErr.message });
@@ -417,7 +410,7 @@ app.get('/api/users/me/settings', authenticateToken, (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!user) return res.status(404).json({ error: "User not found" });
     let parsedSettings = {};
-    try { parsedSettings = JSON.parse(user.settings_json || '{}'); } catch(e){}
+    try { parsedSettings = JSON.parse(user.settings_json || '{}'); } catch (e) { }
     res.json({ settings: parsedSettings });
   });
 });
@@ -425,8 +418,8 @@ app.get('/api/users/me/settings', authenticateToken, (req, res) => {
 app.put('/api/users/me/settings', authenticateToken, (req, res) => {
   const { settings } = req.body;
   if (!settings) return res.status(400).json({ error: "No settings provided" });
-  
-  db.run("UPDATE users SET settings_json = ? WHERE id = ?", [JSON.stringify(settings), req.user.id], function(err) {
+
+  db.run("UPDATE users SET settings_json = ? WHERE id = ?", [JSON.stringify(settings), req.user.id], function (err) {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true });
   });
@@ -706,9 +699,9 @@ app.post('/api/disbursements', authenticateToken, (req, res) => {
     dataList.forEach(data => {
       if (hasError) return;
       const newId = Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 9);
-      
+
       const s = (val) => (val === "" || val === undefined) ? null : val;
-      
+
       stmt.run(newId, s(data.project_code), data.date, s(data.payee), s(data.particulars), s(data.tin), s(data.cv_no), s(data.bank), s(data.check_no), s(data.or_inv_no), data.accts_pay || 0, data.input_tax || 0, data.output_tax || 0, data.target_cib || 0, data.gross_amount || 0, data.ewt_amount || 0, data.net_amount || 0, JSON.stringify(data.expenses), data.created_at, data.costing_type || 'normal', JSON.stringify(data.attachments || []), data.stocks_amount || 0, data.stock_description || '', data.is_monitoring_only ? 1 : 0, function (err) {
         if (hasError) return;
         if (err) {
@@ -716,7 +709,7 @@ app.post('/api/disbursements', authenticateToken, (req, res) => {
           db.run("ROLLBACK");
           return res.status(500).json({ error: err.message });
         }
-        
+
         logActivity(req.user.username, 'CREATE_DISBURSEMENT', 'disbursement', newId, 'CV# ' + data.cv_no + ' | Project: ' + data.project_code + ' | Amount: ' + data.gross_amount);
 
         const afterInsert = () => {
@@ -1548,26 +1541,26 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
     });
 
     // ── Color / Style constants ───────────────────────────────
-    const INDIGO       = 'FF3730A3'; // header bg
-    const AMBER_LIGHT  = 'FFFFF3CD'; // month header bg
-    const SLATE_LIGHT  = 'FFF1F5F9'; // monthly-total bg
-    const GRAND_BG     = 'FF312E81'; // grand total bg (darker indigo)
-    const WHITE        = 'FFFFFFFF';
-    const GRAY_BORDER  = 'FFD1D5DB';
-    const DARK_TEXT    = 'FF1E293B';
+    const INDIGO = 'FF3730A3'; // header bg
+    const AMBER_LIGHT = 'FFFFF3CD'; // month header bg
+    const SLATE_LIGHT = 'FFF1F5F9'; // monthly-total bg
+    const GRAND_BG = 'FF312E81'; // grand total bg (darker indigo)
+    const WHITE = 'FFFFFFFF';
+    const GRAY_BORDER = 'FFD1D5DB';
+    const DARK_TEXT = 'FF1E293B';
 
     const thinBorder = {
-      top:    { style: 'thin',  color: { argb: GRAY_BORDER } },
-      left:   { style: 'thin',  color: { argb: GRAY_BORDER } },
-      bottom: { style: 'thin',  color: { argb: GRAY_BORDER } },
-      right:  { style: 'thin',  color: { argb: GRAY_BORDER } }
+      top: { style: 'thin', color: { argb: GRAY_BORDER } },
+      left: { style: 'thin', color: { argb: GRAY_BORDER } },
+      bottom: { style: 'thin', color: { argb: GRAY_BORDER } },
+      right: { style: 'thin', color: { argb: GRAY_BORDER } }
     };
 
     const mediumBorder = {
-      top:    { style: 'medium', color: { argb: INDIGO } },
-      left:   { style: 'medium', color: { argb: INDIGO } },
+      top: { style: 'medium', color: { argb: INDIGO } },
+      left: { style: 'medium', color: { argb: INDIGO } },
       bottom: { style: 'medium', color: { argb: INDIGO } },
-      right:  { style: 'medium', color: { argb: INDIGO } }
+      right: { style: 'medium', color: { argb: INDIGO } }
     };
 
     // Fixed columns + dynamic expense columns + Total + Net Profit
@@ -1577,37 +1570,37 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
 
     // ── Column widths ─────────────────────────────────────────
     const colDefs = [
-      { key: 'date',              width: 10 },
-      { key: 'code',              width: 16 },
-      { key: 'TCC',               width: 20 },
-      { key: 'CONTRACT_WO_VAT',   width: 20 },
-      { key: 'CWOV_OH_PM',        width: 22 },
-      { key: 'EQ_30_OH',          width: 22 },
-      { key: 'EQ_10_RET',         width: 24 },
-      { key: 'EFFECTIVE_OH',      width: 20 },
-      { key: 'TOTAL_EOC',         width: 20 },
+      { key: 'date', width: 10 },
+      { key: 'code', width: 16 },
+      { key: 'TCC', width: 20 },
+      { key: 'CONTRACT_WO_VAT', width: 20 },
+      { key: 'CWOV_OH_PM', width: 22 },
+      { key: 'EQ_30_OH', width: 22 },
+      { key: 'EQ_10_RET', width: 24 },
+      { key: 'EFFECTIVE_OH', width: 20 },
+      { key: 'TOTAL_EOC', width: 20 },
       ...customColumns.map(col => ({ key: col.id, width: 18 })),
-      { key: 'total_exp',         width: 18 },
-      { key: 'net_profit',        width: 18 },
+      { key: 'total_exp', width: 18 },
+      { key: 'net_profit', width: 18 },
     ];
 
     colDefs.forEach((col, i) => {
       const c = sheet.getColumn(i + 1);
-      c.key   = col.key;
+      c.key = col.key;
       c.width = col.width;
     });
 
     // ── Title rows ────────────────────────────────────────────
     const title1 = sheet.addRow(['FBTMCC — MONTHLY UNIFIED MASTER LEDGER']);
     sheet.mergeCells(`A1:${sheet.getColumn(totalCols).letter}1`);
-    title1.getCell(1).font      = { bold: true, size: 14, color: { argb: INDIGO }, name: 'Calibri' };
+    title1.getCell(1).font = { bold: true, size: 14, color: { argb: INDIGO }, name: 'Calibri' };
     title1.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
     title1.height = 24;
 
     const yearLabel = (year && year !== 'All') ? `Year: ${year}` : 'All Records';
     const title2 = sheet.addRow([yearLabel]);
     sheet.mergeCells(`A2:${sheet.getColumn(totalCols).letter}2`);
-    title2.getCell(1).font      = { italic: true, size: 11, color: { argb: 'FF64748B' }, name: 'Calibri' };
+    title2.getCell(1).font = { italic: true, size: 11, color: { argb: 'FF64748B' }, name: 'Calibri' };
     title2.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
     title2.height = 16;
 
@@ -1631,10 +1624,10 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
 
     const headerRow = sheet.addRow(headerLabels);
     headerRow.eachCell({ includeEmpty: true }, cell => {
-      cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: INDIGO } };
-      cell.font      = { bold: true, color: { argb: WHITE }, size: 10, name: 'Calibri' };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: INDIGO } };
+      cell.font = { bold: true, color: { argb: WHITE }, size: 10, name: 'Calibri' };
       cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-      cell.border    = mediumBorder;
+      cell.border = mediumBorder;
     });
     headerRow.height = 44;
     headerRow.commit();
@@ -1650,10 +1643,10 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
 
     // Helper: apply cell style for a data cell
     const styleDataCell = (cell, fill, isNumeric = false, isBold = false, fontColor = DARK_TEXT) => {
-      cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
-      cell.font      = { name: 'Calibri', size: 10, color: { argb: fontColor }, bold: isBold };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
+      cell.font = { name: 'Calibri', size: 10, color: { argb: fontColor }, bold: isBold };
       cell.alignment = { vertical: 'middle', wrapText: false };
-      cell.border    = thinBorder;
+      cell.border = thinBorder;
       if (isNumeric && typeof cell.value === 'number') {
         cell.numFmt = MONEY_FMT;
       }
@@ -1672,7 +1665,7 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
 
     allMonths.forEach(({ mk, label }) => {
       const projs = projectData.filter(p => p.projectMk === mk);
-      const exps  = expsByMonth[mk] || {};
+      const exps = expsByMonth[mk] || {};
 
       // Compute dynamic expense sum for this month
       const dynamicExpensesSum = customColumns.reduce((sum, col) => sum + (parseFloat(exps[col.id]) || 0), 0);
@@ -1683,15 +1676,15 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
       // ── Month Header Row ──────────────────────────────────
       const mhRow = sheet.addRow([label]);
       sheet.mergeCells(`A${mhRow.number}:${sheet.getColumn(totalCols).letter}${mhRow.number}`);
-      mhRow.getCell(1).value     = label;
-      mhRow.getCell(1).fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: AMBER_LIGHT } };
-      mhRow.getCell(1).font      = { bold: true, size: 11, color: { argb: 'FF78350F' }, name: 'Calibri' };
+      mhRow.getCell(1).value = label;
+      mhRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: AMBER_LIGHT } };
+      mhRow.getCell(1).font = { bold: true, size: 11, color: { argb: 'FF78350F' }, name: 'Calibri' };
       mhRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
-      mhRow.getCell(1).border    = {
-        top:    { style: 'medium', color: { argb: 'FFFFFBEB' } },
-        bottom: { style: 'thin',   color: { argb: GRAY_BORDER } },
-        left:   { style: 'thin',   color: { argb: GRAY_BORDER } },
-        right:  { style: 'thin',   color: { argb: GRAY_BORDER } }
+      mhRow.getCell(1).border = {
+        top: { style: 'medium', color: { argb: 'FFFFFBEB' } },
+        bottom: { style: 'thin', color: { argb: GRAY_BORDER } },
+        left: { style: 'thin', color: { argb: GRAY_BORDER } },
+        right: { style: 'thin', color: { argb: GRAY_BORDER } }
       };
       mhRow.height = 20;
       mhRow.commit();
@@ -1718,10 +1711,10 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
         const dr = sheet.addRow(values);
         dr.eachCell({ includeEmpty: true }, (cell, colNumber) => {
           const isNumericCol = colNumber >= 3;
-          cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowFill } };
-          cell.font      = { name: 'Calibri', size: 10, color: { argb: DARK_TEXT } };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowFill } };
+          cell.font = { name: 'Calibri', size: 10, color: { argb: DARK_TEXT } };
           cell.alignment = { vertical: 'middle', wrapText: false };
-          cell.border    = thinBorder;
+          cell.border = thinBorder;
           if (isNumericCol && typeof cell.value === 'number') {
             cell.numFmt = MONEY_FMT;
           }
@@ -1737,13 +1730,13 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
 
       // ── Monthly Total Row ─────────────────────────────────
       const projSums = projs.reduce((acc, p) => {
-        acc.TCC                  += p.TCC || 0;
-        acc.CONTRACT_WO_VAT      += p.CONTRACT_WO_VAT || 0;
+        acc.TCC += p.TCC || 0;
+        acc.CONTRACT_WO_VAT += p.CONTRACT_WO_VAT || 0;
         acc.CONTRACT_WO_VAT_OH_PM += p.CONTRACT_WO_VAT_OH_PM || 0;
-        acc.EQ_30_OH             += p.EQ_30_OH || 0;
-        acc.EQ_10_RETENTION      += p.EQ_10_RETENTION || 0;
-        acc.EFFECTIVE_OH         += p.EFFECTIVE_OH || 0;
-        acc.NET_PROFIT           += p.NET_PROFIT || 0;
+        acc.EQ_30_OH += p.EQ_30_OH || 0;
+        acc.EQ_10_RETENTION += p.EQ_10_RETENTION || 0;
+        acc.EFFECTIVE_OH += p.EFFECTIVE_OH || 0;
+        acc.NET_PROFIT += p.NET_PROFIT || 0;
         customColumns.forEach(col => {
           acc[col.id] = (acc[col.id] || 0); // project rows don't have expense data
         });
@@ -1782,14 +1775,14 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
 
       const mtRow = sheet.addRow(mtValues);
       mtRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: SLATE_LIGHT } };
-        cell.font   = { name: 'Calibri', size: 10, bold: true, color: { argb: DARK_TEXT } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: SLATE_LIGHT } };
+        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: DARK_TEXT } };
         cell.alignment = { vertical: 'middle', wrapText: false };
         cell.border = {
-          top:    { style: 'thin',   color: { argb: '99AAAAAA' } },
+          top: { style: 'thin', color: { argb: '99AAAAAA' } },
           bottom: { style: 'medium', color: { argb: 'FF94A3B8' } },
-          left:   { style: 'thin',   color: { argb: GRAY_BORDER } },
-          right:  { style: 'thin',   color: { argb: GRAY_BORDER } }
+          left: { style: 'thin', color: { argb: GRAY_BORDER } },
+          right: { style: 'thin', color: { argb: GRAY_BORDER } }
         };
         if (colNumber >= 3 && typeof cell.value === 'number') {
           cell.numFmt = MONEY_FMT;
@@ -1803,13 +1796,13 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
       mtRow.commit();
 
       // Accumulate grand totals
-      grandTotal.TCC                   += projSums.TCC;
-      grandTotal.CONTRACT_WO_VAT       += projSums.CONTRACT_WO_VAT;
+      grandTotal.TCC += projSums.TCC;
+      grandTotal.CONTRACT_WO_VAT += projSums.CONTRACT_WO_VAT;
       grandTotal.CONTRACT_WO_VAT_OH_PM += projSums.CONTRACT_WO_VAT_OH_PM;
-      grandTotal.EQ_30_OH              += projSums.EQ_30_OH;
-      grandTotal.EQ_10_RETENTION       += projSums.EQ_10_RETENTION;
-      grandTotal.EFFECTIVE_OH          += projSums.EFFECTIVE_OH;
-      grandTotal.NET_PROFIT            += projSums.NET_PROFIT;
+      grandTotal.EQ_30_OH += projSums.EQ_30_OH;
+      grandTotal.EQ_10_RETENTION += projSums.EQ_10_RETENTION;
+      grandTotal.EFFECTIVE_OH += projSums.EFFECTIVE_OH;
+      grandTotal.NET_PROFIT += projSums.NET_PROFIT;
       grandTotal.total_specific_expenses += projSums.total_specific_expenses;
       customColumns.forEach(col => {
         grandTotal[col.id] = (grandTotal[col.id] || 0) + (projSums[col.id] || 0);
@@ -1819,7 +1812,7 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
     // ── Grand Total Row ───────────────────────────────────────
     const spacerRow = sheet.addRow([]);
     spacerRow.commit();
-    
+
     const gtLabel = 'TOTAL';
     const gtValues = [
       '',
@@ -1838,13 +1831,13 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
 
     const gtRow = sheet.addRow(gtValues);
     gtRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-      cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: GRAND_BG } };
-      cell.font   = { name: 'Calibri', size: 11, bold: true, color: { argb: WHITE } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: GRAND_BG } };
+      cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: WHITE } };
       cell.border = {
-        top:    { style: 'medium', color: { argb: GRAND_BG } },
+        top: { style: 'medium', color: { argb: GRAND_BG } },
         bottom: { style: 'medium', color: { argb: GRAND_BG } },
-        left:   { style: 'medium', color: { argb: GRAND_BG } },
-        right:  { style: 'medium', color: { argb: GRAND_BG } }
+        left: { style: 'medium', color: { argb: GRAND_BG } },
+        right: { style: 'medium', color: { argb: GRAND_BG } }
       };
       cell.alignment = { vertical: 'middle', wrapText: false };
       if (colNumber >= 3 && typeof cell.value === 'number') {
@@ -1889,43 +1882,43 @@ app.post('/api/project-ledger/export-styled', authenticateToken, async (req, res
     const sheet = workbook.addWorksheet('PROJECT MASTER SPREADSHEET');
 
     // Color Constants (Matching Office Dashboard)
-    const INDIGO       = 'FF3730A3';
-    const WHITE        = 'FFFFFFFF';
-    const GRAY_BORDER  = 'FFD1D5DB';
-    const DARK_TEXT    = 'FF1E293B';
-    const BLUE_TEXT    = 'FF2563EB';
-    const RED_TEXT     = 'FFDC2626';
+    const INDIGO = 'FF3730A3';
+    const WHITE = 'FFFFFFFF';
+    const GRAY_BORDER = 'FFD1D5DB';
+    const DARK_TEXT = 'FF1E293B';
+    const BLUE_TEXT = 'FF2563EB';
+    const RED_TEXT = 'FFDC2626';
 
     const thinBorder = {
-      top:    { style: 'thin',  color: { argb: GRAY_BORDER } },
-      left:   { style: 'thin',  color: { argb: GRAY_BORDER } },
-      bottom: { style: 'thin',  color: { argb: GRAY_BORDER } },
-      right:  { style: 'thin',  color: { argb: GRAY_BORDER } }
+      top: { style: 'thin', color: { argb: GRAY_BORDER } },
+      left: { style: 'thin', color: { argb: GRAY_BORDER } },
+      bottom: { style: 'thin', color: { argb: GRAY_BORDER } },
+      right: { style: 'thin', color: { argb: GRAY_BORDER } }
     };
 
     const colDefs = [
-      { key: 'code',            width: 15 },
-      { key: 'name',            width: 35 },
-      { key: 'cc',              width: 18 },
-      { key: 'add_parts',       width: 25 },
-      { key: 'add_amount',      width: 15 },
-      { key: 'taw',             width: 18 },
-      { key: 'tcc',             width: 18 },
-      { key: 'vat',             width: 15 },
-      { key: 'cc_wo_vat',       width: 18 },
-      { key: 'oh_30',           width: 15 },
-      { key: 'oh_20',           width: 15 },
-      { key: 'oh_12',           width: 15 },
-      { key: 'dlm_30',          width: 18 },
-      { key: 'dlm_20',          width: 18 },
-      { key: 'dlm_12',          width: 18 },
-      { key: 'adlm',            width: 15 },
-      { key: 'sav_30',          width: 15 },
-      { key: 'sav_20',          width: 15 },
-      { key: 'sav_12',          width: 15 },
-      { key: 'remarks',         width: 15 },
-      { key: 'proj_area',       width: 20 },
-      { key: 'proj_start',      width: 15 }
+      { key: 'code', width: 15 },
+      { key: 'name', width: 35 },
+      { key: 'cc', width: 18 },
+      { key: 'add_parts', width: 25 },
+      { key: 'add_amount', width: 15 },
+      { key: 'taw', width: 18 },
+      { key: 'tcc', width: 18 },
+      { key: 'vat', width: 15 },
+      { key: 'cc_wo_vat', width: 18 },
+      { key: 'oh_30', width: 15 },
+      { key: 'oh_20', width: 15 },
+      { key: 'oh_12', width: 15 },
+      { key: 'dlm_30', width: 18 },
+      { key: 'dlm_20', width: 18 },
+      { key: 'dlm_12', width: 18 },
+      { key: 'adlm', width: 15 },
+      { key: 'sav_30', width: 15 },
+      { key: 'sav_20', width: 15 },
+      { key: 'sav_12', width: 15 },
+      { key: 'remarks', width: 15 },
+      { key: 'proj_area', width: 20 },
+      { key: 'proj_start', width: 15 }
     ];
 
     colDefs.forEach((col, i) => {
@@ -1954,14 +1947,14 @@ app.post('/api/project-ledger/export-styled', authenticateToken, async (req, res
 
     // Headers
     const headerVals = [
-        "Code", "Store Name", "Contract Cost (CC)",
-        "Additional Works Particulars", "Amount", "Total Additional (TAW)",
-        "Total Contract (TCC)", "12% VAT of TCC", "CC without VAT",
-        "Overhead 30%", "Overhead 20%", "Overhead 12%",
-        "Target DLM @ 30%", "Target DLM @ 20%", "Target DLM @ 12%",
-        "Actual ADLM", "Saving @ 30%", "Saving @ 20%", "Saving @ 12%", "Remarks", "PROJECT AREA", "PROJECT START"
+      "Code", "Store Name", "Contract Cost (CC)",
+      "Additional Works Particulars", "Amount", "Total Additional (TAW)",
+      "Total Contract (TCC)", "12% VAT of TCC", "CC without VAT",
+      "Overhead 30%", "Overhead 20%", "Overhead 12%",
+      "Target DLM @ 30%", "Target DLM @ 20%", "Target DLM @ 12%",
+      "Actual ADLM", "Saving @ 30%", "Saving @ 20%", "Saving @ 12%", "Remarks", "PROJECT AREA", "PROJECT START"
     ];
-    
+
     const headerRow = sheet.addRow(headerVals);
     headerRow.eachCell(cell => {
       cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE } };
@@ -1973,9 +1966,9 @@ app.post('/api/project-ledger/export-styled', authenticateToken, async (req, res
 
     // Formatting Helpers
     const formatMoney = (val) => {
-       if (val === null || val === undefined || val === '') return '';
-       const v = parseFloat(val);
-       return isNaN(v) ? '' : v;
+      if (val === null || val === undefined || val === '') return '';
+      const v = parseFloat(val);
+      return isNaN(v) ? '' : v;
     };
     const formatDate = (dateStr) => {
       if (!dateStr) return "";
@@ -1991,17 +1984,17 @@ app.post('/api/project-ledger/export-styled', authenticateToken, async (req, res
           cell.numFmt = '#,##0.00';
         }
         if (colNumber >= 17 && colNumber <= 19 && typeof cell.value === 'number') {
-            if (cell.value < 0) cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: RED_TEXT } };
-            else cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: BLUE_TEXT } };
+          if (cell.value < 0) cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: RED_TEXT } };
+          else cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: BLUE_TEXT } };
         }
         if (colNumber === 7 || colNumber === 9 || colNumber === 16) {
-             cell.font = { name: 'Arial', size: 9, bold: true };
+          cell.font = { name: 'Arial', size: 9, bold: true };
         }
       });
     }
 
     function styleSubRow(r) {
-       r.eachCell((cell, colNumber) => {
+      r.eachCell((cell, colNumber) => {
         cell.font = { name: 'Arial', size: 9, italic: true, color: { argb: 'FF64748B' } };
         cell.border = thinBorder;
         if (colNumber === 5) {
@@ -2011,7 +2004,7 @@ app.post('/api/project-ledger/export-styled', authenticateToken, async (req, res
     }
 
     function styleSubTotalRow(r) {
-       r.eachCell((cell, colNumber) => {
+      r.eachCell((cell, colNumber) => {
         cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FF334155' } };
         cell.border = thinBorder;
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
@@ -2033,7 +2026,7 @@ app.post('/api/project-ledger/export-styled', authenticateToken, async (req, res
           "-", 0, formatMoney(p.TAW), formatMoney(p.TCC), formatMoney(p.VAT_12), formatMoney(p.CC_WITHOUT_VAT),
           formatMoney(p.OH_30), formatMoney(p.OH_20), formatMoney(p.OH_12),
           formatMoney(p.TARGET_DLM_30), formatMoney(p.TARGET_DLM_20), formatMoney(p.TARGET_DLM_12),
-          formatMoney(p.ADLM), formatMoney(p.SAVING_30), formatMoney(p.SAVING_20), formatMoney(p.SAVING_12), 
+          formatMoney(p.ADLM), formatMoney(p.SAVING_30), formatMoney(p.SAVING_20), formatMoney(p.SAVING_12),
           "No Record", pArea, pStart
         ]);
         styleRow(row);
@@ -2045,7 +2038,7 @@ app.post('/api/project-ledger/export-styled', authenticateToken, async (req, res
               add.particulars, formatMoney(add.amount), formatMoney(p.TAW), formatMoney(p.TCC), formatMoney(p.VAT_12), formatMoney(p.CC_WITHOUT_VAT),
               formatMoney(p.OH_30), formatMoney(p.OH_20), formatMoney(p.OH_12),
               formatMoney(p.TARGET_DLM_30), formatMoney(p.TARGET_DLM_20), formatMoney(p.TARGET_DLM_12),
-              formatMoney(p.ADLM), formatMoney(p.SAVING_30), formatMoney(p.SAVING_20), formatMoney(p.SAVING_12), 
+              formatMoney(p.ADLM), formatMoney(p.SAVING_30), formatMoney(p.SAVING_20), formatMoney(p.SAVING_12),
               "Active Works", pArea, pStart
             ]);
             styleRow(row);
