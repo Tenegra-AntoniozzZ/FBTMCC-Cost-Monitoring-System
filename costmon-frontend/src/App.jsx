@@ -15,6 +15,7 @@ import AuditLogScreen from './components/AuditLogScreen';
 import AdminScreen from './components/AdminScreen';
 import DatabaseManagement from './components/DatabaseManagement';
 import StocksScreen from './components/StockScreen';
+import AccountsPayableScreen from './components/AccountsPayableScreen';
 import { API_URL } from './utils/Constants';
 
 export default function App() {
@@ -308,6 +309,7 @@ export default function App() {
           <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/dashboard'} icon={<LayoutDashboard size={20} />} label="Dashboard" onClick={() => handleNavigation('/dashboard')} />
           <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/disbursements'} icon={<Receipt size={20} />} label="Disbursements" onClick={() => handleNavigation('/disbursements')} />
           <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/cost-monitoring'} icon={<BarChart3 size={20} />} label="Cost Monitoring" onClick={() => handleNavigation('/cost-monitoring')} />
+          <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/accounts-payable'} icon={<Wallet size={20} />} label="Accounts Payable" onClick={() => handleNavigation('/accounts-payable')} />
           <NavItem isSidebarOpen={isSidebarOpen} active={location.pathname === '/stocks'} icon={<Package size={20} />} label="Stocks" onClick={() => handleNavigation('/stocks')} />
 
           {['ceo', 'encoder'].includes(userRole) && (
@@ -458,6 +460,16 @@ export default function App() {
               <StocksScreen
                 onNavigateToDisbursement={navigateToDisbursement}
                 onUseStock={navigateToNewDisbursementWithStock}
+              />
+            }
+          />
+          <Route
+            path="/accounts-payable"
+            element={
+              <AccountsPayableScreen
+                disbursements={disbursements}
+                projects={projects}
+                userRole={userRole}
               />
             }
           />

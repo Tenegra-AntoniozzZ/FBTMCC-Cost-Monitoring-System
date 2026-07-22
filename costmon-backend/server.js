@@ -1170,6 +1170,221 @@ app.get('/api/disbursements/export', authenticateToken, async (req, res) => {
 });
 
 // ==========================================
+// ACCOUNTS PAYABLE MONITOR EXCEL EXPORT
+// ==========================================
+app.post('/api/disbursements/export-accounts-payable', authenticateToken, async (req, res) => {
+  const { ids } = req.body;
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'No disbursement IDs provided.' });
+  }
+
+  const placeholders = ids.map(() => '?').join(',');
+  db.all(
+    `SELECT d.*, p.project_name FROM disbursements d
+     LEFT JOIN projects p ON d.project_code = p.project_code
+     WHERE d.id IN (${placeholders}) AND d.is_monitoring_only = 1
+     ORDER BY d.payee ASC, d.project_code ASC, d.date ASC`,
+    ids,
+    async (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'No monitoring-only records found for the provided IDs.' });
+      }
+
+      try {
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = 'FBTMCC Cost Monitoring System';
+        workbook.created = new Date();
+
+        const MONTH_NAMES = {
+          '01': 'JANUARY', '02': 'FEBRUARY', '03': 'MARCH', '04': 'APRIL',
+          '05': 'MAY', '06': 'JUNE', '07': 'JULY', '08': 'AUGUST',
+          '09': 'SEPTEMBER', '10': 'OCTOBER', '11': 'NOVEMBER', '12': 'DECEMBER'
+        };
+
+        const formatDate = (dateStr) => {
+          if (!dateStr) return '';
+          const parts = dateStr.split('-');
+          if (parts.length < 3) return dateStr;
+          return `${parseInt(parts[1])}/${parseInt(parts[2])}/${parts[0]}`;
+        };
+
+        // Group rows by payee
+        const payeeMap = new Map();
+        rows.forEach(row => {
+          const payee = (row.payee || 'UNKNOWN').toUpperCase();
+          if (!payeeMap.has(payee)) payeeMap.set(payee, []);
+          payeeMap.get(payee).push(row);
+        });
+
+        // One worksheet per payee
+        for (const [payee, payeeRows] of payeeMap.entries()) {
+          // Determine month/year label
+          const dates = payeeRows.map(r => r.date).filter(Boolean).sort();
+          let monthLabel = '';
+          if (dates.length > 0) {
+            const firstDate = dates[0];
+            const lastDate = dates[dates.length - 1];
+            const firstMo = firstDate.substring(5, 7);
+            const firstYr = firstDate.substring(0, 4);
+            const lastMo = lastDate.substring(5, 7);
+            const lastYr = lastDate.substring(0, 4);
+            if (firstMo === lastMo && firstYr === lastYr) {
+              monthLabel = `FOR THE MONTH OF ${MONTH_NAMES[firstMo] || firstMo} ${firstYr}`;
+            } else {
+              monthLabel = `FOR THE MONTHS OF ${MONTH_NAMES[firstMo] || firstMo} ${firstYr} - ${MONTH_NAMES[lastMo] || lastMo} ${lastYr}`;
+            }
+          }
+
+          const sheetName = payee.substring(0, 31).replace(/[\\\/\?\*\[\]:]/g, '').trim() || 'Sheet1';
+          const sheet = workbook.addWorksheet(sheetName, {
+            pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1 }
+          });
+
+          // Column widths
+          sheet.getColumn(1).width = 10;  // PO #
+          sheet.getColumn(2).width = 13;  // Date of PO
+          sheet.getColumn(3).width = 13;  // Sales ORDER
+          sheet.getColumn(4).width = 16;  // Sales ORDER Date
+          sheet.getColumn(5).width = 52;  // PROJECT
+          sheet.getColumn(6).width = 16;  // Amount
+
+          // ── ROW 1: Payee/Company Name ────────────────────────────────
+          const r1 = sheet.addRow([payee, '', '', '', '', '']);
+          sheet.mergeCells('A1:F1');
+          r1.getCell(1).value = payee;
+          r1.getCell(1).font = { bold: true, size: 13, name: 'Calibri' };
+          r1.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+          r1.height = 22;
+
+          // ── ROW 2: ACCOUNTS PAYABLE ──────────────────────────────────
+          const r2 = sheet.addRow(['ACCOUNTS PAYABLE', '', '', '', '', '']);
+          sheet.mergeCells('A2:F2');
+          r2.getCell(1).value = 'ACCOUNTS PAYABLE';
+          r2.getCell(1).font = { bold: true, size: 12, name: 'Calibri' };
+          r2.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+          r2.height = 18;
+
+          // ── ROW 3: FOR THE MONTH OF ──────────────────────────────────
+          const r3 = sheet.addRow([monthLabel, '', '', '', '', '']);
+          sheet.mergeCells('A3:F3');
+          r3.getCell(1).value = monthLabel;
+          r3.getCell(1).font = { bold: true, size: 11, name: 'Calibri' };
+          r3.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+          r3.height = 16;
+
+          // ── ROWS 4-5: Blank spacers ──────────────────────────────────
+          sheet.addRow([]).height = 8;
+          sheet.addRow([]).height = 8;
+
+          // ── ROW 6: Column Headers ────────────────────────────────────
+          const headerRow = sheet.addRow(['PO #', 'Date of PO', 'Sales ORDER', 'Sales ORDER Date', 'PROJECT', 'Amount']);
+          headerRow.height = 20;
+          headerRow.eachCell({ includeEmpty: true }, (cell) => {
+            cell.font = { bold: true, size: 11, name: 'Calibri' };
+            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            cell.border = {
+              top: { style: 'thin' }, left: { style: 'thin' },
+              bottom: { style: 'thin' }, right: { style: 'thin' }
+            };
+          });
+
+          // ── DATA ROWS grouped by project ─────────────────────────────
+          const projectMap = new Map();
+          const projectOrder = [];
+          payeeRows.forEach(row => {
+            const proj = row.project_code || 'NO PROJECT';
+            if (!projectMap.has(proj)) { projectMap.set(proj, []); projectOrder.push(proj); }
+            projectMap.get(proj).push(row);
+          });
+
+          let grandTotal = 0;
+
+          for (const projCode of projectOrder) {
+            const projRows = projectMap.get(projCode);
+            let projectSubtotal = 0;
+
+            for (const row of projRows) {
+              const amount = parseFloat(row.gross_amount) || 0;
+              projectSubtotal += amount;
+              grandTotal += amount;
+
+              // Build full project label (code + name)
+              let projLabel = projCode;
+              if (row.project_name && row.project_name.trim() && row.project_name.trim() !== projCode) {
+                projLabel = `${projCode} ${row.project_name.trim()}`.toUpperCase();
+              }
+
+              const dataRow = sheet.addRow([
+                row.po_no || '',
+                formatDate(row.date),
+                row.or_inv_no || row.cv_no || '',
+                formatDate(row.date),
+                projLabel,
+                amount
+              ]);
+              dataRow.height = 15;
+              dataRow.eachCell({ includeEmpty: true }, (cell, colNum) => {
+                cell.font = { name: 'Calibri', size: 10 };
+                if (colNum <= 4) {
+                  cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                } else if (colNum === 5) {
+                  cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                } else if (colNum === 6) {
+                  cell.numFmt = '#,##0.00';
+                  cell.alignment = { horizontal: 'right', vertical: 'middle' };
+                }
+              });
+            }
+
+            // Subtotal row (amount only, underlined)
+            const subRow = sheet.addRow(['', '', '', '', '', projectSubtotal]);
+            subRow.height = 14;
+            const subCell = subRow.getCell(6);
+            subCell.numFmt = '#,##0.00';
+            subCell.font = { name: 'Calibri', size: 10 };
+            subCell.alignment = { horizontal: 'right' };
+            subCell.border = { bottom: { style: 'thin', color: { argb: 'FF000000' } } };
+
+            // Blank spacer row between project groups
+            sheet.addRow([]).height = 8;
+          }
+
+          // ── FOOTER: Total Payable ────────────────────────────────────
+          const footerRow = sheet.addRow([`Total Payable : ${payee}`, '', '', '', '', grandTotal]);
+          sheet.mergeCells(`A${footerRow.number}:E${footerRow.number}`);
+          footerRow.getCell(1).font = { bold: true, size: 11, name: 'Calibri' };
+          footerRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+          footerRow.getCell(6).numFmt = '#,##0.00';
+          footerRow.getCell(6).font = { bold: true, size: 11, name: 'Calibri' };
+          footerRow.getCell(6).alignment = { horizontal: 'right', vertical: 'middle' };
+          footerRow.getCell(6).border = {
+            top: { style: 'thin' }, bottom: { style: 'double' },
+            left: { style: 'thin' }, right: { style: 'thin' }
+          };
+          footerRow.height = 20;
+        }
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const filename = `Accounts_Payable_Monitor_${timestamp}.xlsx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        await workbook.xlsx.write(res);
+        res.end();
+
+        logActivity(
+          req.user.username, 'EXPORT_ACCOUNTS_PAYABLE', 'disbursements', 'excel',
+          `Exported ${rows.length} AP monitor records for: ${[...payeeMap.keys()].join(', ')}`
+        );
+      } catch (excelErr) {
+        console.error('Accounts payable export error:', excelErr.message);
+        if (!res.headersSent) res.status(500).json({ error: 'Failed to generate Excel file.' });
+      }
+    }
+  );
+});
+
+// ==========================================
 // FILE UPLOAD ENDPOINTS
 // ==========================================
 app.post('/api/disbursements/:id/upload', authenticateToken, upload.single('receipt'), (req, res) => {
