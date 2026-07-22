@@ -573,7 +573,14 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     setIsMonitoringOnly(false);
     setIsStockAllocationMode(false);
     setStockAllocationSource(null);
+    setHasAttemptedSubmit(false);
   };
+
+  useEffect(() => {
+    if (isModalOpen) {
+      setHasAttemptedSubmit(false);
+    }
+  }, [isModalOpen]);
 
   const closeAndResetModal = () => {
     setIsModalOpen(false);
@@ -950,6 +957,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     });
 
     setErrorMessage('');
+    setHasAttemptedSubmit(false);
     setIsModalOpen(true);
   };
 
@@ -1047,6 +1055,18 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     const dateEmpty = !headerData.date;
     const projectEmpty = !isPureStock && (!headerData.project_code || headerData.project_code.length === 0);
     if ((cvEmpty && orEmpty) || payeeEmpty || particularsEmpty || dateEmpty || projectEmpty) return;
+
+    // Block submission if any active row in Cost Breakdown has missing/unselected category
+    const hasUnselectedCategory = costingGroups.some(group => {
+      const allLines = [...group.constructionLines, ...group.miscLines];
+      return allLines.some(line => {
+        const catEmpty = !line.category || !line.category.trim() || line.category.toLowerCase().includes('select');
+        const rawAmt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
+        const hasAmount = rawAmt > 0 || (line.amount && String(line.amount).trim() !== '');
+        return catEmpty && (hasAmount || group.constructionLines.length === 1);
+      });
+    });
+    if (hasUnselectedCategory) return;
 
     if (isPureStock) {
       setShowStockWarning(true);
@@ -1245,6 +1265,20 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       if (hasEmptyStockAmount) {
         return;
       }
+    }
+
+    const hasUnselectedCategory = costingGroups.some(group => {
+      const allLines = [...group.constructionLines, ...group.miscLines];
+      return allLines.some(line => {
+        const catEmpty = !line.category || !line.category.trim() || line.category.toLowerCase().includes('select');
+        const rawAmt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
+        const hasAmount = rawAmt > 0 || (line.amount && String(line.amount).trim() !== '');
+        return catEmpty && (hasAmount || group.constructionLines.length === 1);
+      });
+    });
+
+    if (hasUnselectedCategory) {
+      return;
     }
 
     const hasEmptyCosting = costingGroups.some(group => {
@@ -2285,7 +2319,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                           const usedMiscCategories = group.miscLines.map(item => item.category).filter(Boolean);
 
                           return (
-                            <div key={group.id} className="border-2 border-slate-200 dark:border-slate-600 rounded-xl overflow-hidden shadow-sm animate-in slide-in-from-top-2">
+                            <div key={group.id} className={`border-2 border-slate-200 dark:border-slate-600 rounded-xl overflow-hidden shadow-sm animate-in slide-in-from-top-2 ${groupIndex % 2 === 0 ? 'bg-slate-50 dark:bg-slate-800' : 'bg-blue-50 dark:bg-slate-800/70'}`}>
                               {/* Group Header with Target Selector */}
                               <div className="bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-700/60 dark:to-slate-700/30 px-4 py-2.5 flex items-center justify-between border-b border-slate-200 dark:border-slate-600">
                                 <div className="flex items-center gap-3 flex-wrap">
@@ -2319,7 +2353,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                                 )}
                               </div>
 
-                              <div className="p-4 space-y-4 bg-white dark:bg-slate-800/50">
+                              <div className="p-4 space-y-4">
                                 {/* Cost Monitoring Breakdown */}
                                 <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors duration-300">
                                   <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100 dark:border-slate-700">
@@ -2332,41 +2366,52 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                                     </button>
                                   </div>
                                   <div className="max-h-[200px] overflow-y-auto pr-2 custom-scrollbar space-y-2">
-                                    {group.constructionLines.map((line, index) => (
-                                      <div key={line.id} className="flex gap-2 items-start animate-in slide-in-from-top-2">
-                                        <div className="w-7 h-8 mt-1 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded flex items-center justify-center text-xs font-bold text-slate-400 dark:text-slate-500 shrink-0">
-                                          {index + 1}
+                                    {group.constructionLines.map((line, index) => {
+                                      const isCatEmpty = !line.category || !line.category.trim() || line.category.toLowerCase().includes('select');
+                                      const rawAmt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
+                                      const hasAmount = rawAmt > 0 || (line.amount && String(line.amount).trim() !== '');
+                                      const showCategoryError = hasAttemptedSubmit && isCatEmpty && (hasAmount || group.constructionLines.length === 1);
+                                      const showAmountError = hasAttemptedSubmit && !isCatEmpty && rawAmt <= 0;
+
+                                      return (
+                                        <div key={line.id} className="flex gap-2 items-start animate-in slide-in-from-top-2">
+                                          <div className="w-7 h-8 mt-1 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded flex items-center justify-center text-xs font-bold text-slate-400 dark:text-slate-500 shrink-0">
+                                            {index + 1}
+                                          </div>
+                                          <div className="flex-1 mt-1">
+                                            <SearchableDropdown
+                                              options={mainCategoriesList}
+                                              value={line.category}
+                                              onChange={(val) => handleLineChange(group.id, line.id, 'category', val, 'construction')}
+                                              placeholder="-- Find Construction Category --"
+                                              hasError={lineErrors.includes(line.id) || showCategoryError}
+                                              disabledOptions={usedMainCategories}
+                                            />
+                                            {showCategoryError && (
+                                              <p className="text-xs text-red-500 mt-1">Category is required</p>
+                                            )}
+                                          </div>
+                                          <div className="w-36 relative mt-1">
+                                            <span className="absolute left-2.5 top-2 text-slate-400 dark:text-slate-500 text-sm font-medium">₱</span>
+                                            <input type="text" placeholder="0.00"
+                                              className={`w-full pl-7 p-2 border rounded-md text-sm font-bold focus:ring-2 outline-none text-right transition-colors ${
+                                                showAmountError
+                                                  ? 'border-red-500 bg-red-50 text-red-700 focus:ring-red-500'
+                                                  : 'bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white focus:ring-blue-500 dark:focus:ring-blue-400'
+                                              }`}
+                                              value={line.amount} onChange={(e) => handleLineChange(group.id, line.id, 'amount', e.target.value, 'construction')} />
+                                            {showAmountError && (
+                                              <p className="text-xs text-red-500 mt-1">Amount required</p>
+                                            )}
+                                          </div>
+                                          <button type="button" onClick={() => removeLine(group.id, line.id, 'construction')}
+                                            disabled={group.constructionLines.length + group.miscLines.length <= 1}
+                                            className="p-2 mt-1 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-30 disabled:hover:bg-transparent">
+                                            <Trash2 size={16} />
+                                          </button>
                                         </div>
-                                        <div className="flex-1">
-                                          <SearchableDropdown
-                                            options={mainCategoriesList}
-                                            value={line.category}
-                                            onChange={(val) => handleLineChange(group.id, line.id, 'category', val, 'construction')}
-                                            placeholder="-- Find Construction Category --"
-                                            hasError={lineErrors.includes(line.id)}
-                                            disabledOptions={usedMainCategories}
-                                          />
-                                        </div>
-                                        <div className="w-36 relative mt-1">
-                                          <span className="absolute left-2.5 top-2 text-slate-400 dark:text-slate-500 text-sm font-medium">₱</span>
-                                          <input type="text" placeholder="0.00"
-                                            className={`w-full pl-7 p-2 border rounded-md text-sm font-bold focus:ring-2 outline-none text-right transition-colors ${
-                                              hasAttemptedSubmit && line.category && !line.category.toLowerCase().includes('select') && (parseFloat(String(line.amount).replace(/,/g, '')) || 0) <= 0
-                                                ? 'border-red-500 bg-red-50 text-red-700 focus:ring-red-500'
-                                                : 'bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white focus:ring-blue-500 dark:focus:ring-blue-400'
-                                            }`}
-                                            value={line.amount} onChange={(e) => handleLineChange(group.id, line.id, 'amount', e.target.value, 'construction')} />
-                                          {hasAttemptedSubmit && line.category && !line.category.toLowerCase().includes('select') && (parseFloat(String(line.amount).replace(/,/g, '')) || 0) <= 0 && (
-                                            <p className="text-xs text-red-500 mt-1">Amount required</p>
-                                          )}
-                                        </div>
-                                        <button type="button" onClick={() => removeLine(group.id, line.id, 'construction')}
-                                          disabled={group.constructionLines.length + group.miscLines.length <= 1}
-                                          className="p-2 mt-1 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-30 disabled:hover:bg-transparent">
-                                          <Trash2 size={16} />
-                                        </button>
-                                      </div>
-                                    ))}
+                                      );
+                                    })}
                                   </div>
                                   <div className="mt-3 pt-2 text-[10px] text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700 italic">
                                     * If "Labor /SUBCONTRACTOR" or "LABOR/PAYROLL" is chosen, it will calculate automatically by 2% for the EWT Payable.
@@ -2387,40 +2432,51 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
                                       <div className="py-6 text-center border-2 border-dashed border-slate-100 dark:border-slate-700 rounded-xl">
                                         <p className="text-slate-400 dark:text-slate-500 text-xs font-medium">No miscellaneous cost added.</p>
                                       </div>
-                                    ) : group.miscLines.map((line, index) => (
-                                      <div key={line.id} className="flex gap-2 items-start animate-in slide-in-from-top-2">
-                                        <div className="w-7 h-8 mt-1 bg-teal-50/50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800/50 rounded flex items-center justify-center text-xs font-bold text-teal-600 dark:text-teal-400 shrink-0">
-                                          {index + 1}
+                                    ) : group.miscLines.map((line, index) => {
+                                      const isCatEmpty = !line.category || !line.category.trim() || line.category.toLowerCase().includes('select');
+                                      const rawAmt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
+                                      const hasAmount = rawAmt > 0 || (line.amount && String(line.amount).trim() !== '');
+                                      const showCategoryError = hasAttemptedSubmit && isCatEmpty && hasAmount;
+                                      const showAmountError = hasAttemptedSubmit && !isCatEmpty && rawAmt <= 0;
+
+                                      return (
+                                        <div key={line.id} className="flex gap-2 items-start animate-in slide-in-from-top-2">
+                                          <div className="w-7 h-8 mt-1 bg-teal-50/50 dark:bg-teal-900/20 border border-teal-100 dark:border-teal-800/50 rounded flex items-center justify-center text-xs font-bold text-teal-600 dark:text-teal-400 shrink-0">
+                                            {index + 1}
+                                          </div>
+                                          <div className="flex-1 mt-1">
+                                            <SearchableDropdown
+                                              options={miscCategoriesList}
+                                              value={line.category}
+                                              onChange={(val) => handleLineChange(group.id, line.id, 'category', val, 'misc')}
+                                              placeholder="-- Find Miscellaneous Item --"
+                                              hasError={lineErrors.includes(line.id) || showCategoryError}
+                                              disabledOptions={usedMiscCategories}
+                                            />
+                                            {showCategoryError && (
+                                              <p className="text-xs text-red-500 mt-1">Category is required</p>
+                                            )}
+                                          </div>
+                                          <div className="w-36 relative mt-1">
+                                            <span className="absolute left-2.5 top-2 text-slate-400 dark:text-slate-500 text-sm font-medium">₱</span>
+                                            <input type="text" placeholder="0.00"
+                                              className={`w-full pl-7 p-2 border rounded-md text-sm font-bold focus:ring-2 outline-none text-right transition-colors ${
+                                                showAmountError
+                                                  ? 'border-red-500 bg-red-50 text-red-700 focus:ring-red-500'
+                                                  : 'bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white focus:ring-blue-500 dark:focus:ring-blue-400'
+                                              }`}
+                                              value={line.amount} onChange={(e) => handleLineChange(group.id, line.id, 'amount', e.target.value, 'misc')} />
+                                            {showAmountError && (
+                                              <p className="text-xs text-red-500 mt-1">Amount required</p>
+                                            )}
+                                          </div>
+                                          <button type="button" onClick={() => removeLine(group.id, line.id, 'misc')}
+                                            className="p-2 mt-1 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors">
+                                            <Trash2 size={16} />
+                                          </button>
                                         </div>
-                                        <div className="flex-1">
-                                          <SearchableDropdown
-                                            options={miscCategoriesList}
-                                            value={line.category}
-                                            onChange={(val) => handleLineChange(group.id, line.id, 'category', val, 'misc')}
-                                            placeholder="-- Find Miscellaneous Item --"
-                                            hasError={lineErrors.includes(line.id)}
-                                            disabledOptions={usedMiscCategories}
-                                          />
-                                        </div>
-                                        <div className="w-36 relative mt-1">
-                                          <span className="absolute left-2.5 top-2 text-slate-400 dark:text-slate-500 text-sm font-medium">₱</span>
-                                          <input type="text" placeholder="0.00"
-                                            className={`w-full pl-7 p-2 border rounded-md text-sm font-bold focus:ring-2 outline-none text-right transition-colors ${
-                                              hasAttemptedSubmit && line.category && !line.category.toLowerCase().includes('select') && (parseFloat(String(line.amount).replace(/,/g, '')) || 0) <= 0
-                                                ? 'border-red-500 bg-red-50 text-red-700 focus:ring-red-500'
-                                                : 'bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white focus:ring-blue-500 dark:focus:ring-blue-400'
-                                            }`}
-                                            value={line.amount} onChange={(e) => handleLineChange(group.id, line.id, 'amount', e.target.value, 'misc')} />
-                                          {hasAttemptedSubmit && line.category && !line.category.toLowerCase().includes('select') && (parseFloat(String(line.amount).replace(/,/g, '')) || 0) <= 0 && (
-                                            <p className="text-xs text-red-500 mt-1">Amount required</p>
-                                          )}
-                                        </div>
-                                        <button type="button" onClick={() => removeLine(group.id, line.id, 'misc')}
-                                          className="p-2 mt-1 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors">
-                                          <Trash2 size={16} />
-                                        </button>
-                                      </div>
-                                    ))}
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               </div>
