@@ -483,7 +483,7 @@ export default function App() {
             </div>
             <h3 className="text-xl font-black text-slate-800 dark:text-white mb-2 tracking-tight">Unsaved Changes</h3>
             <p className="text-slate-500 dark:text-slate-400 mb-6 font-medium text-sm">
-              May mga binago ka sa project details. I-save muna bago {pendingNavigation === 'logout' ? 'mag log out' : pendingNavigation === 'search' ? 'maghanap' : 'lumipat'}?
+              You have unsaved changes in project details. Save changes before {pendingNavigation === 'logout' ? 'logging out' : pendingNavigation === 'search' ? 'searching' : 'navigating'}?
             </p>
             <div className="flex flex-col gap-3">
               <button

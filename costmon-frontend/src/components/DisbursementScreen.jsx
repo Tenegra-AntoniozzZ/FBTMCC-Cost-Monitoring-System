@@ -981,7 +981,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
         }).then(async (res) => {
           if (!res.ok) {
             const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.error || "Hindi ma-save ang data.");
+            throw new Error(errData.error || "Failed to save data.");
           }
           return res;
         });
@@ -999,7 +999,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
           }).then(async (res) => {
             if (!res.ok) {
               const errData = await res.json().catch(() => ({}));
-              throw new Error(errData.error || "Hindi ma-save ang data.");
+              throw new Error(errData.error || "Failed to save data.");
             }
             return res;
           })
@@ -1025,7 +1025,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       setPostSavePrompt(true);
     } catch (error) {
       console.error(error);
-      setErrorMessage(error.message || "Network Error: Hindi makonekta sa Local Server.");
+      setErrorMessage(error.message || "Network Error: Unable to connect to Local Server.");
     } finally {
       setIsSaving(false);
     }
@@ -1236,17 +1236,17 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     });
 
     if (!finalHeaderData.cv_no && !finalHeaderData.or_inv_no) { return; }
-    if (isDuplicateCV) { setErrorMessage("May kaparehas na CV#! Paki-palitan bago i-save."); return; }
-    if (isDuplicateOR) { setErrorMessage("May kaparehas na OR/INV#! Paki-palitan bago i-save."); return; }
+    if (isDuplicateCV) { setErrorMessage("Duplicate CV#! Please change it before saving."); return; }
+    if (isDuplicateOR) { setErrorMessage("Duplicate OR/INV#! Please change it before saving."); return; }
     const stockAllocationValid = isStockAllocationMode && totals.cib_coh > 0 && totals.cib_coh <= targetCib;
-    if (!isVarianceZero && !stockAllocationValid) { setErrorMessage("Hindi pwedeng i-save! Paki-check ang Variance. Kailangang pantay ang Target CIB sa Computed CIB."); return; }
+    if (!isVarianceZero && !stockAllocationValid) { setErrorMessage("Cannot save! Please check the Variance. Target CIB must equal Computed CIB."); return; }
 
     const projectCodes = Array.isArray(finalHeaderData.project_code)
       ? finalHeaderData.project_code
       : (typeof finalHeaderData.project_code === 'string' ? finalHeaderData.project_code.split(',').filter(Boolean) : []);
 
     if (!isPureStock && projectCodes.length === 0) {
-      setErrorMessage("Kailangan pumili ng Project Code.");
+      setErrorMessage("Please select a Project Code.");
       return;
     }
 
@@ -1255,7 +1255,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     if (isAddStocksChecked) {
       const hasInvalidStock = stocksList.some(s => !s.description || s.description.trim() === '');
       if (hasInvalidStock) {
-        setErrorMessage("Kailangan maglagay ng Stock Description kapag nag-add ng stocks.");
+        setErrorMessage("Please provide a Stock Description when adding stocks.");
         return;
       }
       const hasEmptyStockAmount = stocksList.some(s => {

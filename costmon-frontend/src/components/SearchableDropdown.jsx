@@ -96,7 +96,7 @@ export default function SearchableDropdown({ options, value, onChange, placehold
           <input
             type="text"
             className="w-full pl-8 p-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 transition-colors"
-            placeholder="Mag-type para maghanap..."
+            placeholder="Type to search..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={(e) => {

@@ -515,7 +515,7 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
             options={projects.map(p => `${p.project_code} — ${p.project_name}`)}
             value={project ? `${project.project_code} — ${project.project_name}` : ''}
             onChange={handleProjectDropdownChange}
-            placeholder="-- Maghanap ng Project --"
+            placeholder="-- Search Project --"
           />
         </div>
       </header>
@@ -986,7 +986,7 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
             </div>
             <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight mb-2">Unsaved Project Changes</h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mb-6">
-              May mga binago ka sa project details na hindi pa nase-save. Gusto mo bang i-save bago lumipat ng project?
+              You have unsaved changes in project details. Do you want to save before switching projects?
             </p>
             <div className="space-y-3">
               <button
@@ -1030,7 +1030,7 @@ export default function CostMonitoringScreen({ projects, disbursements, categori
             <div className="flex flex-col items-center text-center">
               <div className="bg-amber-100 dark:bg-amber-900/30 p-4 rounded-full text-amber-600 mb-5"><Receipt size={32} strokeWidth={2.5} /></div>
               <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Redirect to Disbursement</h3>
-              <p className="text-slate-500 font-medium mb-6">Para i-update o idelete ang item na ito, kailangan nating lumipat sa <span className="font-bold underline">Disbursement Ledger</span>. Awtomatikong bubukas ang voucher <span className="font-mono font-bold text-blue-600">#{redirectionModal.cvNo}</span> para sa iyo.</p>
+              <p className="text-slate-500 font-medium mb-6">To update or delete this item, you need to switch to the <span className="font-bold underline">Disbursement Ledger</span>. Voucher <span className="font-mono font-bold text-blue-600">#{redirectionModal.cvNo}</span> will automatically open for you.</p>
               <div className="flex w-full gap-3">
                 <button onClick={() => setRedirectionModal({ isOpen: false, disbursementId: null, cvNo: '' })} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-xl">Cancel</button>
                 <button onClick={handleConfirmRedirection} className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl flex items-center justify-center gap-2">Confirm & Go <ArrowUp className="rotate-90" size={18} /></button>
@@ -1455,7 +1455,7 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
         }
       } else {
         const errData = await response.json().catch(() => ({}));
-        const errMsg = errData.error || errData.message || 'Hindi ma-save ang data.';
+        const errMsg = errData.error || errData.message || 'Failed to save data.';
         setErrorMessage(errMsg);
         alert(errMsg);
       }
@@ -1479,7 +1479,7 @@ function AddAdditionalModal({ isOpen, onClose, project, disbursements, refreshDa
       .map(line => ({ ...line, amount: String(line.amount).replace(/,/g, '') || '0' }));
 
     if (validLines.length === 0) {
-      setErrorMessage('Kailangan maglagay ng kahit isang item sa Cost Breakdown.');
+      setErrorMessage('Please add at least one item in the Cost Breakdown.');
       return;
     }
 
