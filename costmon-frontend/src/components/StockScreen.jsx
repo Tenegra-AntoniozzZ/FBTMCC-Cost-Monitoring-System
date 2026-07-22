@@ -8,6 +8,9 @@ export default function StocksScreen({ onNavigateToDisbursement, onUseStock }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [hideMonitoring, setHideMonitoring] = useState(false);
 
+    const userRole = sessionStorage.getItem('fbtmcc_role');
+    const isRestricted = userRole === 'engineer' || userRole === 'admin';
+
     useEffect(() => {
         const fetchDisbursements = async () => {
             try {
@@ -137,20 +140,30 @@ export default function StocksScreen({ onNavigateToDisbursement, onUseStock }) {
                                             <td className="px-6 py-4 text-center w-40">
                                                 <div className="flex items-center justify-center gap-2">
                                                     <button
-                                                        onClick={() => onNavigateToDisbursement && onNavigateToDisbursement(record.cv_no, record.id)}
-                                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 dark:text-blue-400 font-bold text-xs rounded-lg transition-colors shadow-sm"
-                                                        title="Edit Disbursement"
+                                                        onClick={() => !isRestricted && onNavigateToDisbursement && onNavigateToDisbursement(record.cv_no, record.id)}
+                                                        disabled={isRestricted}
+                                                        className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 font-bold text-xs rounded-lg transition-colors shadow-sm ${
+                                                            isRestricted 
+                                                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed dark:bg-slate-800 dark:text-slate-500' 
+                                                                : 'bg-blue-50 hover:bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 dark:text-blue-400'
+                                                        }`}
+                                                        title={isRestricted ? "View Only" : "Edit Disbursement"}
                                                     >
                                                         <Edit size={14} /> Edit
                                                     </button>
                                                     <button
-                                                        onClick={() => onUseStock && onUseStock({
+                                                        onClick={() => !isRestricted && onUseStock && onUseStock({
                                                             cv_no: record.cv_no,
                                                             stock_description: record.stock_description,
                                                             stocks_amount: parseFloat(record.stocks_amount)
                                                         })}
-                                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 dark:text-emerald-400 font-bold text-xs rounded-lg transition-colors shadow-sm border border-emerald-200 dark:border-emerald-800"
-                                                        title="Allocate / Use this Stock"
+                                                        disabled={isRestricted}
+                                                        className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 font-bold text-xs rounded-lg transition-colors shadow-sm border ${
+                                                            isRestricted 
+                                                                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700' 
+                                                                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                                                        }`}
+                                                        title={isRestricted ? "View Only" : "Allocate / Use this Stock"}
                                                     >
                                                         <ShoppingCart size={14} /> Use Stock
                                                     </button>
