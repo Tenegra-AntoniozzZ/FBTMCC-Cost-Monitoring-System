@@ -1057,16 +1057,24 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
     if ((cvEmpty && orEmpty) || payeeEmpty || particularsEmpty || dateEmpty || projectEmpty) return;
 
     // Block submission if any active row in Cost Breakdown has missing/unselected category
-    const hasUnselectedCategory = costingGroups.some(group => {
-      const allLines = [...group.constructionLines, ...group.miscLines];
-      return allLines.some(line => {
-        const catEmpty = !line.category || !line.category.trim() || line.category.toLowerCase().includes('select');
-        const rawAmt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
-        const hasAmount = rawAmt > 0 || (line.amount && String(line.amount).trim() !== '');
-        return catEmpty && (hasAmount || group.constructionLines.length === 1);
+    if (!isPureStock) {
+      const hasUnselectedCategory = costingGroups.some(group => {
+        const constructionInvalid = group.constructionLines.some(line => {
+          const isCatEmpty = !line.category || !line.category.trim() || line.category.toLowerCase().includes('select');
+          const rawAmt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
+          const hasAmount = rawAmt > 0 || (line.amount && String(line.amount).trim() !== '');
+          return isCatEmpty && (hasAmount || group.constructionLines.length === 1);
+        });
+        const miscInvalid = group.miscLines.some(line => {
+          const isCatEmpty = !line.category || !line.category.trim() || line.category.toLowerCase().includes('select');
+          const rawAmt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
+          const hasAmount = rawAmt > 0 || (line.amount && String(line.amount).trim() !== '');
+          return isCatEmpty && hasAmount;
+        });
+        return constructionInvalid || miscInvalid;
       });
-    });
-    if (hasUnselectedCategory) return;
+      if (hasUnselectedCategory) return;
+    }
 
     if (isPureStock) {
       setShowStockWarning(true);
@@ -1267,32 +1275,40 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
       }
     }
 
-    const hasUnselectedCategory = costingGroups.some(group => {
-      const allLines = [...group.constructionLines, ...group.miscLines];
-      return allLines.some(line => {
-        const catEmpty = !line.category || !line.category.trim() || line.category.toLowerCase().includes('select');
-        const rawAmt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
-        const hasAmount = rawAmt > 0 || (line.amount && String(line.amount).trim() !== '');
-        return catEmpty && (hasAmount || group.constructionLines.length === 1);
+    if (!isPureStock) {
+      const hasUnselectedCategory = costingGroups.some(group => {
+        const constructionInvalid = group.constructionLines.some(line => {
+          const isCatEmpty = !line.category || !line.category.trim() || line.category.toLowerCase().includes('select');
+          const rawAmt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
+          const hasAmount = rawAmt > 0 || (line.amount && String(line.amount).trim() !== '');
+          return isCatEmpty && (hasAmount || group.constructionLines.length === 1);
+        });
+        const miscInvalid = group.miscLines.some(line => {
+          const isCatEmpty = !line.category || !line.category.trim() || line.category.toLowerCase().includes('select');
+          const rawAmt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
+          const hasAmount = rawAmt > 0 || (line.amount && String(line.amount).trim() !== '');
+          return isCatEmpty && hasAmount;
+        });
+        return constructionInvalid || miscInvalid;
       });
-    });
 
-    if (hasUnselectedCategory) {
-      return;
-    }
+      if (hasUnselectedCategory) {
+        return;
+      }
 
-    const hasEmptyCosting = costingGroups.some(group => {
-      const allLines = [...group.constructionLines, ...group.miscLines];
-      return allLines.some(line => {
-        const cat = line.category ? line.category.trim() : '';
-        const isValidCat = cat !== '' && !cat.toLowerCase().includes('select');
-        const rawAmt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
-        return isValidCat && rawAmt <= 0;
+      const hasEmptyCosting = costingGroups.some(group => {
+        const allLines = [...group.constructionLines, ...group.miscLines];
+        return allLines.some(line => {
+          const cat = line.category ? line.category.trim() : '';
+          const isValidCat = cat !== '' && !cat.toLowerCase().includes('select');
+          const rawAmt = parseFloat(String(line.amount).replace(/,/g, '')) || 0;
+          return isValidCat && rawAmt <= 0;
+        });
       });
-    });
 
-    if (hasEmptyCosting) {
-      return;
+      if (hasEmptyCosting) {
+        return;
+      }
     }
 
     const numProjects = finalProjectCodes.length;
