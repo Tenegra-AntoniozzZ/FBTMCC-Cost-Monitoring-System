@@ -29,9 +29,9 @@ const formatDate = (dateStr) => {
 };
 
 export default function AccountsPayableScreen({ disbursements, projects, userRole }) {
-  // ─── Source data: only monitoring-only records ────────────────────────────
+  // ─── Source data: records with non-empty OR / INV # ───────────────────────
   const monitoringRecords = useMemo(() =>
-    (disbursements || []).filter(d => d.is_monitoring_only === 1 || d.is_monitoring_only === true),
+    (disbursements || []).filter(d => d.or_inv_no && String(d.or_inv_no).trim() !== ''),
     [disbursements]
   );
 

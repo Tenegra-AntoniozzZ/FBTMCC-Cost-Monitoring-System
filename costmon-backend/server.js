@@ -1194,13 +1194,13 @@ app.post('/api/disbursements/export-accounts-payable', authenticateToken, async 
   db.all(
     `SELECT d.*, p.project_name FROM disbursements d
      LEFT JOIN projects p ON d.project_code = p.project_code
-     WHERE d.id IN (${placeholders}) AND d.is_monitoring_only = 1
+     WHERE d.id IN (${placeholders}) AND (d.or_inv_no IS NOT NULL AND trim(d.or_inv_no) != '')
      ORDER BY d.payee ASC, d.project_code ASC, d.date ASC`,
     ids,
     async (err, rows) => {
       if (err) return res.status(500).json({ error: err.message });
       if (rows.length === 0) {
-        return res.status(404).json({ error: 'No monitoring-only records found for the provided IDs.' });
+        return res.status(404).json({ error: 'No invoice-based records found for the provided IDs.' });
       }
 
       try {
