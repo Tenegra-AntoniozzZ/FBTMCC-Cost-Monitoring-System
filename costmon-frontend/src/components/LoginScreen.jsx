@@ -125,7 +125,7 @@ export default function LoginScreen({ onLogin, isDarkMode, toggleTheme }) {
       {/* BRANDING SECTION */}
       <div className={`flex flex-col items-center text-center transition-all duration-500 mb-12`}>
         <div className={`mb-4 transform transition-all duration-500 hover:scale-110`}>
-          <img src={FBTlogo} alt="FBTMCC Logo" className="w-40 h-auto object-contain drop-shadow-2xl" />
+          <img src={FBTlogo} alt="FBTMCC Logo" draggable={false} className="w-40 h-auto object-contain drop-shadow-2xl select-none" />
         </div>
         <h1 className={`font-black text-slate-800 dark:text-slate-100 tracking-tight leading-none uppercase text-5xl`}>
           FBTMCC <span className={`text-indigo-600 dark:text-indigo-400 block mt-1 text-4xl mt-2`}>COST MONITORING</span>
