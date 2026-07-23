@@ -1834,18 +1834,18 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
 
     // ── Column widths ─────────────────────────────────────────
     const colDefs = [
-      { key: 'date', width: 10 },
-      { key: 'code', width: 16 },
-      { key: 'TCC', width: 20 },
-      { key: 'CONTRACT_WO_VAT', width: 20 },
-      { key: 'CWOV_OH_PM', width: 22 },
-      { key: 'EQ_30_OH', width: 22 },
-      { key: 'EQ_10_RET', width: 24 },
-      { key: 'EFFECTIVE_OH', width: 20 },
-      { key: 'TOTAL_EOC', width: 20 },
-      ...customColumns.map(col => ({ key: col.id, width: 18 })),
-      { key: 'total_exp', width: 18 },
-      { key: 'net_profit', width: 18 },
+      { key: 'date', width: 9 },
+      { key: 'code', width: 12 },
+      { key: 'TCC', width: 12 },
+      { key: 'CONTRACT_WO_VAT', width: 12 },
+      { key: 'CWOV_OH_PM', width: 12 },
+      { key: 'EQ_30_OH', width: 12 },
+      { key: 'EQ_10_RET', width: 12 },
+      { key: 'EFFECTIVE_OH', width: 12 },
+      { key: 'TOTAL_EOC', width: 12 },
+      ...customColumns.map(col => ({ key: col.id, width: 11 })),
+      { key: 'total_exp', width: 12 },
+      { key: 'net_profit', width: 12 },
     ];
 
     colDefs.forEach((col, i) => {
@@ -1909,7 +1909,7 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
     const styleDataCell = (cell, fill, isNumeric = false, isBold = false, fontColor = DARK_TEXT) => {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
       cell.font = { name: 'Calibri', size: 10, color: { argb: fontColor }, bold: isBold };
-      cell.alignment = { vertical: 'middle', wrapText: false };
+      cell.alignment = { vertical: 'middle', wrapText: true };
       cell.border = thinBorder;
       if (isNumeric && typeof cell.value === 'number') {
         cell.numFmt = MONEY_FMT;
@@ -2160,28 +2160,28 @@ app.post('/api/project-ledger/export-styled', authenticateToken, async (req, res
     };
 
     const colDefs = [
-      { key: 'code', width: 15 },
-      { key: 'name', width: 35 },
-      { key: 'cc', width: 18 },
-      { key: 'add_parts', width: 25 },
-      { key: 'add_amount', width: 15 },
-      { key: 'taw', width: 18 },
-      { key: 'tcc', width: 18 },
-      { key: 'vat', width: 15 },
-      { key: 'cc_wo_vat', width: 18 },
-      { key: 'oh_30', width: 15 },
-      { key: 'oh_20', width: 15 },
-      { key: 'oh_12', width: 15 },
-      { key: 'dlm_30', width: 18 },
-      { key: 'dlm_20', width: 18 },
-      { key: 'dlm_12', width: 18 },
-      { key: 'adlm', width: 15 },
-      { key: 'sav_30', width: 15 },
-      { key: 'sav_20', width: 15 },
-      { key: 'sav_12', width: 15 },
-      { key: 'remarks', width: 15 },
-      { key: 'proj_area', width: 20 },
-      { key: 'proj_start', width: 15 }
+      { key: 'code', width: 10 },
+      { key: 'name', width: 18 },
+      { key: 'cc', width: 12 },
+      { key: 'add_parts', width: 18 },
+      { key: 'add_amount', width: 12 },
+      { key: 'taw', width: 12 },
+      { key: 'tcc', width: 12 },
+      { key: 'vat', width: 11 },
+      { key: 'cc_wo_vat', width: 12 },
+      { key: 'oh_30', width: 11 },
+      { key: 'oh_20', width: 11 },
+      { key: 'oh_12', width: 11 },
+      { key: 'dlm_30', width: 11 },
+      { key: 'dlm_20', width: 11 },
+      { key: 'dlm_12', width: 11 },
+      { key: 'adlm', width: 11 },
+      { key: 'sav_30', width: 11 },
+      { key: 'sav_20', width: 11 },
+      { key: 'sav_12', width: 11 },
+      { key: 'remarks', width: 12 },
+      { key: 'proj_area', width: 12 },
+      { key: 'proj_start', width: 10 }
     ];
 
     colDefs.forEach((col, i) => {
@@ -2243,6 +2243,7 @@ app.post('/api/project-ledger/export-styled', authenticateToken, async (req, res
       r.eachCell((cell, colNumber) => {
         cell.font = { name: 'Arial', size: 9 };
         cell.border = thinBorder;
+        cell.alignment = { vertical: 'middle', wrapText: true };
         if (colNumber >= 3 && colNumber <= 19) {
           cell.numFmt = '#,##0.00';
         }
@@ -2260,6 +2261,7 @@ app.post('/api/project-ledger/export-styled', authenticateToken, async (req, res
       r.eachCell((cell, colNumber) => {
         cell.font = { name: 'Arial', size: 9, italic: true, color: { argb: 'FF64748B' } };
         cell.border = thinBorder;
+        cell.alignment = { vertical: 'middle', wrapText: true };
         if (colNumber === 5) {
           cell.numFmt = '#,##0.00';
         }
@@ -2270,6 +2272,7 @@ app.post('/api/project-ledger/export-styled', authenticateToken, async (req, res
       r.eachCell((cell, colNumber) => {
         cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FF334155' } };
         cell.border = thinBorder;
+        cell.alignment = { vertical: 'middle', wrapText: true };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
         if (colNumber === 5) {
           cell.numFmt = '#,##0.00';
