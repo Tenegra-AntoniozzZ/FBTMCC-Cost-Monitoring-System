@@ -4,6 +4,7 @@ import {
   Square, CheckSquare, Minus, Loader2, X, ClipboardList, Receipt
 } from 'lucide-react';
 import { API_URL } from '../utils/Constants';
+import { generateFilename } from '../utils/exportUtils';
 
 const MONTH_OPTIONS = [
   { value: '01', label: 'January' }, { value: '02', label: 'February' },
@@ -197,7 +198,7 @@ export default function AccountsPayableScreen({ disbursements, projects, userRol
       }
       const disposition = response.headers.get('content-disposition') || '';
       const match = disposition.match(/filename="?([^"]+)"?/);
-      const filename = match ? match[1] : `accounts_payable_${Date.now()}.xlsx`;
+      const filename = match ? match[1] : generateFilename('accounts_payable');
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');

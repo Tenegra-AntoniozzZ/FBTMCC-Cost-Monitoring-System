@@ -4,6 +4,7 @@ import {
   X, User, Clock, Database, RefreshCw, Download, Filter, Loader2
 } from 'lucide-react';
 import { API_URL } from '../utils/Constants';
+import { generateFilename } from '../utils/exportUtils';
 
 // ─── Action badge colours (unchanged logic) ───────────────────
 const ACTION_COLORS = {
@@ -124,7 +125,7 @@ export default function AuditLogScreen({ isDark }) {
       // Derive filename from Content-Disposition or fall back to a default
       const disposition = response.headers.get('content-disposition') || '';
       const match       = disposition.match(/filename="?([^"]+)"?/);
-      const filename    = match ? match[1] : `audit_log_${Date.now()}.xlsx`;
+      const filename    = match ? match[1] : generateFilename('audit_log');
 
       const blob = await response.blob();
       const url  = window.URL.createObjectURL(blob);
