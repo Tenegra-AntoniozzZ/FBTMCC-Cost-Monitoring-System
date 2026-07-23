@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { LayoutDashboard, Receipt, BarChart3, Lock, User, KeyRound, AlertCircle, ArrowLeft, CheckCircle2, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, Receipt, BarChart3, Lock, User, AlertCircle, ArrowLeft, Sun, Moon } from 'lucide-react';
 import { API_URL } from '../utils/Constants';
 import FBTlogo from '../assets/FBTlogo.png';
 
 export default function LoginScreen({ onLogin, isDarkMode, toggleTheme }) {
-  const [view, setView] = useState('role-select'); // 'role-select', 'login', 'forgot-username', 'forgot-question'
+  const [view, setView] = useState('role-select'); // 'role-select', 'login'
   const [selectedRole, setSelectedRole] = useState(null);
 
   // Login State
@@ -12,14 +12,6 @@ export default function LoginScreen({ onLogin, isDarkMode, toggleTheme }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  // Forgot Password State
-  const [resetUsername, setResetUsername] = useState('');
-  const [securityQuestion, setSecurityQuestion] = useState('');
-  const [securityAnswer, setSecurityAnswer] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
 
   const closeForm = () => {
     setView('role-select');
@@ -74,61 +66,7 @@ export default function LoginScreen({ onLogin, isDarkMode, toggleTheme }) {
     }
   };
 
-  const handleFetchQuestion = async (e) => {
-    e.preventDefault();
-    setError('');
-    setIsLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/forgot-password/question`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: resetUsername })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setSecurityQuestion(data.question);
-        setView('forgot-question');
-      } else {
-        setError(data.error);
-      }
-    } catch {
-      setError('Server connection error.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  const handleResetPassword = async (e) => {
-    e.preventDefault();
-    setError('');
-    if (newPassword !== confirmPassword) {
-      return setError('New passwords do not match!');
-    }
-    setIsLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/forgot-password/reset`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: resetUsername, answer: securityAnswer, newPassword })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setSuccessMsg('Password successfully changed! You may now log in.');
-        setTimeout(() => {
-          setView('login');
-          setSuccessMsg('');
-          setUsername(resetUsername);
-          setPassword('');
-        }, 3000);
-      } else {
-        setError(data.error);
-      }
-    } catch {
-      setError('Server connection error.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   // Dynamic Theming Mapping with Dark Mode classes
   const themeColors = {
@@ -238,11 +176,6 @@ export default function LoginScreen({ onLogin, isDarkMode, toggleTheme }) {
               </div>
             )}
 
-            {successMsg && (
-              <div className="mb-6 p-3 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg text-sm font-bold flex items-center gap-2 animate-in fade-in">
-                <CheckCircle2 size={16} /> {successMsg}
-              </div>
-            )}
 
             {view === 'login' && (
               <form onSubmit={handleLoginSubmit} className="space-y-5">
@@ -275,81 +208,15 @@ export default function LoginScreen({ onLogin, isDarkMode, toggleTheme }) {
                   {isLoading ? 'VERIFYING...' : 'LOGIN TO SYSTEM'}
                 </button>
 
-                <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-100 dark:border-slate-700">
+                <div className="flex items-center mt-6 pt-4 border-t border-slate-100 dark:border-slate-700">
                   <button type="button" onClick={closeForm} className={`text-sm font-bold text-slate-500 dark:text-slate-400 ${t.textHover} transition-colors flex items-center gap-1`}>
                     <ArrowLeft size={14} /> Back to Roles
                   </button>
-                  <button type="button" onClick={() => { setView('forgot-username'); setError(''); }} className={`text-sm font-bold text-slate-400 dark:text-slate-500 ${t.textHover} transition-colors`}>
-                    Forgot Password?
-                  </button>
                 </div>
               </form>
             )}
 
-            {view === 'forgot-username' && (
-              <form onSubmit={handleFetchQuestion} className="space-y-5 animate-in slide-in-from-right-4">
-                <div className="text-center mb-6 border-b border-slate-100 dark:border-slate-700 pb-4">
-                  <h2 className={`text-xl font-black ${t.text} uppercase mt-1`}>Account Recovery</h2>
-                </div>
-                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mb-4 text-center">Enter your username to retrieve your Security Question.</p>
-                <div className="space-y-1">
-                  <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Username</label>
-                  <input type="text" required autoFocus value={resetUsername} onChange={e => setResetUsername(e.target.value)}
-                    className={`w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-800 focus:ring-2 ${t.ring} outline-none font-bold text-slate-700 dark:text-slate-200`}
-                    placeholder="e.g. encoder1" />
-                </div>
-                <button type="submit" disabled={isLoading} className={`w-full py-4 ${t.bg} ${t.bgHover} text-white rounded-xl font-black tracking-wide shadow-lg ${t.shadow} transition-all disabled:opacity-70`}>
-                  {isLoading ? 'SEARCHING...' : 'NEXT'}
-                </button>
-                <button type="button" onClick={() => setView('login')} className="w-full py-3 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 font-bold flex items-center justify-center gap-2">
-                  <ArrowLeft size={16} /> Back to Login
-                </button>
-              </form>
-            )}
 
-            {view === 'forgot-question' && (
-              <form onSubmit={handleResetPassword} className="space-y-5 animate-in slide-in-from-right-4">
-                <div className={`${t.lightBg} p-4 rounded-xl mb-4 border border-slate-100 dark:border-slate-700/50`}>
-                  <span className={`text-[10px] font-black ${t.text} uppercase tracking-widest`}>Security Question:</span>
-                  <p className="font-bold text-slate-800 dark:text-slate-200 mt-1">{securityQuestion}</p>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Your Answer</label>
-                  <input type="text" required value={securityAnswer} onChange={e => setSecurityAnswer(e.target.value)}
-                    className={`w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-800 focus:ring-2 ${t.ring} outline-none font-bold text-slate-700 dark:text-slate-200`}
-                    placeholder="Type your answer..." />
-                </div>
-
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
-                  <div className="space-y-1 mt-2">
-                    <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">New Password</label>
-                    <div className="relative">
-                      <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
-                      <input type="password" required value={newPassword} onChange={e => setNewPassword(e.target.value)}
-                        className={`w-full pl-10 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-800 focus:ring-2 ${t.ring} outline-none font-bold text-slate-700 dark:text-slate-200`}
-                        placeholder="••••••••" />
-                    </div>
-                  </div>
-                  <div className="space-y-1 mt-3">
-                    <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Confirm New Password</label>
-                    <div className="relative">
-                      <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
-                      <input type="password" required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
-                        className={`w-full pl-10 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:bg-white dark:focus:bg-slate-800 focus:ring-2 ${t.ring} outline-none font-bold text-slate-700 dark:text-slate-200`}
-                        placeholder="••••••••" />
-                    </div>
-                  </div>
-                </div>
-
-                <button type="submit" disabled={isLoading} className={`w-full py-4 ${t.bg} ${t.bgHover} text-white rounded-xl font-black tracking-wide shadow-lg ${t.shadow} transition-all mt-4 disabled:opacity-70`}>
-                  {isLoading ? 'SAVING...' : 'RESET PASSWORD'}
-                </button>
-                <button type="button" onClick={() => setView('login')} className="w-full py-2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 font-bold flex items-center justify-center gap-2">
-                  Cancel
-                </button>
-              </form>
-            )}
           </div>
         </div>
       )}
