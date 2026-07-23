@@ -123,7 +123,7 @@ export default function LoginScreen({ onLogin, isDarkMode, toggleTheme }) {
       )}
 
       {/* BRANDING SECTION */}
-      <div className={`flex flex-col items-center text-center transition-all duration-500 mb-12`}>
+      <div className={`flex flex-col items-center text-center transition-all duration-500 mb-12 select-none`}>
         <div className={`mb-4 transform transition-all duration-500 hover:scale-110`}>
           <img src={FBTlogo} alt="FBTMCC Logo" draggable={false} className="w-40 h-auto object-contain drop-shadow-2xl select-none" />
         </div>
@@ -135,7 +135,7 @@ export default function LoginScreen({ onLogin, isDarkMode, toggleTheme }) {
       </div>
 
       {/* VIEW: ROLE SELECTION */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-5xl px-4 z-10">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-5xl px-4 z-10 select-none">
         <div onClick={() => handleRoleClick('encoder')} className="group bg-white dark:bg-slate-800 p-8 rounded-[2.5rem] shadow-xl shadow-slate-200 dark:shadow-none border border-slate-100 dark:border-slate-700 cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-400 hover:bg-indigo-50/30 dark:hover:bg-slate-800/80 transition-all duration-300 flex flex-col items-center text-center relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 dark:bg-indigo-900/20 rounded-bl-[100px] -mr-16 -mt-16 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/40 transition-colors"></div>
           <div className="bg-slate-100 dark:bg-slate-700 p-5 rounded-2xl text-slate-600 dark:text-slate-300 mb-6 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300 shadow-inner"><Receipt size={32} strokeWidth={2.5} /></div>
@@ -161,7 +161,7 @@ export default function LoginScreen({ onLogin, isDarkMode, toggleTheme }) {
         </div>
       </div>
 
-      <footer className="text-slate-400 dark:text-slate-600 text-[15px] font-black tracking-widest uppercase relative z-10 transition-all duration-500 mt-16">
+      <footer className="text-slate-400 dark:text-slate-600 text-[15px] font-black tracking-widest uppercase relative z-10 transition-all duration-500 mt-16 select-none">
         FBT Marketing and Construction Corp. © 2026
       </footer>
 
@@ -171,7 +171,7 @@ export default function LoginScreen({ onLogin, isDarkMode, toggleTheme }) {
           <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-3xl shadow-2xl p-8 border border-slate-100 dark:border-slate-700 animate-in zoom-in-95 duration-300">
 
             {error && (
-              <div className="mb-6 p-3 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg text-sm font-bold flex items-center gap-2 animate-in fade-in">
+              <div className="mb-6 p-3 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg text-sm font-bold flex items-center gap-2 animate-in fade-in select-none">
                 <AlertCircle size={16} /> {error}
               </div>
             )}
@@ -179,13 +179,13 @@ export default function LoginScreen({ onLogin, isDarkMode, toggleTheme }) {
 
             {view === 'login' && (
               <form onSubmit={handleLoginSubmit} className="space-y-5">
-                <div className="text-center mb-6 border-b border-slate-100 dark:border-slate-700 pb-4">
+                <div className="text-center mb-6 border-b border-slate-100 dark:border-slate-700 pb-4 select-none">
                   <span className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Selected Portal</span>
                   <h2 className={`text-xl font-black ${t.text} uppercase mt-1`}>{selectedRole === 'ceo' ? 'PRESIDENT' : selectedRole}</h2>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Username</label>
+                  <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 select-none">Username</label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
                     <input type="text" required autoFocus value={username} onChange={e => setUsername(e.target.value)}
@@ -195,7 +195,7 @@ export default function LoginScreen({ onLogin, isDarkMode, toggleTheme }) {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Password</label>
+                  <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1 select-none">Password</label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
                     <input type="password" required value={password} onChange={e => setPassword(e.target.value)}
@@ -204,11 +204,11 @@ export default function LoginScreen({ onLogin, isDarkMode, toggleTheme }) {
                   </div>
                 </div>
 
-                <button type="submit" disabled={isLoading} className={`w-full py-4 ${t.bg} ${t.bgHover} text-white rounded-xl font-black tracking-wide shadow-lg ${t.shadow} transition-all flex items-center justify-center gap-2 disabled:opacity-70 mt-2`}>
+                <button type="submit" disabled={isLoading} className={`w-full py-4 ${t.bg} ${t.bgHover} text-white rounded-xl font-black tracking-wide shadow-lg ${t.shadow} transition-all flex items-center justify-center gap-2 disabled:opacity-70 mt-2 select-none`}>
                   {isLoading ? 'VERIFYING...' : 'LOGIN TO SYSTEM'}
                 </button>
 
-                <div className="flex items-center mt-6 pt-4 border-t border-slate-100 dark:border-slate-700">
+                <div className="flex items-center mt-6 pt-4 border-t border-slate-100 dark:border-slate-700 select-none">
                   <button type="button" onClick={closeForm} className={`text-sm font-bold text-slate-500 dark:text-slate-400 ${t.textHover} transition-colors flex items-center gap-1`}>
                     <ArrowLeft size={14} /> Back to Roles
                   </button>
