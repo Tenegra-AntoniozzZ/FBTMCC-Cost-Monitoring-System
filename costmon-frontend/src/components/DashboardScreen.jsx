@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, Fragment, useRef } from 'react';
 import { LayoutDashboard, Briefcase, Building2, ArrowLeft, TrendingUp, FileText, ZoomIn, ZoomOut, RotateCcw, Wallet, Receipt, Eye, EyeOff, Calendar, X, Download, FileSpreadsheet, BarChart2, PieChart as PieChartIcon, Settings } from 'lucide-react';
 import { API_URL } from '../utils/Constants';
+import { generateFilename } from '../utils/exportUtils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line } from 'recharts';
 
 export default function DashboardScreen({ projects = [], disbursements = [], categories = [] }) {
@@ -232,7 +233,7 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
 
       const disposition = response.headers.get('content-disposition') || '';
       const match = disposition.match(/filename="?([^"]+)"?/);
-      const filename = match ? match[1] : `PROJECT_MASTER_SPREADSHEET_${Date.now()}.xlsx`;
+      const filename = match ? match[1] : generateFilename('PROJECT_MASTER_SPREADSHEET');
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -281,7 +282,7 @@ export default function DashboardScreen({ projects = [], disbursements = [], cat
 
       const disposition = response.headers.get('content-disposition') || '';
       const match = disposition.match(/filename="?([^"]+)"?/);
-      const filename = match ? match[1] : `MONTHLY_MASTER_LEDGER_${Date.now()}.xlsx`;
+      const filename = match ? match[1] : generateFilename('MONTHLY_MASTER_LEDGER');
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);

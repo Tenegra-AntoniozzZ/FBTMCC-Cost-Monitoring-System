@@ -8,6 +8,7 @@ import LoadingOverlay from './LoadingOverlay';
 import UnsavedChangesModal from './UnsavedChangesModal';
 import DraftFoundModal from './DraftFoundModal';
 import { API_URL } from '../utils/Constants';
+import { generateFilename } from '../utils/exportUtils';
 
 const TargetProjectDropdown = ({ value, onChange, disabled, selectedProjects }) => {
   const currentValues = Array.isArray(value) ? value : (value ? [value] : ['all']);
@@ -395,7 +396,7 @@ export default function DisbursementScreen({ projects, categories, categoryObjec
 
       const disposition = response.headers.get('content-disposition') || '';
       const match = disposition.match(/filename="?([^"]+)"?/);
-      const filename = match ? match[1] : `disbursement_ledger_${Date.now()}.xlsx`;
+      const filename = match ? match[1] : generateFilename('disbursement_ledger');
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);

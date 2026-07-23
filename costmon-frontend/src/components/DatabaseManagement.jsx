@@ -5,6 +5,7 @@ import {
   FileWarning, Info, KeyRound, Save, Database
 } from 'lucide-react';
 import { API_URL } from '../utils/Constants';
+import { generateFilename } from '../utils/exportUtils';
 
 // ─── Action Modal ──────────────────────────────────────────────
 function DbActionModal({ isOpen, mode, onClose, onExportConfirm, onImportConfirm }) {
@@ -323,7 +324,7 @@ export default function DatabaseManagement() {
     }
     const disposition = response.headers.get('content-disposition') || '';
     const match       = disposition.match(/filename="?([^"]+)"?/);
-    const filename    = match ? match[1] : `costmon_backup_${Date.now()}.db`;
+    const filename    = match ? match[1] : generateFilename('costmon_backup', 'db');
     const blob = await response.blob();
     const url  = window.URL.createObjectURL(blob);
     const a    = document.createElement('a');

@@ -21,7 +21,8 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 app.use(cors({
   origin: allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true
+  credentials: true,
+  exposedHeaders: ['Content-Disposition']
 }));
 
 app.use(express.json({ limit: '50mb' }));
@@ -101,6 +102,24 @@ const logActivity = (username, action, entityType, entityId, details) => {
     [username || 'system', action, entityType, String(entityId || ''), details || '', timestamp],
     (err) => { if (err) console.error('Audit log error:', err.message); }
   );
+};
+
+// ==========================================
+// EXPORT FILENAME HELPER
+// ==========================================
+const generateExportFilename = (prefix, extension = 'xlsx') => {
+  const date = new Date();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const yy = String(date.getFullYear()).slice(-2);
+  let hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const hh = String(hours).padStart(2, '0');
+  const timestamp = `${mm}-${dd}-${yy}_${hh}-${minutes}-${ampm}`;
+  return `${prefix}_${timestamp}.${extension}`;
 };
 
 db.serialize(() => {
@@ -564,8 +583,7 @@ app.get('/api/audit-logs/export', authenticateToken, requireCEO, async (req, res
     });
 
     // ── Stream to response ────────────────────────────────────
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const filename = `audit_log_${timestamp}.xlsx`;
+    const filename = generateExportFilename('audit_log');
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -1144,14 +1162,8 @@ app.get('/api/disbursements/export', authenticateToken, async (req, res) => {
       summaryRow.height = 24;
       summaryRow.commit();
 
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      let filePrefix = 'All_Transaction_Disbursement';
-      if (transactionFilter === 'EWT') {
-        filePrefix = 'EWT_Transaction_Disbursement';
-      } else if (transactionFilter && transactionFilter !== 'All') {
-        filePrefix = `${transactionFilter}_Transaction_Disbursement`;
-      }
-      const filename = `${filePrefix}_${timestamp}.xlsx`;
+      const filePrefix = transactionFilter === 'EWT' ? 'EWT_Transaction_Disbursement' : (transactionFilter && transactionFilter !== 'All' ? `${transactionFilter}_Transaction_Disbursement` : 'All_Transaction_Disbursement');
+      const filename = generateExportFilename(filePrefix);
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -1217,8 +1229,30 @@ app.post('/api/disbursements/export-accounts-payable', authenticateToken, async 
           payeeMap.get(payee).push(row);
         });
 
-        // One worksheet per payee
+        // One worksheet for all selected blocks
+        const sheet = workbook.addWorksheet('Accounts Payable Monitor', {
+          pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1 }
+        });
+
+        // Column widths
+        sheet.getColumn(1).width = 10;  // PO #
+        sheet.getColumn(2).width = 13;  // Date of PO
+        sheet.getColumn(3).width = 13;  // Sales ORDER
+        sheet.getColumn(4).width = 16;  // Sales ORDER Date
+        sheet.getColumn(5).width = 52;  // PROJECT
+        sheet.getColumn(6).width = 16;  // Amount
+
+        let isFirstPayee = true;
+
         for (const [payee, payeeRows] of payeeMap.entries()) {
+          if (!isFirstPayee) {
+            // Leave 3 empty rows between each disbursement block
+            sheet.addRow([]);
+            sheet.addRow([]);
+            sheet.addRow([]);
+          }
+          isFirstPayee = false;
+
           // Determine month/year label
           const dates = payeeRows.map(r => r.date).filter(Boolean).sort();
           let monthLabel = '';
@@ -1236,22 +1270,9 @@ app.post('/api/disbursements/export-accounts-payable', authenticateToken, async 
             }
           }
 
-          const sheetName = payee.substring(0, 31).replace(/[\\\/\?\*\[\]:]/g, '').trim() || 'Sheet1';
-          const sheet = workbook.addWorksheet(sheetName, {
-            pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1 }
-          });
-
-          // Column widths
-          sheet.getColumn(1).width = 10;  // PO #
-          sheet.getColumn(2).width = 13;  // Date of PO
-          sheet.getColumn(3).width = 13;  // Sales ORDER
-          sheet.getColumn(4).width = 16;  // Sales ORDER Date
-          sheet.getColumn(5).width = 52;  // PROJECT
-          sheet.getColumn(6).width = 16;  // Amount
-
           // ── ROW 1: Payee/Company Name ────────────────────────────────
           const r1 = sheet.addRow([payee, '', '', '', '', '']);
-          sheet.mergeCells('A1:F1');
+          sheet.mergeCells(`A${r1.number}:F${r1.number}`);
           r1.getCell(1).value = payee;
           r1.getCell(1).font = { bold: true, size: 13, name: 'Calibri' };
           r1.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
@@ -1259,7 +1280,7 @@ app.post('/api/disbursements/export-accounts-payable', authenticateToken, async 
 
           // ── ROW 2: ACCOUNTS PAYABLE ──────────────────────────────────
           const r2 = sheet.addRow(['ACCOUNTS PAYABLE', '', '', '', '', '']);
-          sheet.mergeCells('A2:F2');
+          sheet.mergeCells(`A${r2.number}:F${r2.number}`);
           r2.getCell(1).value = 'ACCOUNTS PAYABLE';
           r2.getCell(1).font = { bold: true, size: 12, name: 'Calibri' };
           r2.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
@@ -1267,7 +1288,7 @@ app.post('/api/disbursements/export-accounts-payable', authenticateToken, async 
 
           // ── ROW 3: FOR THE MONTH OF ──────────────────────────────────
           const r3 = sheet.addRow([monthLabel, '', '', '', '', '']);
-          sheet.mergeCells('A3:F3');
+          sheet.mergeCells(`A${r3.number}:F${r3.number}`);
           r3.getCell(1).value = monthLabel;
           r3.getCell(1).font = { bold: true, size: 11, name: 'Calibri' };
           r3.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
@@ -1279,13 +1300,16 @@ app.post('/api/disbursements/export-accounts-payable', authenticateToken, async 
 
           // ── ROW 6: Column Headers ────────────────────────────────────
           const headerRow = sheet.addRow(['PO #', 'Date of PO', 'Sales ORDER', 'Sales ORDER Date', 'PROJECT', 'Amount']);
-          headerRow.height = 20;
+          headerRow.height = 28;
           headerRow.eachCell({ includeEmpty: true }, (cell) => {
-            cell.font = { bold: true, size: 11, name: 'Calibri' };
-            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3730A3' } };
+            cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11, name: 'Calibri' };
+            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
             cell.border = {
-              top: { style: 'thin' }, left: { style: 'thin' },
-              bottom: { style: 'thin' }, right: { style: 'thin' }
+              top: { style: 'medium', color: { argb: 'FF3730A3' } },
+              left: { style: 'medium', color: { argb: 'FF3730A3' } },
+              bottom: { style: 'medium', color: { argb: 'FF3730A3' } },
+              right: { style: 'medium', color: { argb: 'FF3730A3' } }
             };
           });
 
@@ -1299,6 +1323,7 @@ app.post('/api/disbursements/export-accounts-payable', authenticateToken, async 
           });
 
           let grandTotal = 0;
+          let rowCount = 0;
 
           for (const projCode of projectOrder) {
             const projRows = projectMap.get(projCode);
@@ -1323,26 +1348,42 @@ app.post('/api/disbursements/export-accounts-payable', authenticateToken, async 
                 projLabel,
                 amount
               ]);
-              dataRow.height = 15;
+              dataRow.height = 18;
+
+              const rowFill = rowCount % 2 === 0
+                ? { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } }
+                : { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+
+              const thinBorder = {
+                top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+                right: { style: 'thin', color: { argb: 'FFD1D5DB' } }
+              };
+
               dataRow.eachCell({ includeEmpty: true }, (cell, colNum) => {
-                cell.font = { name: 'Calibri', size: 10 };
+                cell.fill = rowFill;
+                cell.border = thinBorder;
+                cell.font = { name: 'Calibri', size: 10, color: { argb: 'FF1E293B' } };
                 if (colNum <= 4) {
-                  cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                  cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
                 } else if (colNum === 5) {
-                  cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                  cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
                 } else if (colNum === 6) {
-                  cell.numFmt = '#,##0.00';
+                  cell.numFmt = '"₱"#,##0.00';
                   cell.alignment = { horizontal: 'right', vertical: 'middle' };
                 }
               });
+
+              rowCount++;
             }
 
             // Subtotal row (amount only, underlined)
             const subRow = sheet.addRow(['', '', '', '', '', projectSubtotal]);
             subRow.height = 14;
             const subCell = subRow.getCell(6);
-            subCell.numFmt = '#,##0.00';
-            subCell.font = { name: 'Calibri', size: 10 };
+            subCell.numFmt = '"₱"#,##0.00';
+            subCell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF1E293B' } };
             subCell.alignment = { horizontal: 'right' };
             subCell.border = { bottom: { style: 'thin', color: { argb: 'FF000000' } } };
 
@@ -1353,20 +1394,25 @@ app.post('/api/disbursements/export-accounts-payable', authenticateToken, async 
           // ── FOOTER: Total Payable ────────────────────────────────────
           const footerRow = sheet.addRow([`Total Payable : ${payee}`, '', '', '', '', grandTotal]);
           sheet.mergeCells(`A${footerRow.number}:E${footerRow.number}`);
-          footerRow.getCell(1).font = { bold: true, size: 11, name: 'Calibri' };
+          
+          footerRow.eachCell({ includeEmpty: true }, (cell) => {
+            cell.border = {
+              top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+              bottom: { style: 'double', color: { argb: 'FF1E293B' } }
+            };
+          });
+
+          footerRow.getCell(1).font = { bold: true, size: 11, name: 'Calibri', color: { argb: 'FF475569' } };
           footerRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
-          footerRow.getCell(6).numFmt = '#,##0.00';
-          footerRow.getCell(6).font = { bold: true, size: 11, name: 'Calibri' };
+          
+          footerRow.getCell(6).numFmt = '"₱"#,##0.00';
+          footerRow.getCell(6).font = { bold: true, size: 11, name: 'Calibri', color: { argb: 'FF1E293B' } };
           footerRow.getCell(6).alignment = { horizontal: 'right', vertical: 'middle' };
-          footerRow.getCell(6).border = {
-            top: { style: 'thin' }, bottom: { style: 'double' },
-            left: { style: 'thin' }, right: { style: 'thin' }
-          };
-          footerRow.height = 20;
+          
+          footerRow.height = 24;
         }
 
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        const filename = `Accounts_Payable_Monitor_${timestamp}.xlsx`;
+        const filename = generateExportFilename('Accounts_Payable_Monitor');
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         await workbook.xlsx.write(res);
@@ -2069,9 +2115,8 @@ app.get('/api/office-ledger/export', authenticateToken, async (req, res) => {
     gtRow.commit();
 
     // ── Stream file to client ─────────────────────────────────
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
     const yearSuffix = (year && year !== 'All') ? `_${year}` : '';
-    const filename = `MONTHLY_MASTER_LEDGER${yearSuffix}_${timestamp}.xlsx`;
+    const filename = generateExportFilename(`MONTHLY_MASTER_LEDGER${yearSuffix}`);
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
@@ -2280,8 +2325,7 @@ app.post('/api/project-ledger/export-styled', authenticateToken, async (req, res
       }
     });
 
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const filename = `PROJECT_MASTER_SPREADSHEET_${timestamp}.xlsx`;
+    const filename = generateExportFilename('PROJECT_MASTER_SPREADSHEET');
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
